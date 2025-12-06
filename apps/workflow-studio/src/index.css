@@ -117,4 +117,41 @@
   body {
     @apply bg-background text-foreground;
   }
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+}
+
+/* React Flow overrides */
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__node.react-flow__node-addNodes {
+  cursor: default;
+}
+
+.react-flow__node .nodrag {
+  cursor: pointer;
+}
+
+.react-flow__handle {
+  width: 12px !important;
+  height: 12px !important;
+}
+
+.react-flow__controls {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.react-flow__minimap {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Ensure pointer events work on custom nodes */
+.react-flow__node-addNodes {
+  pointer-events: all !important;
 }
