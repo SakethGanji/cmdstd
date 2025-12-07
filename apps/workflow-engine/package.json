@@ -4,10 +4,10 @@
   "description": "Custom workflow automation engine",
   "type": "module",
   "main": "dist/index.js",
-  "types": "src/trpc/router.ts",
+  "types": "src/types.ts",
   "exports": {
     ".": {
-      "types": "./src/trpc/router.ts",
+      "types": "./src/types.ts",
       "import": "./dist/index.js"
     },
     "./trpc": {

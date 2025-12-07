@@ -30,7 +30,21 @@ export class HttpRequestNode extends BaseNode {
     description: 'Makes HTTP requests to external APIs',
     group: ['transform'],
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
-    outputs: [{ name: 'main', displayName: 'Response', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Response',
+        type: 'main',
+        schema: {
+          type: 'object',
+          properties: {
+            statusCode: { type: 'number', description: 'HTTP status code' },
+            headers: { type: 'object', description: 'Response headers' },
+            body: { type: 'unknown', description: 'Response body (JSON parsed if applicable)' },
+          },
+        },
+      },
+    ],
 
     properties: [
       {

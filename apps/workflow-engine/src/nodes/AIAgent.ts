@@ -79,7 +79,42 @@ export class AIAgentNode extends BaseNode {
     description: 'AI Agent with tool calling capabilities using Gemini',
     group: ['ai'],
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'object',
+          properties: {
+            response: { type: 'string', description: 'Agent final response text' },
+            toolCalls: {
+              type: 'array',
+              description: 'List of tool calls made by the agent',
+              items: {
+                type: 'object',
+                properties: {
+                  tool: { type: 'string', description: 'Tool name' },
+                  args: { type: 'unknown', description: 'Tool arguments' },
+                  result: { type: 'unknown', description: 'Tool result' },
+                },
+              },
+            },
+            iterations: { type: 'number', description: 'Number of agent loop iterations' },
+            model: { type: 'string', description: 'Model used for generation' },
+            usage: {
+              type: 'object',
+              description: 'Token usage statistics',
+              properties: {
+                promptTokens: { type: 'number', description: 'Total tokens in prompts' },
+                completionTokens: { type: 'number', description: 'Total tokens in completions' },
+                totalTokens: { type: 'number', description: 'Total tokens used' },
+              },
+            },
+          },
+        },
+      },
+    ],
 
     properties: [
       {

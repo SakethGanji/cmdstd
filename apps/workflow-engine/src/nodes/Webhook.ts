@@ -18,7 +18,24 @@ export class WebhookNode extends BaseNode {
     description: 'Triggers workflow from HTTP webhook requests',
     group: ['trigger'],
     inputs: [], // Trigger node - no inputs
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'object',
+          properties: {
+            body: { type: 'unknown', description: 'Request body' },
+            headers: { type: 'object', description: 'Request headers' },
+            query: { type: 'object', description: 'Query parameters' },
+            params: { type: 'object', description: 'URL path parameters' },
+            method: { type: 'string', description: 'HTTP method' },
+            path: { type: 'string', description: 'Request path' },
+          },
+        },
+      },
+    ],
 
     properties: [
       {

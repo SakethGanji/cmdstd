@@ -1,13 +1,9 @@
 import { useCallback, useMemo } from 'react';
-import { X, Search, ArrowLeft, ChevronRight } from 'lucide-react';
-import {
-  useNodeCreatorStore,
-  triggerNodes,
-  regularNodes,
-  getNodesByCategory,
-} from '../../stores/nodeCreatorStore';
+import { X, Search, ArrowLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { generateNodeName, getExistingNodeNames, getDefaultParameters } from '../../lib/workflowTransform';
+import { useNodeTypes, getNodeIcon, backendTypeToUIType } from '../../hooks/useNodeTypes';
 import NodeItem from './NodeItem';
 import type { NodeDefinition, WorkflowNodeData } from '../../types/workflow';
 
@@ -25,10 +21,54 @@ export default function NodeCreatorPanel() {
 
   const { addNode, nodes, onConnect } = useWorkflowStore();
 
+  // Fetch node types from API
+  const { data: apiNodes, isLoading, isError } = useNodeTypes();
+
+  // Transform API nodes to NodeDefinition format
+  const { triggerNodes, regularNodes } = useMemo(() => {
+    if (!apiNodes) return { triggerNodes: [], regularNodes: [] };
+
+    const triggers: NodeDefinition[] = [];
+    const regular: NodeDefinition[] = [];
+
+    apiNodes.forEach((node) => {
+      const isTrigger = node.group?.includes('trigger');
+      const category = node.group?.[0] || 'other';
+
+      // Map API category to UI category
+      const categoryMap: Record<string, NodeDefinition['category']> = {
+        trigger: 'trigger',
+        transform: 'transform',
+        flow: 'flow',
+        ai: 'ai',
+        helper: 'helper',
+        other: 'action',
+      };
+
+      const nodeDef: NodeDefinition = {
+        type: backendTypeToUIType(node.type),
+        name: node.type, // Backend type (PascalCase)
+        displayName: node.displayName,
+        description: node.description,
+        icon: getNodeIcon(node.type, node.icon),
+        category: categoryMap[category] || 'action',
+        subcategory: getCategoryLabel(category),
+      };
+
+      if (isTrigger) {
+        triggers.push(nodeDef);
+      } else {
+        regular.push(nodeDef);
+      }
+    });
+
+    return { triggerNodes: triggers, regularNodes: regular };
+  }, [apiNodes]);
+
   // Get the right nodes based on view
   const availableNodes = useMemo(() => {
     return view === 'trigger' ? triggerNodes : regularNodes;
-  }, [view]);
+  }, [view, triggerNodes, regularNodes]);
 
   // Filter nodes by search
   const filteredNodes = useMemo(() => {
@@ -41,11 +81,20 @@ export default function NodeCreatorPanel() {
     );
   }, [availableNodes, search]);
 
-  // Group nodes by category
-  const groupedNodes = useMemo(
-    () => getNodesByCategory(filteredNodes),
-    [filteredNodes]
-  );
+  // Group nodes by subcategory
+  const groupedNodes = useMemo(() => {
+    const grouped: Record<string, NodeDefinition[]> = {};
+
+    filteredNodes.forEach((node) => {
+      const key = node.subcategory || node.category;
+      if (!grouped[key]) {
+        grouped[key] = [];
+      }
+      grouped[key].push(node);
+    });
+
+    return grouped;
+  }, [filteredNodes]);
 
   // Calculate position for new node
   const getNewNodePosition = useCallback(() => {
@@ -202,7 +251,19 @@ export default function NodeCreatorPanel() {
 
         {/* Node List */}
         <div className="flex-1 overflow-y-auto p-4">
-          {search ? (
+          {isLoading ? (
+            // Loading state
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 size={32} className="animate-spin text-muted-foreground mb-3" />
+              <p className="text-sm text-muted-foreground">Loading nodes...</p>
+            </div>
+          ) : isError ? (
+            // Error state
+            <div className="flex flex-col items-center justify-center py-12">
+              <p className="text-sm text-destructive mb-2">Failed to load nodes</p>
+              <p className="text-xs text-muted-foreground">Please check your connection and try again</p>
+            </div>
+          ) : search ? (
             // Flat list when searching
             <div className="space-y-2">
               {filteredNodes.map((node) => (
@@ -236,28 +297,30 @@ export default function NodeCreatorPanel() {
                       />
                     ))}
                   </div>
-                  <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Other Triggers
-                    </h3>
-                    {triggerNodes.slice(3).map((node) => (
-                      <NodeItem
-                        key={node.type}
-                        node={node}
-                        onClick={() => handleNodeSelect(node)}
-                      />
-                    ))}
-                  </div>
+                  {triggerNodes.length > 3 && (
+                    <div className="space-y-2">
+                      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Other Triggers
+                      </h3>
+                      {triggerNodes.slice(3).map((node) => (
+                        <NodeItem
+                          key={node.type}
+                          node={node}
+                          onClick={() => handleNodeSelect(node)}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </>
               ) : (
                 // Regular view - grouped by category
-                Object.entries(groupedNodes).map(([category, nodes]) => (
+                Object.entries(groupedNodes).map(([category, categoryNodes]) => (
                   <div key={category} className="space-y-2">
                     <h3 className="flex items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {category}
                       <ChevronRight size={14} className="ml-1" />
                     </h3>
-                    {nodes.map((node) => (
+                    {categoryNodes.map((node) => (
                       <NodeItem
                         key={node.type}
                         node={node}
@@ -280,4 +343,19 @@ export default function NodeCreatorPanel() {
       </div>
     </>
   );
+}
+
+/**
+ * Get a human-readable label for a category
+ */
+function getCategoryLabel(category: string): string {
+  const labels: Record<string, string> = {
+    trigger: 'Triggers',
+    transform: 'Transform Data',
+    flow: 'Flow',
+    ai: 'AI',
+    helper: 'Helpers',
+    other: 'Other',
+  };
+  return labels[category] || category.charAt(0).toUpperCase() + category.slice(1);
 }

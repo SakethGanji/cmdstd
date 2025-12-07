@@ -22,7 +22,40 @@ export class ErrorTriggerNode extends BaseNode {
     description: 'Trigger a workflow when another workflow fails',
     group: ['trigger'],
     inputs: [], // Trigger node - no inputs
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'object',
+          properties: {
+            failedWorkflow: {
+              type: 'object',
+              description: 'Information about the failed workflow',
+              properties: {
+                id: { type: 'string', description: 'Workflow ID' },
+                name: { type: 'string', description: 'Workflow name' },
+                executionId: { type: 'string', description: 'Execution ID' },
+              },
+            },
+            errors: {
+              type: 'array',
+              description: 'List of errors that occurred',
+              items: {
+                type: 'object',
+                properties: {
+                  nodeName: { type: 'string', description: 'Name of the node that failed' },
+                  message: { type: 'string', description: 'Error message' },
+                  timestamp: { type: 'string', description: 'ISO timestamp of error' },
+                },
+              },
+            },
+            timestamp: { type: 'string', description: 'ISO timestamp when error workflow triggered' },
+          },
+        },
+      },
+    ],
     properties: [], // Error data comes from the failing workflow
   };
 

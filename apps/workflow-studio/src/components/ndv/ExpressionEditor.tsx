@@ -1,11 +1,29 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Code2, X, ChevronDown } from 'lucide-react';
+
+// Type definitions for output schema (matching workflow-engine)
+interface OutputSchemaProperty {
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'unknown';
+  description?: string;
+  properties?: Record<string, OutputSchemaProperty>;
+  items?: OutputSchemaProperty;
+}
+
+interface OutputSchema {
+  type: 'object' | 'array' | 'string' | 'number' | 'boolean' | 'unknown';
+  properties?: Record<string, OutputSchemaProperty>;
+  items?: OutputSchemaProperty;
+  description?: string;
+  passthrough?: boolean;
+}
 
 interface ExpressionEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   label?: string;
+  /** Output schema from connected upstream node for autocomplete */
+  outputSchema?: OutputSchema;
 }
 
 // Simple expression syntax highlighting
@@ -45,25 +63,58 @@ function highlightExpression(text: string): React.ReactNode[] {
   return parts.length > 0 ? parts : [text];
 }
 
-// Common expression suggestions
-const expressionSuggestions = [
-  { label: '$json', description: 'Current item JSON data' },
-  { label: '$json.fieldName', description: 'Access a specific field' },
-  { label: '$input.item', description: 'Current input item' },
-  { label: '$input.all()', description: 'All input items' },
-  { label: '$node["NodeName"].json', description: 'Data from specific node' },
-  { label: '$now', description: 'Current timestamp' },
-  { label: '$today', description: "Today's date" },
-  { label: '$env.VARIABLE', description: 'Environment variable' },
-  { label: '$runIndex', description: 'Current run index' },
-  { label: '$itemIndex', description: 'Current item index' },
+// Base expression suggestions (always available)
+const baseExpressionSuggestions = [
+  { label: '$json', description: 'Current item JSON data', category: 'data' },
+  { label: '$input.item', description: 'Current input item', category: 'data' },
+  { label: '$input.all()', description: 'All input items', category: 'data' },
+  { label: '$node["NodeName"].json', description: 'Data from specific node', category: 'data' },
+  { label: '$now', description: 'Current timestamp', category: 'helper' },
+  { label: '$today', description: "Today's date", category: 'helper' },
+  { label: '$env.VARIABLE', description: 'Environment variable', category: 'helper' },
+  { label: '$runIndex', description: 'Current run index', category: 'helper' },
+  { label: '$itemIndex', description: 'Current item index', category: 'helper' },
 ];
+
+/**
+ * Generate field suggestions from an output schema
+ */
+function generateSchemaFields(
+  schema: OutputSchema | OutputSchemaProperty | undefined,
+  prefix: string = '$json'
+): Array<{ label: string; description: string; category: string }> {
+  if (!schema) return [];
+
+  const suggestions: Array<{ label: string; description: string; category: string }> = [];
+
+  if (schema.type === 'object' && schema.properties) {
+    for (const [key, prop] of Object.entries(schema.properties)) {
+      const fieldPath = `${prefix}.${key}`;
+      const typedProp = prop as OutputSchemaProperty;
+      const typeLabel = typedProp.type === 'unknown' ? 'any' : typedProp.type;
+
+      suggestions.push({
+        label: fieldPath,
+        description: typedProp.description || `${typeLabel} field`,
+        category: 'field',
+      });
+
+      // Recurse for nested objects (max 2 levels deep)
+      if (typedProp.type === 'object' && typedProp.properties && prefix.split('.').length < 3) {
+        suggestions.push(...generateSchemaFields(typedProp, fieldPath));
+      }
+    }
+  }
+
+  return suggestions;
+}
 
 export default function ExpressionEditor({
   value,
   onChange,
   placeholder = 'Enter value or expression...',
   label,
+  outputSchema,
 }: ExpressionEditorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -71,6 +122,18 @@ export default function ExpressionEditor({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasExpression = value.includes('{{');
+
+  // Generate suggestions from output schema
+  const expressionSuggestions = useMemo(() => {
+    const schemaFields = generateSchemaFields(outputSchema);
+
+    // If we have schema fields, show them first, then base suggestions
+    if (schemaFields.length > 0) {
+      return [...schemaFields, ...baseExpressionSuggestions];
+    }
+
+    return baseExpressionSuggestions;
+  }, [outputSchema]);
 
   const insertExpression = (expr: string) => {
     const before = value.slice(0, cursorPosition);
@@ -204,24 +267,76 @@ export default function ExpressionEditor({
 
             {showSuggestions && (
               <div
-                className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-lg border border-border bg-popover shadow-lg"
+                className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-border bg-popover shadow-lg"
                 onClick={(e) => e.stopPropagation()}
               >
-                {expressionSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.label}
-                    type="button"
-                    onClick={() => insertExpression(suggestion.label)}
-                    className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
-                  >
-                    <code className="text-sm font-mono text-primary">
-                      {suggestion.label}
-                    </code>
-                    <span className="text-xs text-muted-foreground truncate">
-                      {suggestion.description}
-                    </span>
-                  </button>
-                ))}
+                {/* Schema fields section */}
+                {expressionSuggestions.some((s) => s.category === 'field') && (
+                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border-b border-border">
+                    Available Fields
+                  </div>
+                )}
+                {expressionSuggestions
+                  .filter((s) => s.category === 'field')
+                  .map((suggestion) => (
+                    <button
+                      key={suggestion.label}
+                      type="button"
+                      onClick={() => insertExpression(suggestion.label)}
+                      className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
+                    >
+                      <code className="text-sm font-mono text-primary">
+                        {suggestion.label}
+                      </code>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {suggestion.description}
+                      </span>
+                    </button>
+                  ))}
+
+                {/* Data variables section */}
+                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border-b border-border">
+                  Data Variables
+                </div>
+                {expressionSuggestions
+                  .filter((s) => s.category === 'data')
+                  .map((suggestion) => (
+                    <button
+                      key={suggestion.label}
+                      type="button"
+                      onClick={() => insertExpression(suggestion.label)}
+                      className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
+                    >
+                      <code className="text-sm font-mono text-foreground">
+                        {suggestion.label}
+                      </code>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {suggestion.description}
+                      </span>
+                    </button>
+                  ))}
+
+                {/* Helper variables section */}
+                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border-b border-border">
+                  Helpers
+                </div>
+                {expressionSuggestions
+                  .filter((s) => s.category === 'helper')
+                  .map((suggestion) => (
+                    <button
+                      key={suggestion.label}
+                      type="button"
+                      onClick={() => insertExpression(suggestion.label)}
+                      className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
+                    >
+                      <code className="text-sm font-mono text-foreground">
+                        {suggestion.label}
+                      </code>
+                      <span className="text-xs text-muted-foreground truncate">
+                        {suggestion.description}
+                      </span>
+                    </button>
+                  ))}
               </div>
             )}
           </div>

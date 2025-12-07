@@ -34,7 +34,18 @@ export class MergeNode extends BaseNode {
       type: 'dynamicFromConnections',
       minInputs: 2,
     },
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'unknown',
+          description: 'Combined data from all inputs (shape depends on merge mode)',
+          passthrough: true,
+        },
+      },
+    ],
 
     properties: [
       {

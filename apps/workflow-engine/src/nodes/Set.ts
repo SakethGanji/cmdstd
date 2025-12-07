@@ -30,7 +30,17 @@ export class SetNode extends BaseNode {
     description: 'Set, rename, or delete fields on items',
     group: ['transform'],
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'unknown',
+          description: 'Modified data with fields set/renamed/deleted based on configuration',
+        },
+      },
+    ],
 
     properties: [
       {

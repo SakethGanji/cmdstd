@@ -22,7 +22,9 @@ export class WaitNode extends BaseNode {
     description: 'Pause workflow execution for a specified time',
     group: ['flow'],
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      { name: 'main', displayName: 'Output', type: 'main', schema: { type: 'unknown', passthrough: true } },
+    ],
 
     properties: [
       {

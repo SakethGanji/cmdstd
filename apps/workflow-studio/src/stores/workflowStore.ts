@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import type { Node, Edge, Connection, NodeChange, EdgeChange } from 'reactflow';
 import { addEdge, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import type { WorkflowNodeData, NodeExecutionData, StickyNoteData } from '../types/workflow';
-import { triggerNodes } from './nodeCreatorStore';
+import { isTriggerNode } from '../hooks/useNodeTypes';
 
 // Backend-compatible pinned data format: { json: {...} }[]
 type BackendNodeData = { json: Record<string, unknown> };
@@ -131,10 +131,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     }
 
     // Can't connect to trigger nodes (they have no inputs)
-    const isTriggerNode = triggerNodes.some(
-      (t) => t.type === targetNode.data?.type
-    );
-    if (isTriggerNode) {
+    if (isTriggerNode(targetNode.data?.type || '')) {
       return { isValid: false, message: 'Cannot connect to trigger nodes' };
     }
 

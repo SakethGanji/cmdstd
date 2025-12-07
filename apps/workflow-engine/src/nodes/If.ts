@@ -29,10 +29,10 @@ export class IfNode extends BaseNode {
     // Single main input
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
 
-    // Fixed two outputs
+    // Fixed two outputs - passthrough data unchanged
     outputs: [
-      { name: 'true', displayName: 'True', type: 'main' },
-      { name: 'false', displayName: 'False', type: 'main' },
+      { name: 'true', displayName: 'True', type: 'main', schema: { type: 'unknown', passthrough: true } },
+      { name: 'false', displayName: 'False', type: 'main', schema: { type: 'unknown', passthrough: true } },
     ],
 
     properties: [

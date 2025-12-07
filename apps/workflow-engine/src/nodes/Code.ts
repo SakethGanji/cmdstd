@@ -29,7 +29,17 @@ export class CodeNode extends BaseNode {
     description: 'Execute custom JavaScript code',
     group: ['transform'],
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'unknown',
+          description: 'User-defined output from JavaScript code execution',
+        },
+      },
+    ],
 
     properties: [
       {

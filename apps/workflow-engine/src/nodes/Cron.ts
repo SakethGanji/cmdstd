@@ -23,7 +23,22 @@ export class CronNode extends BaseNode {
     description: 'Trigger workflow on a schedule',
     group: ['trigger'],
     inputs: [], // Trigger node - no inputs
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'object',
+          properties: {
+            triggeredAt: { type: 'string', description: 'ISO timestamp when triggered' },
+            executionId: { type: 'string', description: 'Unique execution ID' },
+            mode: { type: 'string', description: 'Trigger mode (cron)' },
+            schedule: { type: 'string', description: 'Schedule description' },
+          },
+        },
+      },
+    ],
 
     properties: [
       {

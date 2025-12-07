@@ -18,7 +18,17 @@ export class StartNode extends BaseNode {
     description: 'Entry point for manual workflow execution',
     group: ['trigger'],
     inputs: [], // Trigger node - no inputs
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'unknown',
+          description: 'Initial workflow input data (if provided) or empty object',
+        },
+      },
+    ],
     properties: [], // No configuration needed
   };
 

@@ -158,6 +158,53 @@ export interface INodeProperty {
 export type NodePortType = 'main' | 'resource';
 
 /**
+ * Schema property definition for describing output data shape
+ */
+export interface IOutputSchemaProperty {
+  /** Type of this property */
+  type: 'string' | 'number' | 'boolean' | 'object' | 'array' | 'unknown';
+  /** Human-readable description */
+  description?: string;
+  /** For nested objects: property definitions */
+  properties?: Record<string, IOutputSchemaProperty>;
+  /** For arrays: schema of array items */
+  items?: IOutputSchemaProperty;
+}
+
+/**
+ * Schema describing the data shape of a node output
+ *
+ * Used by the frontend to provide autocomplete for expressions
+ * like {{ $json.fieldName }}
+ *
+ * @example
+ * // HttpRequest output schema
+ * schema: {
+ *   type: 'object',
+ *   properties: {
+ *     status: { type: 'number', description: 'HTTP status code' },
+ *     data: { type: 'unknown', description: 'Response body' },
+ *     headers: { type: 'object', description: 'Response headers' }
+ *   }
+ * }
+ */
+export interface IOutputSchema {
+  /** JSON Schema-like type definition */
+  type: 'object' | 'array' | 'string' | 'number' | 'boolean' | 'unknown';
+  /** For objects: property definitions */
+  properties?: Record<string, IOutputSchemaProperty>;
+  /** For arrays: schema of array items */
+  items?: IOutputSchemaProperty;
+  /** Human-readable description */
+  description?: string;
+  /**
+   * Whether this output passes through input data unchanged
+   * UI can infer schema from connected upstream node
+   */
+  passthrough?: boolean;
+}
+
+/**
  * Definition of a node output
  */
 export interface INodeOutputDefinition {
@@ -171,6 +218,11 @@ export interface INodeOutputDefinition {
    * - 'resource': Resource output (e.g., LLM model, tool definitions)
    */
   type?: NodePortType;
+  /**
+   * Schema describing the data shape of this output
+   * Used by frontend for expression autocomplete
+   */
+  schema?: IOutputSchema;
 }
 
 /**

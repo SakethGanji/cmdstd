@@ -56,7 +56,29 @@ export class LLMChatNode extends BaseNode {
     description: 'Make a simple LLM call using Google Gemini',
     group: ['ai'],
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
-    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
+    outputs: [
+      {
+        name: 'main',
+        displayName: 'Output',
+        type: 'main',
+        schema: {
+          type: 'object',
+          properties: {
+            response: { type: 'string', description: 'LLM response text' },
+            model: { type: 'string', description: 'Model used for generation' },
+            usage: {
+              type: 'object',
+              description: 'Token usage statistics',
+              properties: {
+                promptTokens: { type: 'number', description: 'Tokens in prompt' },
+                completionTokens: { type: 'number', description: 'Tokens in completion' },
+                totalTokens: { type: 'number', description: 'Total tokens used' },
+              },
+            },
+          },
+        },
+      },
+    ],
 
     properties: [
       {

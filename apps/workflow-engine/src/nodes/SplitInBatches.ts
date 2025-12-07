@@ -37,8 +37,24 @@ export class SplitInBatchesNode extends BaseNode {
 
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
     outputs: [
-      { name: 'loop', displayName: 'Loop', type: 'main' },
-      { name: 'done', displayName: 'Done', type: 'main' },
+      {
+        name: 'loop',
+        displayName: 'Loop',
+        type: 'main',
+        schema: { type: 'unknown', passthrough: true, description: 'Current batch of items' },
+      },
+      {
+        name: 'done',
+        displayName: 'Done',
+        type: 'main',
+        schema: {
+          type: 'object',
+          properties: {
+            totalProcessed: { type: 'number', description: 'Total items processed' },
+            batchesProcessed: { type: 'number', description: 'Number of batches processed' },
+          },
+        },
+      },
     ],
 
     properties: [
