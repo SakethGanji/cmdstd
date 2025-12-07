@@ -21,6 +21,11 @@ import {
   Pencil,
   Check,
   X,
+  MessageSquare,
+  Bot,
+  AlertTriangle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import type { Node } from 'reactflow';
 import type { WorkflowNodeData } from '../../types/workflow';
@@ -41,6 +46,9 @@ const iconMap: Record<string, LucideIcon> = {
   globe: Globe,
   pen: Pen,
   calendar: Calendar,
+  'message-square': MessageSquare,
+  bot: Bot,
+  'alert-triangle': AlertTriangle,
 };
 
 interface NodeSettingsProps {
@@ -294,8 +302,18 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
                     </div>
                   )}
 
+                  {/* LLM Chat Node */}
+                  {node.data.type === 'llmChat' && (
+                    <LLMChatForm node={node} updateNodeData={updateNodeData} />
+                  )}
+
+                  {/* AI Agent Node */}
+                  {node.data.type === 'aiAgent' && (
+                    <AIAgentForm node={node} updateNodeData={updateNodeData} />
+                  )}
+
                   {/* Generic fallback for other node types */}
-                  {!['httpRequest', 'code', 'if'].includes(node.data.type || '') && (
+                  {!['httpRequest', 'code', 'if', 'llmChat', 'aiAgent'].includes(node.data.type || '') && (
                     <div className="flex items-center gap-2 rounded-lg bg-primary/10 px-4 py-3 text-sm text-primary">
                       <Info size={16} />
                       <span>
@@ -466,6 +484,285 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
           <Play size={18} />
           Test step
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// Password Input Component
+// ============================================
+
+interface PasswordInputProps {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  description?: string;
+}
+
+function PasswordInput({ label, value, onChange, placeholder, description }: PasswordInputProps) {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-foreground">
+        {label}
+      </label>
+      <div className="relative">
+        <input
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          className="w-full rounded-lg border border-input bg-secondary px-3 py-2 pr-10 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+        <button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground"
+        >
+          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+        </button>
+      </div>
+      {description && (
+        <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// LLM Chat Form Component
+// ============================================
+
+interface FormProps {
+  node: Node<WorkflowNodeData>;
+  updateNodeData: (nodeId: string, data: Partial<WorkflowNodeData>) => void;
+}
+
+function LLMChatForm({ node, updateNodeData }: FormProps) {
+  const params = node.data.parameters || {};
+
+  const updateParam = (key: string, value: unknown) => {
+    updateNodeData(node.id, {
+      parameters: { ...params, [key]: value },
+    });
+  };
+
+  return (
+    <div className="space-y-4">
+      <PasswordInput
+        label="API Key"
+        value={(params.apiKey as string) || ''}
+        onChange={(value) => updateParam('apiKey', value)}
+        placeholder="Enter your Google AI API Key"
+        description="Get your key at https://aistudio.google.com/app/apikey"
+      />
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-foreground">
+          Model
+        </label>
+        <select
+          value={(params.model as string) || 'gemini-2.5-flash'}
+          onChange={(e) => updateParam('model', e.target.value)}
+          className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
+          <option value="gemini-2.5-pro">Gemini 2.5 Pro (Most Capable)</option>
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        </select>
+      </div>
+
+      <ExpressionEditor
+        label="System Prompt"
+        value={(params.systemPrompt as string) || ''}
+        onChange={(value) => updateParam('systemPrompt', value)}
+        placeholder="You are a helpful assistant..."
+      />
+
+      <ExpressionEditor
+        label="User Prompt"
+        value={(params.userPrompt as string) || ''}
+        onChange={(value) => updateParam('userPrompt', value)}
+        placeholder="Enter your prompt here. Use {{ $json.field }} for expressions."
+      />
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Temperature
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.1}
+            value={(params.temperature as number) ?? 0.7}
+            onChange={(e) => updateParam('temperature', parseFloat(e.target.value))}
+            className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">0 = deterministic, 1 = creative</p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Max Tokens
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={8192}
+            value={(params.maxTokens as number) ?? 1024}
+            onChange={(e) => updateParam('maxTokens', parseInt(e.target.value))}
+            className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
+// AI Agent Form Component
+// ============================================
+
+function AIAgentForm({ node, updateNodeData }: FormProps) {
+  const params = node.data.parameters || {};
+
+  const updateParam = (key: string, value: unknown) => {
+    updateNodeData(node.id, {
+      parameters: { ...params, [key]: value },
+    });
+  };
+
+  // Parse tools array
+  const toolsValue = (params.tools as string) || '["http_request", "calculate", "get_current_time"]';
+  let selectedTools: string[] = [];
+  try {
+    selectedTools = JSON.parse(toolsValue);
+  } catch {
+    selectedTools = ['http_request', 'calculate', 'get_current_time'];
+  }
+
+  const toggleTool = (tool: string) => {
+    const newTools = selectedTools.includes(tool)
+      ? selectedTools.filter((t) => t !== tool)
+      : [...selectedTools, tool];
+    updateParam('tools', JSON.stringify(newTools));
+  };
+
+  return (
+    <div className="space-y-4">
+      <PasswordInput
+        label="API Key"
+        value={(params.apiKey as string) || ''}
+        onChange={(value) => updateParam('apiKey', value)}
+        placeholder="Enter your Google AI API Key"
+        description="Get your key at https://aistudio.google.com/app/apikey"
+      />
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-foreground">
+          Model
+        </label>
+        <select
+          value={(params.model as string) || 'gemini-2.5-flash'}
+          onChange={(e) => updateParam('model', e.target.value)}
+          className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+        >
+          <option value="gemini-2.5-flash">Gemini 2.5 Flash (Fast)</option>
+          <option value="gemini-2.5-pro">Gemini 2.5 Pro (Most Capable)</option>
+          <option value="gemini-2.0-flash">Gemini 2.0 Flash</option>
+        </select>
+      </div>
+
+      <ExpressionEditor
+        label="System Prompt"
+        value={(params.systemPrompt as string) || 'You are a helpful assistant. Use the available tools when needed to complete tasks.'}
+        onChange={(value) => updateParam('systemPrompt', value)}
+        placeholder="You are a helpful assistant..."
+      />
+
+      <ExpressionEditor
+        label="User Prompt"
+        value={(params.userPrompt as string) || ''}
+        onChange={(value) => updateParam('userPrompt', value)}
+        placeholder="Enter the task for the agent. Use {{ $json.field }} for expressions."
+      />
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-foreground">
+          Tools
+        </label>
+        <div className="space-y-2 rounded-lg border border-input bg-secondary p-3">
+          {[
+            { id: 'http_request', name: 'HTTP Request', desc: 'Make API calls' },
+            { id: 'calculate', name: 'Calculate', desc: 'Math expressions' },
+            { id: 'get_current_time', name: 'Get Current Time', desc: 'Current date/time' },
+            { id: 'json_transform', name: 'JSON Transform', desc: 'Extract/transform data' },
+          ].map((tool) => (
+            <label key={tool.id} className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selectedTools.includes(tool.id)}
+                onChange={() => toggleTool(tool.id)}
+                className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+              />
+              <div>
+                <span className="text-sm text-foreground">{tool.name}</span>
+                <span className="ml-2 text-xs text-muted-foreground">{tool.desc}</span>
+              </div>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Max Iterations
+          </label>
+          <input
+            type="number"
+            min={1}
+            max={50}
+            value={(params.maxIterations as number) ?? 10}
+            onChange={(e) => updateParam('maxIterations', parseInt(e.target.value))}
+            className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+          <p className="mt-1 text-xs text-muted-foreground">Prevents infinite loops</p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-foreground">
+            Temperature
+          </label>
+          <input
+            type="number"
+            min={0}
+            max={1}
+            step={0.1}
+            value={(params.temperature as number) ?? 0.7}
+            onChange={(e) => updateParam('temperature', parseFloat(e.target.value))}
+            className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-foreground">
+          Max Tokens
+        </label>
+        <input
+          type="number"
+          min={1}
+          max={8192}
+          value={(params.maxTokens as number) ?? 2048}
+          onChange={(e) => updateParam('maxTokens', parseInt(e.target.value))}
+          className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+        />
       </div>
     </div>
   );

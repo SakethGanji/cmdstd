@@ -53,7 +53,7 @@ export interface NodeDefinition {
   displayName: string;
   description: string;
   icon: string;
-  category: 'trigger' | 'action' | 'transform' | 'flow' | 'helper';
+  category: 'trigger' | 'action' | 'transform' | 'flow' | 'helper' | 'ai';
   subcategory?: string;
 }
 

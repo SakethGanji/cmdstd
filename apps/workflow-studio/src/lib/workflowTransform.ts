@@ -71,6 +71,10 @@ const UI_TO_BACKEND_NODE_TYPE: Record<string, string> = {
   // Helpers
   httpRequest: 'HttpRequest',
   wait: 'Wait',
+
+  // AI
+  llmChat: 'LLMChat',
+  aiAgent: 'AIAgent',
 };
 
 /**
@@ -89,6 +93,8 @@ const BACKEND_TO_UI_NODE_TYPE: Record<string, string> = {
   SplitInBatches: 'splitInBatches',
   HttpRequest: 'httpRequest',
   Wait: 'wait',
+  LLMChat: 'llmChat',
+  AIAgent: 'aiAgent',
 };
 
 /**
@@ -122,10 +128,48 @@ const NODE_TYPE_ICONS: Record<string, string> = {
   SplitInBatches: 'layers',
   HttpRequest: 'globe',
   Wait: 'clock',
+  LLMChat: 'message-square',
+  AIAgent: 'bot',
 };
 
 export function getNodeIcon(backendType: string): string {
   return NODE_TYPE_ICONS[backendType] || 'code';
+}
+
+// ============================================================================
+// Default Parameters (for node creation)
+// ============================================================================
+
+/**
+ * Returns default parameters for a node type.
+ * These are used when a new node is created to ensure required fields have values.
+ */
+export function getDefaultParameters(backendType: string): Record<string, unknown> {
+  const defaults: Record<string, Record<string, unknown>> = {
+    LLMChat: {
+      model: 'gemini-2.5-flash',
+      systemPrompt: '',
+      userPrompt: '',
+      temperature: 0.7,
+      maxTokens: 1024,
+    },
+    AIAgent: {
+      model: 'gemini-2.5-flash',
+      systemPrompt: 'You are a helpful assistant. Use the available tools when needed to complete tasks.',
+      userPrompt: '',
+      tools: '["http_request", "calculate", "get_current_time"]',
+      maxIterations: 10,
+      temperature: 0.7,
+      maxTokens: 2048,
+    },
+    HttpRequest: {
+      method: 'GET',
+      url: '',
+      responseType: 'json',
+    },
+  };
+
+  return defaults[backendType] || {};
 }
 
 // ============================================================================
@@ -300,6 +344,8 @@ function getNodeDescription(backendType: string): string {
     SplitInBatches: 'Split data into batches for processing',
     HttpRequest: 'Makes HTTP requests and returns the response',
     Wait: 'Wait for a specified amount of time',
+    LLMChat: 'Make a simple LLM call using Google Gemini',
+    AIAgent: 'AI Agent with tool calling capabilities',
   };
   return descriptions[backendType] || 'Configure this node';
 }

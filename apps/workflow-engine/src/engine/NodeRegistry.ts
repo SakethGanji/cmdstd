@@ -18,6 +18,8 @@ import {
   SplitInBatchesNode,
   CronNode,
   ErrorTriggerNode,
+  LLMChatNode,
+  AIAgentNode,
 } from '../nodes/index.js';
 
 /**
@@ -232,3 +234,5 @@ NodeRegistry.register(WaitNode);
 NodeRegistry.register(SplitInBatchesNode);
 NodeRegistry.register(CronNode);
 NodeRegistry.register(ErrorTriggerNode);
+NodeRegistry.register(LLMChatNode);
+NodeRegistry.register(AIAgentNode);

@@ -7,7 +7,7 @@ import {
   getNodesByCategory,
 } from '../../stores/nodeCreatorStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import { generateNodeName, getExistingNodeNames } from '../../lib/workflowTransform';
+import { generateNodeName, getExistingNodeNames, getDefaultParameters } from '../../lib/workflowTransform';
 import NodeItem from './NodeItem';
 import type { NodeDefinition, WorkflowNodeData } from '../../types/workflow';
 
@@ -90,7 +90,7 @@ export default function NodeCreatorPanel() {
         type: nodeDef.type,       // UI type (camelCase)
         icon: nodeDef.icon,
         description: nodeDef.description,
-        parameters: {},
+        parameters: getDefaultParameters(nodeDef.name),
         continueOnFail: false,
         retryOnFail: 0,
         retryDelay: 1000,

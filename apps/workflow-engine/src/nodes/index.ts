@@ -11,3 +11,5 @@ export { WaitNode } from './Wait.js';
 export { SplitInBatchesNode } from './SplitInBatches.js';
 export { CronNode, CronManager, cronManager } from './Cron.js';
 export { ErrorTriggerNode, ErrorWorkflowManager } from './ErrorTrigger.js';
+export { LLMChatNode } from './LLMChat.js';
+export { AIAgentNode } from './AIAgent.js';

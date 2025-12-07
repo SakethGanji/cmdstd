@@ -11,6 +11,9 @@ import {
   Globe,
   Pen,
   Calendar,
+  MessageSquare,
+  Bot,
+  AlertTriangle,
   type LucideIcon,
 } from 'lucide-react';
 import type { NodeDefinition } from '../../types/workflow';
@@ -29,6 +32,9 @@ const iconMap: Record<string, LucideIcon> = {
   globe: Globe,
   pen: Pen,
   calendar: Calendar,
+  'message-square': MessageSquare,
+  bot: Bot,
+  'alert-triangle': AlertTriangle,
 };
 
 interface NodeItemProps {

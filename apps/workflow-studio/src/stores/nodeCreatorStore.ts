@@ -173,6 +173,25 @@ export const regularNodes: NodeDefinition[] = [
     category: 'helper',
     subcategory: 'Helpers',
   },
+  // AI Nodes
+  {
+    type: 'llmChat',
+    name: 'LLMChat',
+    displayName: 'LLM Chat',
+    description: 'Make a simple LLM call using Google Gemini',
+    icon: 'message-square',
+    category: 'ai',
+    subcategory: 'AI',
+  },
+  {
+    type: 'aiAgent',
+    name: 'AIAgent',
+    displayName: 'AI Agent',
+    description: 'AI Agent with tool calling capabilities',
+    icon: 'bot',
+    category: 'ai',
+    subcategory: 'AI',
+  },
 ];
 
 // Helper to get nodes by category

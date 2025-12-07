@@ -17,6 +17,8 @@ import {
   Pen,
   Calendar,
   AlertTriangle,
+  MessageSquare,
+  Bot,
 } from 'lucide-react';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
 import { useNDVStore } from '../../../stores/ndvStore';
@@ -38,6 +40,8 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
   pen: Pen,
   calendar: Calendar,
   'alert-triangle': AlertTriangle,
+  'message-square': MessageSquare,
+  bot: Bot,
 };
 
 function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
@@ -82,58 +86,58 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-    <div
-      className={`
+      <div
+        className={`
         relative flex min-w-[150px] cursor-grab flex-col rounded-lg border-2 bg-card shadow-md transition-all
         ${selected ? 'border-primary shadow-lg' : 'border-border'}
         ${data.disabled ? 'opacity-50' : ''}
         ${getStatusColor()}
       `}
-      onDoubleClick={handleDoubleClick}
-    >
-      {/* Input Handle - not shown for trigger nodes */}
-      {!isTrigger && (
+        onDoubleClick={handleDoubleClick}
+      >
+        {/* Input Handle - not shown for trigger nodes */}
+        {!isTrigger && (
+          <Handle
+            type="target"
+            position={Position.Left}
+            className="!h-3 !w-3 !border-2 !border-border !bg-card"
+          />
+        )}
+
+        {/* Node Content */}
+        <div className="flex items-center gap-3 px-4 py-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <IconComponent size={20} />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-sm font-semibold text-foreground">
+              {data.label}
+            </span>
+            {data.description && (
+              <span className="text-xs text-muted-foreground">{data.description}</span>
+            )}
+          </div>
+        </div>
+
+        {/* Execution status indicator */}
+        {executionData?.status === 'running' && (
+          <div className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full bg-amber-500" />
+        )}
+        {executionData?.status === 'success' && (
+          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500" />
+        )}
+        {executionData?.status === 'error' && (
+          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-destructive" />
+        )}
+
+        {/* Output Handle with + button */}
         <Handle
-          type="target"
-          position={Position.Left}
+          type="source"
+          position={Position.Right}
           className="!h-3 !w-3 !border-2 !border-border !bg-card"
         />
-      )}
 
-      {/* Node Content */}
-      <div className="flex items-center gap-3 px-4 py-3">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          <IconComponent size={20} />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-semibold text-foreground">
-            {data.label}
-          </span>
-          {data.description && (
-            <span className="text-xs text-muted-foreground">{data.description}</span>
-          )}
-        </div>
       </div>
-
-      {/* Execution status indicator */}
-      {executionData?.status === 'running' && (
-        <div className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full bg-amber-500" />
-      )}
-      {executionData?.status === 'success' && (
-        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500" />
-      )}
-      {executionData?.status === 'error' && (
-        <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-destructive" />
-      )}
-
-      {/* Output Handle with + button */}
-      <Handle
-        type="source"
-        position={Position.Right}
-        className="!h-3 !w-3 !border-2 !border-border !bg-card"
-      />
-
-    </div>
 
       {/* Add Node Button - always rendered, visibility controlled by opacity */}
       <button
