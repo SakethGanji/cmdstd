@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { Link, useMatchRoute } from "@tanstack/react-router"
 import { ChevronLeft, ChevronRight, Terminal, Workflow } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -21,6 +22,8 @@ import {
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { toggleSidebar, state } = useSidebar()
   const isCollapsed = state === "collapsed"
+  const matchRoute = useMatchRoute()
+  const isEditorActive = matchRoute({ to: '/editor' })
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -44,9 +47,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           <SidebarGroupContent>
             <SidebarMenu>
               <SidebarMenuItem>
-                <SidebarMenuButton isActive tooltip="Editor">
-                  <Workflow />
-                  <span>Editor</span>
+                <SidebarMenuButton asChild isActive={!!isEditorActive} tooltip="Editor">
+                  <Link to="/editor">
+                    <Workflow />
+                    <span>Editor</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
