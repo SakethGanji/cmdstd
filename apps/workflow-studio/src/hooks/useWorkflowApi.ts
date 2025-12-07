@@ -309,24 +309,30 @@ export function useDeleteWorkflow() {
 // ============================================================================
 
 /**
- * Find the source node that provides input to a target node
+ * Find the source node name that provides input to a target node
  */
 function findInputNode(
   targetNodeName: string,
   edges: { source: string; target: string }[],
   nodes: Node<WorkflowNodeData>[]
 ): string | null {
-  // Create name to ID map
+  // Create maps for ID <-> name conversion
   const idToName = new Map<string, string>();
+  const nameToId = new Map<string, string>();
   nodes.forEach((node) => {
     const data = node.data as WorkflowNodeData;
     idToName.set(node.id, data.name);
+    nameToId.set(data.name, node.id);
   });
+
+  // Find the target node's ID from its name
+  const targetNodeId = nameToId.get(targetNodeName);
+  if (!targetNodeId) return null;
 
   // Find edge that targets this node
   for (const edge of edges) {
-    const targetName = idToName.get(edge.target);
-    if (targetName === targetNodeName) {
+    if (edge.target === targetNodeId) {
+      // Return the source node's name
       return idToName.get(edge.source) || null;
     }
   }

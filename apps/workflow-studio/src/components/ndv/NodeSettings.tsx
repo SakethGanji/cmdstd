@@ -65,7 +65,11 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(node.data.label);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const updateNodeData = useWorkflowStore((s) => s.updateNodeData);
+  const { updateNodeData, edges, nodes } = useWorkflowStore((s) => ({
+    updateNodeData: s.updateNodeData,
+    edges: s.edges,
+    nodes: s.nodes,
+  }));
 
   // Fetch node type schema from API
   const { data: nodeTypes, isLoading: isLoadingSchema } = useNodeTypes();
@@ -73,6 +77,19 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
   // Get the schema for this node type
   const backendType = uiTypeToBackendType(node.data.type || '');
   const nodeSchema = nodeTypes?.find((n) => n.type === backendType);
+
+  // Find upstream node(s) connected to this node's input
+  const upstreamNodeId = edges.find((e) => e.target === node.id)?.source;
+  const upstreamNode = upstreamNodeId ? nodes.find((n) => n.id === upstreamNodeId) : null;
+  const upstreamBackendType = upstreamNode?.data?.type
+    ? uiTypeToBackendType(upstreamNode.data.type)
+    : null;
+  const upstreamNodeSchema = upstreamBackendType
+    ? nodeTypes?.find((n) => n.type === upstreamBackendType)
+    : null;
+
+  // Get the output schema from the upstream node's first output
+  const upstreamOutputSchema = upstreamNodeSchema?.outputs?.[0]?.schema;
 
   const IconComponent = iconMap[node.data.icon || 'code'] || Code;
 
@@ -234,6 +251,7 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
                         });
                       }}
                       allValues={(node.data.parameters as Record<string, unknown>) || {}}
+                      upstreamSchema={upstreamOutputSchema}
                     />
                   ) : nodeSchema && nodeSchema.properties.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-lg bg-muted px-4 py-3 text-sm text-muted-foreground">

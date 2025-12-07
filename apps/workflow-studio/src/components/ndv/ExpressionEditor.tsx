@@ -119,9 +119,52 @@ export default function ExpressionEditor({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [isDragOver, setIsDragOver] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasExpression = value.includes('{{');
+
+  // Handle drag over
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Check if it's a field path being dragged
+    if (e.dataTransfer.types.includes('application/x-field-path') || e.dataTransfer.types.includes('text/plain')) {
+      e.dataTransfer.dropEffect = 'copy';
+      setIsDragOver(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragOver(false);
+
+    // Try to get the field path from custom type first, then fall back to text
+    let fieldPath = e.dataTransfer.getData('application/x-field-path');
+    if (!fieldPath) {
+      fieldPath = e.dataTransfer.getData('text/plain');
+    }
+
+    if (fieldPath && fieldPath.startsWith('$json')) {
+      // Insert the expression at the end of current value (or replace if empty)
+      const expression = `{{ ${fieldPath} }}`;
+      if (value.trim()) {
+        onChange(`${value} ${expression}`);
+      } else {
+        onChange(expression);
+      }
+
+      // Auto-expand to show the inserted expression
+      setIsExpanded(true);
+    }
+  };
 
   // Generate suggestions from output schema
   const expressionSuggestions = useMemo(() => {
@@ -176,12 +219,16 @@ export default function ExpressionEditor({
       )}
 
       <div className="relative">
-        {/* Main input */}
+        {/* Main input with drop zone */}
         <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           className={`
             flex items-start gap-2 rounded-lg border bg-secondary transition-all
             ${isExpanded ? 'border-primary ring-1 ring-primary' : 'border-input'}
             ${hasExpression ? 'bg-primary/5' : ''}
+            ${isDragOver ? 'border-primary ring-2 ring-primary/50 bg-primary/10' : ''}
           `}
         >
           {/* Expression toggle button */}
@@ -249,6 +296,13 @@ export default function ExpressionEditor({
               />
             </button>
           </div>
+
+          {/* Drop indicator overlay */}
+          {isDragOver && (
+            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-primary/10 border-2 border-dashed border-primary pointer-events-none">
+              <span className="text-sm font-medium text-primary">Drop to insert field</span>
+            </div>
+          )}
         </div>
 
         {/* Expression suggestions dropdown */}
