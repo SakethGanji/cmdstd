@@ -151,6 +151,13 @@ export interface INodeProperty {
 // ============================================
 
 /**
+ * Port type for visual distinction and connection validation
+ * - 'main': Primary data flow (solid circle handle)
+ * - 'resource': Helper/auxiliary connection like LLM, Tools, Memory (diamond handle)
+ */
+export type NodePortType = 'main' | 'resource';
+
+/**
  * Definition of a node output
  */
 export interface INodeOutputDefinition {
@@ -158,6 +165,12 @@ export interface INodeOutputDefinition {
   name: string;
   /** Display label shown in UI */
   displayName: string;
+  /**
+   * Port type for visual styling and connection validation
+   * - 'main': Data flow output (default)
+   * - 'resource': Resource output (e.g., LLM model, tool definitions)
+   */
+  type?: NodePortType;
 }
 
 /**
@@ -170,10 +183,22 @@ export interface INodeInputDefinition {
   displayName: string;
   /** Whether this input must be connected */
   required?: boolean;
+  /**
+   * Port type for visual styling and connection validation
+   * - 'main': Primary data flow input (default)
+   * - 'resource': Helper input like LLM, Tools, Memory
+   */
+  type?: NodePortType;
+  /**
+   * Maximum number of connections allowed to this input
+   * - undefined or Infinity: unlimited connections
+   * - 1: single connection only (e.g., LLM input)
+   */
+  maxConnections?: number;
 }
 
 // ============================================
-// Dynamic Output Strategy (CRITICAL for Switch/If)
+// Dynamic IO Strategies
 // ============================================
 
 /**
@@ -207,6 +232,38 @@ export interface IOutputStrategy {
 
   /** Add +1 output for fallback/else case */
   addFallback?: boolean;
+}
+
+/**
+ * Strategy for calculating dynamic inputs
+ *
+ * Used by frontend to determine how many input handles to render
+ * for nodes like Merge that accept variable inputs
+ *
+ * @example
+ * // Merge node: inputs determined by connections
+ * inputStrategy: {
+ *   type: 'dynamicFromConnections',
+ *   minInputs: 2
+ * }
+ */
+export interface IInputStrategy {
+  /**
+   * Strategy type:
+   * - 'static': Fixed inputs defined in `inputs` array
+   * - 'dynamicFromConnections': Count determined by actual connections
+   * - 'fixed': Fixed number of inputs specified by `itemCount`
+   */
+  type: 'static' | 'dynamicFromConnections' | 'fixed';
+
+  /** Minimum number of inputs required (for dynamic) */
+  minInputs?: number;
+
+  /** Maximum number of inputs allowed (for dynamic) */
+  maxInputs?: number;
+
+  /** For 'fixed': number of inputs to create */
+  itemCount?: number;
 }
 
 // ============================================
@@ -258,6 +315,9 @@ export interface INodeTypeDescription {
   /** Output definitions, or 'dynamic' for variable outputs (like Switch) */
   outputs?: INodeOutputDefinition[] | 'dynamic';
 
+  /** Strategy for calculating dynamic inputs (frontend uses this) */
+  inputStrategy?: IInputStrategy;
+
   /** Strategy for calculating dynamic outputs (frontend uses this) */
   outputStrategy?: IOutputStrategy;
 }
@@ -287,8 +347,8 @@ export interface INodeTypeInfo {
   /** Category groups */
   group?: string[];
 
-  /** Number of inputs (or 1 as default) */
-  inputCount: number;
+  /** Number of inputs (or 'dynamic' if variable) */
+  inputCount: number | 'dynamic';
 
   /** Number of outputs (or 'dynamic' if variable) */
   outputCount: number | 'dynamic';
@@ -296,11 +356,14 @@ export interface INodeTypeInfo {
   /** Field definitions for form rendering */
   properties: INodeProperty[];
 
-  /** Input definitions */
+  /** Input definitions (when static) */
   inputs?: INodeInputDefinition[];
 
   /** Output definitions (when static) */
   outputs?: INodeOutputDefinition[];
+
+  /** Strategy for calculating dynamic inputs */
+  inputStrategy?: IInputStrategy;
 
   /** Strategy for calculating dynamic outputs */
   outputStrategy?: IOutputStrategy;

@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { createRootRoute, Outlet } from '@tanstack/react-router'
 
 import { AppSidebar } from '@/components/app-sidebar'
+import { ThemeProvider } from '@/components/theme-provider'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { useNodeCreatorStore } from '@/stores/nodeCreatorStore'
 
@@ -25,13 +26,15 @@ function RootLayout() {
   }, [closePanel])
 
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <div className="h-full w-full relative">
-          <Outlet />
-        </div>
-      </SidebarInset>
-    </SidebarProvider>
+    <ThemeProvider defaultTheme="system" storageKey="workflow-studio-theme">
+      <SidebarProvider>
+        <AppSidebar />
+        <SidebarInset>
+          <div className="h-full w-full relative">
+            <Outlet />
+          </div>
+        </SidebarInset>
+      </SidebarProvider>
+    </ThemeProvider>
   )
 }

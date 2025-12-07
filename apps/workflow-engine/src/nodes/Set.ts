@@ -29,7 +29,8 @@ export class SetNode extends BaseNode {
     icon: 'fa:edit',
     description: 'Set, rename, or delete fields on items',
     group: ['transform'],
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
 
     properties: [
       {

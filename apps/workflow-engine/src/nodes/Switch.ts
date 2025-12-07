@@ -29,6 +29,9 @@ export class SwitchNode extends BaseNode {
     description: 'Route items to different outputs based on conditions',
     group: ['flow'],
 
+    // Single main input
+    inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
+
     // Dynamic outputs based on rules
     outputs: 'dynamic',
     outputStrategy: {

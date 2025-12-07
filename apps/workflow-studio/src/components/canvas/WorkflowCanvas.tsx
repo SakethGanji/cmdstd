@@ -99,31 +99,31 @@ export default function WorkflowCanvas() {
         nodesDraggable
         nodesConnectable
         elementsSelectable
-        className="bg-neutral-50"
+        className="bg-background"
       >
         <Background
           variant={BackgroundVariant.Dots}
           gap={20}
           size={1}
-          color="#d4d4d4"
+          className="[&>pattern>circle]:fill-border"
         />
         <Controls
           showInteractive={false}
-          className="!bg-white !shadow-md !rounded-lg !border !border-neutral-200"
+          className="!bg-card !shadow-md !rounded-lg !border !border-border"
         />
         <MiniMap
           nodeColor={(node) => {
-            if (node.type === 'addNodes') return '#e5e5e5';
-            return '#3b82f6';
+            if (node.type === 'addNodes') return 'var(--muted)';
+            return 'var(--primary)';
           }}
-          maskColor="rgba(255, 255, 255, 0.8)"
-          className="!bg-white !shadow-md !rounded-lg !border !border-neutral-200"
+          maskColor="hsl(var(--background) / 0.8)"
+          className="!bg-card !shadow-md !rounded-lg !border !border-border"
         />
 
         {/* Top toolbar */}
         <Panel position="top-center" className="flex gap-2">
-          <div className="flex items-center gap-2 rounded-lg bg-white px-4 py-2 shadow-md">
-            <span className="text-sm font-medium text-neutral-700">
+          <div className="flex items-center gap-2 rounded-lg bg-card px-4 py-2 shadow-md border border-border">
+            <span className="text-sm font-medium text-foreground">
               Untitled Workflow
             </span>
           </div>
@@ -134,7 +134,7 @@ export default function WorkflowCanvas() {
           <Panel position="top-right" className="flex gap-2">
             <button
               onClick={() => openPanel('regular')}
-              className="flex items-center gap-2 rounded-lg bg-blue-500 px-4 py-2 text-sm font-medium text-white shadow-md transition-colors hover:bg-blue-600"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md transition-colors hover:bg-primary/90"
             >
               + Add Node
             </button>

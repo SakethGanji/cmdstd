@@ -17,7 +17,8 @@ export class StartNode extends BaseNode {
     icon: 'fa:play',
     description: 'Entry point for manual workflow execution',
     group: ['trigger'],
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: [], // Trigger node - no inputs
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
     properties: [], // No configuration needed
   };
 

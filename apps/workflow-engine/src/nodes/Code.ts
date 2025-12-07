@@ -28,7 +28,8 @@ export class CodeNode extends BaseNode {
     icon: 'fa:code',
     description: 'Execute custom JavaScript code',
     group: ['transform'],
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
 
     properties: [
       {

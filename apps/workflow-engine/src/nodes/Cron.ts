@@ -22,7 +22,8 @@ export class CronNode extends BaseNode {
     icon: 'fa:calendar-alt',
     description: 'Trigger workflow on a schedule',
     group: ['trigger'],
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: [], // Trigger node - no inputs
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
 
     properties: [
       {

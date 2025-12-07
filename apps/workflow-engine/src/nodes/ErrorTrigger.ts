@@ -21,7 +21,8 @@ export class ErrorTriggerNode extends BaseNode {
     icon: 'fa:exclamation-triangle',
     description: 'Trigger a workflow when another workflow fails',
     group: ['trigger'],
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: [], // Trigger node - no inputs
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
     properties: [], // Error data comes from the failing workflow
   };
 

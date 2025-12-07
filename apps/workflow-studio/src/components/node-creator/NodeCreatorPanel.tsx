@@ -138,34 +138,34 @@ export default function NodeCreatorPanel() {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-black/20"
+        className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
         onClick={closePanel}
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 z-50 flex h-full w-[400px] flex-col bg-white shadow-2xl">
+      <div className="fixed right-0 top-0 z-50 flex h-full w-[400px] flex-col bg-card shadow-2xl border-l border-border">
         {/* Header */}
-        <div className="border-b border-neutral-200 px-4 py-4">
+        <div className="border-b border-border px-4 py-4">
           <div className="flex items-center justify-between">
             {view !== 'trigger' && (
               <button
                 onClick={() => setView('trigger')}
-                className="mr-2 rounded p-1 hover:bg-neutral-100"
+                className="mr-2 rounded-md p-1 hover:bg-accent"
               >
-                <ArrowLeft size={20} className="text-neutral-500" />
+                <ArrowLeft size={20} className="text-muted-foreground" />
               </button>
             )}
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-neutral-800">
+              <h2 className="text-lg font-semibold text-foreground">
                 {title}
               </h2>
-              <p className="text-sm text-neutral-500">{subtitle}</p>
+              <p className="text-sm text-muted-foreground">{subtitle}</p>
             </div>
             <button
               onClick={closePanel}
-              className="rounded p-1 hover:bg-neutral-100"
+              className="rounded-md p-1 hover:bg-accent"
             >
-              <X size={20} className="text-neutral-500" />
+              <X size={20} className="text-muted-foreground" />
             </button>
           </div>
 
@@ -173,14 +173,14 @@ export default function NodeCreatorPanel() {
           <div className="relative mt-4">
             <Search
               size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400"
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               type="text"
               placeholder="Search nodes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-neutral-200 bg-neutral-50 py-2 pl-10 pr-4 text-sm outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+              className="w-full rounded-lg border border-input bg-secondary py-2 pl-10 pr-4 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
               autoFocus
             />
           </div>
@@ -199,7 +199,7 @@ export default function NodeCreatorPanel() {
                 />
               ))}
               {filteredNodes.length === 0 && (
-                <p className="py-8 text-center text-sm text-neutral-500">
+                <p className="py-8 text-center text-sm text-muted-foreground">
                   No nodes found matching "{search}"
                 </p>
               )}
@@ -211,7 +211,7 @@ export default function NodeCreatorPanel() {
                 // Trigger view - flat list with sections
                 <>
                   <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Popular
                     </h3>
                     {triggerNodes.slice(0, 3).map((node) => (
@@ -223,7 +223,7 @@ export default function NodeCreatorPanel() {
                     ))}
                   </div>
                   <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Other Triggers
                     </h3>
                     {triggerNodes.slice(3).map((node) => (
@@ -239,7 +239,7 @@ export default function NodeCreatorPanel() {
                 // Regular view - grouped by category
                 Object.entries(groupedNodes).map(([category, nodes]) => (
                   <div key={category} className="space-y-2">
-                    <h3 className="flex items-center text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    <h3 className="flex items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       {category}
                       <ChevronRight size={14} className="ml-1" />
                     </h3>
@@ -258,9 +258,9 @@ export default function NodeCreatorPanel() {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-neutral-200 px-4 py-3">
-          <p className="text-xs text-neutral-500">
-            Press <kbd className="rounded bg-neutral-100 px-1 py-0.5 font-mono">Esc</kbd> to close
+        <div className="border-t border-border px-4 py-3">
+          <p className="text-xs text-muted-foreground">
+            Press <kbd className="rounded-md bg-muted px-1 py-0.5 font-mono">Esc</kbd> to close
           </p>
         </div>
       </div>

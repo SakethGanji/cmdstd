@@ -25,23 +25,23 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
     : null;
 
   return (
-    <div className="flex h-full flex-col bg-neutral-50">
+    <div className="flex h-full flex-col bg-muted">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-neutral-800">Output</h3>
+          <h3 className="font-semibold text-foreground">Output</h3>
           {hasData && (
-            <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs text-green-700">
+            <span className="rounded-full bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 text-xs text-emerald-700 dark:text-emerald-400">
               {executionData?.output?.items.length} items
             </span>
           )}
           {hasError && (
-            <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs text-red-700">
+            <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs text-destructive">
               Error
             </span>
           )}
           {executionTime && (
-            <span className="flex items-center gap-1 text-xs text-neutral-500">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
               <Clock size={12} />
               {executionTime}
             </span>
@@ -54,8 +54,8 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
             onClick={() => setIsPinned(!isPinned)}
             className={`rounded p-1.5 ${
               isPinned
-                ? 'bg-amber-100 text-amber-600'
-                : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700'
+                ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
             }`}
             title={isPinned ? 'Unpin data' : 'Pin data'}
           >
@@ -63,13 +63,13 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
           </button>
 
           {/* Display mode toggle */}
-          <div className="flex items-center gap-1 rounded-lg bg-neutral-100 p-1">
+          <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
             <button
               onClick={() => setDisplayMode('table')}
               className={`rounded p-1.5 ${
                 displayMode === 'table'
-                  ? 'bg-white shadow-sm'
-                  : 'text-neutral-500 hover:text-neutral-700'
+                  ? 'bg-card shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Table view"
             >
@@ -79,8 +79,8 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
               onClick={() => setDisplayMode('json')}
               className={`rounded p-1.5 ${
                 displayMode === 'json'
-                  ? 'bg-white shadow-sm'
-                  : 'text-neutral-500 hover:text-neutral-700'
+                  ? 'bg-card shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               title="JSON view"
             >
@@ -90,8 +90,8 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
               onClick={() => setDisplayMode('schema')}
               className={`rounded p-1.5 ${
                 displayMode === 'schema'
-                  ? 'bg-white shadow-sm'
-                  : 'text-neutral-500 hover:text-neutral-700'
+                  ? 'bg-card shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Schema view"
             >
@@ -103,7 +103,7 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
 
       {/* Pinned indicator */}
       {isPinned && (
-        <div className="flex items-center gap-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-700">
+        <div className="flex items-center gap-2 border-b border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950 px-4 py-2 text-xs text-amber-700 dark:text-amber-400">
           <Pin size={12} />
           This output data is pinned
         </div>
@@ -113,23 +113,23 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
       <div className="flex-1 overflow-auto p-4">
         {!executionData ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <Database size={48} className="mb-4 text-neutral-300" />
-            <p className="text-sm font-medium text-neutral-600">
+            <Database size={48} className="mb-4 text-muted-foreground/50" />
+            <p className="text-sm font-medium text-muted-foreground">
               No output data yet
             </p>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Execute the node to see output
             </p>
           </div>
         ) : executionData.status === 'running' ? (
           <div className="flex h-full flex-col items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-blue-500" />
-            <p className="mt-4 text-sm text-neutral-500">Executing node...</p>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
+            <p className="mt-4 text-sm text-muted-foreground">Executing node...</p>
           </div>
         ) : hasError ? (
-          <div className="rounded-lg border border-red-200 bg-red-50 p-4">
-            <p className="font-medium text-red-800">Execution Error</p>
-            <p className="mt-1 text-sm text-red-600">
+          <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4">
+            <p className="font-medium text-destructive">Execution Error</p>
+            <p className="mt-1 text-sm text-destructive/80">
               {executionData.output?.error}
             </p>
           </div>
@@ -140,8 +140,8 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <Database size={48} className="mb-4 text-neutral-300" />
-            <p className="text-sm font-medium text-neutral-600">
+            <Database size={48} className="mb-4 text-muted-foreground/50" />
+            <p className="text-sm font-medium text-muted-foreground">
               No output items
             </p>
           </div>

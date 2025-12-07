@@ -29,7 +29,8 @@ export class HttpRequestNode extends BaseNode {
     icon: 'fa:globe',
     description: 'Makes HTTP requests to external APIs',
     group: ['transform'],
-    outputs: [{ name: 'main', displayName: 'Response' }],
+    inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
+    outputs: [{ name: 'main', displayName: 'Response', type: 'main' }],
 
     properties: [
       {

@@ -73,18 +73,18 @@ export default function NodeDetailsModal() {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/40"
+        className="absolute inset-0 bg-background/80 backdrop-blur-sm"
         onClick={closeNDV}
       />
 
       {/* Modal */}
-      <div className="relative z-10 flex h-[90vh] w-[95vw] max-w-[1600px] flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+      <div className="relative z-10 flex h-[90vh] w-[95vw] max-w-[1600px] flex-col overflow-hidden rounded-xl bg-card shadow-2xl border border-border">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-neutral-200 px-4 py-3">
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={closeNDV}
-              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-neutral-600 hover:bg-neutral-100"
+              className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-muted-foreground hover:bg-accent"
             >
               <ArrowLeft size={16} />
               Back to canvas
@@ -92,21 +92,21 @@ export default function NodeDetailsModal() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-neutral-800">
+            <span className="text-lg font-semibold text-foreground">
               {activeNode.data.label}
             </span>
             {nodeExecution?.status === 'running' && (
-              <span className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-medium text-yellow-700">
+              <span className="rounded-full bg-amber-100 dark:bg-amber-950 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400">
                 Running...
               </span>
             )}
             {nodeExecution?.status === 'success' && (
-              <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+              <span className="rounded-full bg-emerald-100 dark:bg-emerald-950 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
                 Success
               </span>
             )}
             {nodeExecution?.status === 'error' && (
-              <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+              <span className="rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
                 Error
               </span>
             )}
@@ -116,20 +116,20 @@ export default function NodeDetailsModal() {
             <button
               onClick={handleExecute}
               disabled={nodeExecution?.status === 'running'}
-              className="flex items-center gap-2 rounded-lg bg-green-500 px-4 py-2 text-sm font-medium text-white hover:bg-green-600 disabled:opacity-50"
+              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
               <Play size={16} />
               Test step
             </button>
             <button
               onClick={handleDelete}
-              className="rounded-lg p-2 text-neutral-500 hover:bg-red-50 hover:text-red-600"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
             >
               <Trash2 size={18} />
             </button>
             <button
               onClick={closeNDV}
-              className="rounded-lg p-2 text-neutral-500 hover:bg-neutral-100"
+              className="rounded-lg p-2 text-muted-foreground hover:bg-accent"
             >
               <X size={18} />
             </button>
@@ -147,7 +147,7 @@ export default function NodeDetailsModal() {
               />
             </Panel>
 
-            <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-blue-500 transition-colors" />
+            <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
 
             {/* Settings Panel */}
             <Panel defaultSize={50} minSize={30}>
@@ -157,7 +157,7 @@ export default function NodeDetailsModal() {
               />
             </Panel>
 
-            <PanelResizeHandle className="w-1 bg-neutral-200 hover:bg-blue-500 transition-colors" />
+            <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
 
             {/* Output Panel */}
             <Panel defaultSize={25} minSize={15} maxSize={40}>

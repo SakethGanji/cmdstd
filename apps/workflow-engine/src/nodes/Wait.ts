@@ -21,7 +21,8 @@ export class WaitNode extends BaseNode {
     icon: 'fa:clock',
     description: 'Pause workflow execution for a specified time',
     group: ['flow'],
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
 
     properties: [
       {

@@ -26,10 +26,13 @@ export class IfNode extends BaseNode {
     description: 'Route items based on a condition (true/false outputs)',
     group: ['flow'],
 
+    // Single main input
+    inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
+
     // Fixed two outputs
     outputs: [
-      { name: 'true', displayName: 'True' },
-      { name: 'false', displayName: 'False' },
+      { name: 'true', displayName: 'True', type: 'main' },
+      { name: 'false', displayName: 'False', type: 'main' },
     ],
 
     properties: [

@@ -45,7 +45,7 @@ function WorkflowEdge({
         style={{
           ...style,
           strokeWidth: isHovered ? 3 : 2,
-          stroke: isHovered ? '#3b82f6' : '#94a3b8',
+          stroke: isHovered ? 'var(--primary)' : 'var(--border)',
         }}
         interactionWidth={20}
       />
@@ -70,7 +70,7 @@ function WorkflowEdge({
           >
             <button
               onClick={handleAddNode}
-              className="flex h-6 w-6 items-center justify-center rounded-full bg-blue-500 text-white shadow-md transition-all hover:bg-blue-600 hover:scale-110"
+              className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md transition-all hover:bg-primary/90 hover:scale-110"
             >
               <Plus size={14} />
             </button>

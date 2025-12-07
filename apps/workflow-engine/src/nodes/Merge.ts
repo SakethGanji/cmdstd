@@ -29,8 +29,12 @@ export class MergeNode extends BaseNode {
     description: 'Combine data from multiple workflow branches',
     group: ['flow'],
 
-    inputs: 'dynamic', // Multiple inputs
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: 'dynamic', // Multiple inputs determined by connections
+    inputStrategy: {
+      type: 'dynamicFromConnections',
+      minInputs: 2,
+    },
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
 
     properties: [
       {

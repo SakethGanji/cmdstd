@@ -17,7 +17,8 @@ export class WebhookNode extends BaseNode {
     icon: 'fa:bolt',
     description: 'Triggers workflow from HTTP webhook requests',
     group: ['trigger'],
-    outputs: [{ name: 'main', displayName: 'Output' }],
+    inputs: [], // Trigger node - no inputs
+    outputs: [{ name: 'main', displayName: 'Output', type: 'main' }],
 
     properties: [
       {

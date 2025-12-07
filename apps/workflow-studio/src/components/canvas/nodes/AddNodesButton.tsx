@@ -27,16 +27,16 @@ function AddNodesButton({ data }: NodeProps<AddNodesButtonData>) {
             openPanel('trigger');
           }
         }}
-        className="group flex h-[100px] w-[100px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 bg-white transition-all hover:border-blue-500 hover:bg-blue-50 active:scale-95"
+        className="group flex h-[100px] w-[100px] cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-border bg-card transition-all hover:border-primary hover:bg-primary/10 active:scale-95"
         style={{ pointerEvents: 'all' }}
       >
         <Plus
           size={40}
-          className="text-neutral-400 transition-colors group-hover:text-blue-500"
+          className="text-muted-foreground transition-colors group-hover:text-primary"
           style={{ pointerEvents: 'none' }}
         />
       </div>
-      <p className="mt-2 text-sm font-medium text-neutral-600" style={{ pointerEvents: 'none' }}>
+      <p className="mt-2 text-sm font-medium text-muted-foreground" style={{ pointerEvents: 'none' }}>
         {data.label || 'Add first step...'}
       </p>
     </div>

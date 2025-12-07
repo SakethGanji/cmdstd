@@ -18,26 +18,26 @@ export default function InputPanel({ executionData }: InputPanelProps) {
   const hasData = executionData?.input?.items && executionData.input.items.length > 0;
 
   return (
-    <div className="flex h-full flex-col bg-neutral-50">
+    <div className="flex h-full flex-col bg-muted">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-neutral-200 bg-white px-4 py-3">
+      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-neutral-800">Input</h3>
+          <h3 className="font-semibold text-foreground">Input</h3>
           {hasData && (
-            <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs text-neutral-600">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
               {executionData?.input?.items.length} items
             </span>
           )}
         </div>
 
         {/* Display mode toggle */}
-        <div className="flex items-center gap-1 rounded-lg bg-neutral-100 p-1">
+        <div className="flex items-center gap-1 rounded-lg bg-muted p-1">
           <button
             onClick={() => setDisplayMode('table')}
             className={`rounded p-1.5 ${
               displayMode === 'table'
-                ? 'bg-white shadow-sm'
-                : 'text-neutral-500 hover:text-neutral-700'
+                ? 'bg-card shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
             title="Table view"
           >
@@ -47,8 +47,8 @@ export default function InputPanel({ executionData }: InputPanelProps) {
             onClick={() => setDisplayMode('json')}
             className={`rounded p-1.5 ${
               displayMode === 'json'
-                ? 'bg-white shadow-sm'
-                : 'text-neutral-500 hover:text-neutral-700'
+                ? 'bg-card shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
             title="JSON view"
           >
@@ -58,8 +58,8 @@ export default function InputPanel({ executionData }: InputPanelProps) {
             onClick={() => setDisplayMode('schema')}
             className={`rounded p-1.5 ${
               displayMode === 'schema'
-                ? 'bg-white shadow-sm'
-                : 'text-neutral-500 hover:text-neutral-700'
+                ? 'bg-card shadow-sm'
+                : 'text-muted-foreground hover:text-foreground'
             }`}
             title="Schema view"
           >
@@ -69,10 +69,10 @@ export default function InputPanel({ executionData }: InputPanelProps) {
       </div>
 
       {/* Node selector (would allow selecting which input node to view) */}
-      <div className="border-b border-neutral-200 bg-white px-4 py-2">
-        <button className="flex w-full items-center justify-between rounded-lg border border-neutral-200 px-3 py-2 text-left text-sm hover:bg-neutral-50">
-          <span className="text-neutral-600">Select input node...</span>
-          <ChevronDown size={16} className="text-neutral-400" />
+      <div className="border-b border-border bg-card px-4 py-2">
+        <button className="flex w-full items-center justify-between rounded-lg border border-border px-3 py-2 text-left text-sm hover:bg-accent">
+          <span className="text-muted-foreground">Select input node...</span>
+          <ChevronDown size={16} className="text-muted-foreground" />
         </button>
       </div>
 
@@ -80,17 +80,17 @@ export default function InputPanel({ executionData }: InputPanelProps) {
       <div className="flex-1 overflow-auto p-4">
         {!executionData ? (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <Database size={48} className="mb-4 text-neutral-300" />
-            <p className="text-sm font-medium text-neutral-600">
+            <Database size={48} className="mb-4 text-muted-foreground/50" />
+            <p className="text-sm font-medium text-muted-foreground">
               No input data
             </p>
-            <p className="mt-1 text-xs text-neutral-500">
+            <p className="mt-1 text-xs text-muted-foreground">
               Execute a previous node to see input data
             </p>
           </div>
         ) : executionData.status === 'running' ? (
           <div className="flex h-full items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-neutral-200 border-t-blue-500" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-primary" />
           </div>
         ) : hasData ? (
           <RunDataDisplay
@@ -99,8 +99,8 @@ export default function InputPanel({ executionData }: InputPanelProps) {
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center text-center">
-            <Database size={48} className="mb-4 text-neutral-300" />
-            <p className="text-sm font-medium text-neutral-600">
+            <Database size={48} className="mb-4 text-muted-foreground/50" />
+            <p className="text-sm font-medium text-muted-foreground">
               No input items
             </p>
           </div>

@@ -2,6 +2,7 @@ import type { INode, NodeConstructor } from './types.js';
 import type {
   INodeTypeDescription,
   INodeTypeInfo,
+  INodeInputDefinition,
   INodeOutputDefinition,
 } from './nodeSchema.js';
 import {
@@ -106,14 +107,35 @@ class NodeRegistryClass {
    */
   getNodeInfoFull(): INodeTypeInfo[] {
     return Array.from(this.nodes.values()).map(({ instance, description }) => {
+      // Determine inputs
+      let inputCount: number | 'dynamic' = 1;
+      let inputs: INodeInputDefinition[] = [
+        { name: 'main', displayName: 'Input', type: 'main' },
+      ];
+
+      if (description?.inputs === 'dynamic') {
+        inputCount = 'dynamic';
+        inputs = []; // Dynamic inputs are determined by connections
+      } else if (description?.inputs && Array.isArray(description.inputs)) {
+        inputs = description.inputs;
+        inputCount = inputs.length;
+      } else if (instance.inputCount === Infinity) {
+        // Legacy support: inputCount = Infinity means dynamic
+        inputCount = 'dynamic';
+        inputs = [];
+      } else if (instance.inputCount) {
+        inputCount = instance.inputCount;
+      }
+
       // Determine outputs
       let outputCount: number | 'dynamic' = 1;
       let outputs: INodeOutputDefinition[] = [
-        { name: 'main', displayName: 'Main' },
+        { name: 'main', displayName: 'Output', type: 'main' },
       ];
 
       if (description?.outputs === 'dynamic') {
         outputCount = 'dynamic';
+        outputs = []; // Dynamic outputs are determined by strategy
       } else if (description?.outputs && Array.isArray(description.outputs)) {
         outputs = description.outputs;
         outputCount = outputs.length;
@@ -125,12 +147,12 @@ class NodeRegistryClass {
         description: instance.description,
         icon: description?.icon,
         group: description?.group,
-        inputCount: instance.inputCount || 1,
+        inputCount,
         outputCount,
         properties: description?.properties || [],
-        inputs:
-          description?.inputs === 'dynamic' ? undefined : description?.inputs,
-        outputs: outputs,
+        inputs: inputCount === 'dynamic' ? undefined : inputs,
+        outputs: outputCount === 'dynamic' ? undefined : outputs,
+        inputStrategy: description?.inputStrategy,
         outputStrategy: description?.outputStrategy,
       };
     });
@@ -145,13 +167,34 @@ class NodeRegistryClass {
 
     const { instance, description } = entry;
 
+    // Determine inputs
+    let inputCount: number | 'dynamic' = 1;
+    let inputs: INodeInputDefinition[] = [
+      { name: 'main', displayName: 'Input', type: 'main' },
+    ];
+
+    if (description?.inputs === 'dynamic') {
+      inputCount = 'dynamic';
+      inputs = [];
+    } else if (description?.inputs && Array.isArray(description.inputs)) {
+      inputs = description.inputs;
+      inputCount = inputs.length;
+    } else if (instance.inputCount === Infinity) {
+      inputCount = 'dynamic';
+      inputs = [];
+    } else if (instance.inputCount) {
+      inputCount = instance.inputCount;
+    }
+
+    // Determine outputs
     let outputCount: number | 'dynamic' = 1;
     let outputs: INodeOutputDefinition[] = [
-      { name: 'main', displayName: 'Main' },
+      { name: 'main', displayName: 'Output', type: 'main' },
     ];
 
     if (description?.outputs === 'dynamic') {
       outputCount = 'dynamic';
+      outputs = [];
     } else if (description?.outputs && Array.isArray(description.outputs)) {
       outputs = description.outputs;
       outputCount = outputs.length;
@@ -163,12 +206,12 @@ class NodeRegistryClass {
       description: instance.description,
       icon: description?.icon,
       group: description?.group,
-      inputCount: instance.inputCount || 1,
+      inputCount,
       outputCount,
       properties: description?.properties || [],
-      inputs:
-        description?.inputs === 'dynamic' ? undefined : description?.inputs,
-      outputs: outputs,
+      inputs: inputCount === 'dynamic' ? undefined : inputs,
+      outputs: outputCount === 'dynamic' ? undefined : outputs,
+      inputStrategy: description?.inputStrategy,
       outputStrategy: description?.outputStrategy,
     };
   }

@@ -35,9 +35,10 @@ export class SplitInBatchesNode extends BaseNode {
     description: 'Process items in batches with looping',
     group: ['flow'],
 
+    inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
     outputs: [
-      { name: 'loop', displayName: 'Loop' },
-      { name: 'done', displayName: 'Done' },
+      { name: 'loop', displayName: 'Loop', type: 'main' },
+      { name: 'done', displayName: 'Done', type: 'main' },
     ],
 
     properties: [
