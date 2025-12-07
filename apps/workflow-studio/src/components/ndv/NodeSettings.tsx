@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   Settings,
   Play,
@@ -18,9 +18,14 @@ import {
   Globe,
   Pen,
   Calendar,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react';
 import type { Node } from 'reactflow';
 import type { WorkflowNodeData } from '../../types/workflow';
+import { useWorkflowStore } from '../../stores/workflowStore';
+import ExpressionEditor from './ExpressionEditor';
 
 // Icon mapping
 const iconMap: Record<string, LucideIcon> = {
@@ -49,8 +54,26 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
     main: true,
     options: false,
   });
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState(node.data.label);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const updateNodeData = useWorkflowStore((s) => s.updateNodeData);
 
   const IconComponent = iconMap[node.data.icon || 'code'] || Code;
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingName && nameInputRef.current) {
+      nameInputRef.current.focus();
+      nameInputRef.current.select();
+    }
+  }, [isEditingName]);
+
+  // Reset edited name when node changes
+  useEffect(() => {
+    setEditedName(node.data.label);
+    setIsEditingName(false);
+  }, [node.id, node.data.label]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -59,18 +82,77 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
     }));
   };
 
+  const handleSaveName = () => {
+    if (editedName.trim()) {
+      updateNodeData(node.id, { label: editedName.trim() });
+    } else {
+      setEditedName(node.data.label);
+    }
+    setIsEditingName(false);
+  };
+
+  const handleCancelEdit = () => {
+    setEditedName(node.data.label);
+    setIsEditingName(false);
+  };
+
+  const handleNameKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSaveName();
+    } else if (e.key === 'Escape') {
+      handleCancelEdit();
+    }
+  };
+
   return (
     <div className="flex h-full flex-col bg-card">
-      {/* Node Header */}
+      {/* Node Header with inline editing */}
       <div className="flex items-center gap-4 border-b border-border px-6 py-4">
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <IconComponent size={24} />
         </div>
-        <div>
-          <h2 className="text-xl font-semibold text-foreground">
-            {node.data.label}
-          </h2>
-          <p className="text-sm text-muted-foreground">
+        <div className="flex-1 min-w-0">
+          {isEditingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                ref={nameInputRef}
+                type="text"
+                value={editedName}
+                onChange={(e) => setEditedName(e.target.value)}
+                onKeyDown={handleNameKeyDown}
+                onBlur={handleSaveName}
+                className="flex-1 text-xl font-semibold text-foreground bg-secondary rounded-lg px-2 py-1 border border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              />
+              <button
+                onClick={handleSaveName}
+                className="p-1 rounded hover:bg-accent text-primary"
+                title="Save"
+              >
+                <Check size={18} />
+              </button>
+              <button
+                onClick={handleCancelEdit}
+                className="p-1 rounded hover:bg-accent text-muted-foreground"
+                title="Cancel"
+              >
+                <X size={18} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <h2 className="text-xl font-semibold text-foreground truncate">
+                {node.data.label}
+              </h2>
+              <button
+                onClick={() => setIsEditingName(true)}
+                className="p-1 rounded hover:bg-accent text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                title="Rename node"
+              >
+                <Pencil size={14} />
+              </button>
+            </div>
+          )}
+          <p className="text-sm text-muted-foreground truncate">
             {node.data.description || 'Configure this node'}
           </p>
         </div>
@@ -136,16 +218,26 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
                           <option>DELETE</option>
                         </select>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-sm font-medium text-foreground">
-                          URL
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="https://api.example.com/endpoint"
-                          className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
-                        />
-                      </div>
+                      <ExpressionEditor
+                        label="URL"
+                        value={(node.data.parameters?.url as string) || ''}
+                        onChange={(value) => {
+                          updateNodeData(node.id, {
+                            parameters: { ...node.data.parameters, url: value },
+                          });
+                        }}
+                        placeholder="https://api.example.com/endpoint"
+                      />
+                      <ExpressionEditor
+                        label="Body (JSON)"
+                        value={(node.data.parameters?.body as string) || ''}
+                        onChange={(value) => {
+                          updateNodeData(node.id, {
+                            parameters: { ...node.data.parameters, body: value },
+                          });
+                        }}
+                        placeholder='{"key": "value"}'
+                      />
                     </div>
                   )}
 
@@ -215,13 +307,13 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
               )}
             </div>
 
-            {/* Options Section */}
+            {/* Options Section - Error Handling */}
             <div className="rounded-lg border border-border">
               <button
                 onClick={() => toggleSection('options')}
                 className="flex w-full items-center justify-between px-4 py-3 text-left hover:bg-accent"
               >
-                <span className="font-medium text-foreground">Options</span>
+                <span className="font-medium text-foreground">Error Handling</span>
                 {expandedSections.options ? (
                   <ChevronUp size={18} className="text-muted-foreground" />
                 ) : (
@@ -234,21 +326,83 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
                     <label className="flex items-center gap-2">
                       <input
                         type="checkbox"
+                        checked={node.data.continueOnFail || false}
+                        onChange={(e) => {
+                          updateNodeData(node.id, {
+                            continueOnFail: e.target.checked,
+                          });
+                        }}
                         className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
                       />
-                      <span className="text-sm text-foreground">
-                        Continue on fail
-                      </span>
+                      <div>
+                        <span className="text-sm text-foreground">
+                          Continue on fail
+                        </span>
+                        <p className="text-xs text-muted-foreground">
+                          Continue workflow execution even if this node fails
+                        </p>
+                      </div>
                     </label>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
-                      />
-                      <span className="text-sm text-foreground">
-                        Retry on fail
-                      </span>
-                    </label>
+
+                    <div className="space-y-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={(node.data.retryOnFail || 0) > 0}
+                          onChange={(e) => {
+                            updateNodeData(node.id, {
+                              retryOnFail: e.target.checked ? 3 : 0,
+                            });
+                          }}
+                          className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                        />
+                        <div>
+                          <span className="text-sm text-foreground">
+                            Retry on fail
+                          </span>
+                          <p className="text-xs text-muted-foreground">
+                            Retry this node if it fails
+                          </p>
+                        </div>
+                      </label>
+
+                      {(node.data.retryOnFail || 0) > 0 && (
+                        <div className="ml-6 space-y-3">
+                          <div>
+                            <label className="mb-1 block text-sm text-muted-foreground">
+                              Number of retries (1-10)
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              max={10}
+                              value={node.data.retryOnFail || 3}
+                              onChange={(e) => {
+                                const val = Math.min(10, Math.max(1, parseInt(e.target.value) || 1));
+                                updateNodeData(node.id, { retryOnFail: val });
+                              }}
+                              className="w-24 rounded-lg border border-input bg-secondary px-3 py-1.5 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                          </div>
+                          <div>
+                            <label className="mb-1 block text-sm text-muted-foreground">
+                              Delay between retries (ms)
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              step={100}
+                              value={node.data.retryDelay || 1000}
+                              onChange={(e) => {
+                                const val = Math.max(0, parseInt(e.target.value) || 1000);
+                                updateNodeData(node.id, { retryDelay: val });
+                              }}
+                              className="w-32 rounded-lg border border-input bg-secondary px-3 py-1.5 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
@@ -259,13 +413,17 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
             {/* Node Settings */}
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">
-                Node Name
+                Node Name (ID)
               </label>
               <input
                 type="text"
-                defaultValue={node.data.label}
-                className="w-full rounded-lg border border-input bg-secondary px-3 py-2 text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+                value={node.data.name || node.data.label}
+                disabled
+                className="w-full rounded-lg border border-input bg-muted px-3 py-2 text-sm text-muted-foreground cursor-not-allowed"
               />
+              <p className="mt-1 text-xs text-muted-foreground">
+                This is the unique identifier used in connections. Edit the display name in the header above.
+              </p>
             </div>
 
             <div>
@@ -282,9 +440,18 @@ export default function NodeSettings({ node, onExecute }: NodeSettingsProps) {
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
+                checked={node.data.disabled || false}
+                onChange={(e) => {
+                  updateNodeData(node.id, { disabled: e.target.checked });
+                }}
                 className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
               />
-              <span className="text-sm text-foreground">Disable this node</span>
+              <div>
+                <span className="text-sm text-foreground">Disable this node</span>
+                <p className="text-xs text-muted-foreground">
+                  Disabled nodes are skipped during execution
+                </p>
+              </div>
             </label>
           </div>
         )}

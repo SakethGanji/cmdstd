@@ -16,6 +16,7 @@ import {
   Globe,
   Pen,
   Calendar,
+  AlertTriangle,
 } from 'lucide-react';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
 import { useNDVStore } from '../../../stores/ndvStore';
@@ -36,6 +37,7 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
   globe: Globe,
   pen: Pen,
   calendar: Calendar,
+  'alert-triangle': AlertTriangle,
 };
 
 function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {

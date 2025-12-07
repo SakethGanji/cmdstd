@@ -52,38 +52,46 @@ export const useNodeCreatorStore = create<NodeCreatorState>((set) => ({
     set({ sourceNodeId: null, sourceHandleId: null }),
 }));
 
-// Node definitions - these would come from the backend in a real app
+/**
+ * Node definitions - aligned with backend node types
+ *
+ * Key fields:
+ * - type: UI type (camelCase) - used internally in UI
+ * - backendType: Backend type (PascalCase) - used for API calls and name generation
+ * - displayName: Shown in UI
+ */
+
 export const triggerNodes: NodeDefinition[] = [
   {
     type: 'manualTrigger',
-    name: 'n8n-nodes-base.manualTrigger',
+    name: 'Start',  // Backend type - used for generating node names
     displayName: 'Manual Trigger',
-    description: 'Runs the flow on clicking a button in n8n',
+    description: 'Runs the flow on clicking a button',
     icon: 'mouse-pointer',
     category: 'trigger',
   },
   {
     type: 'scheduleTrigger',
-    name: 'n8n-nodes-base.scheduleTrigger',
+    name: 'Cron',
     displayName: 'Schedule Trigger',
-    description: 'Runs the flow every day, hour, or custom interval',
+    description: 'Runs the flow on a schedule (cron)',
     icon: 'clock',
     category: 'trigger',
   },
   {
     type: 'webhook',
-    name: 'n8n-nodes-base.webhook',
+    name: 'Webhook',
     displayName: 'Webhook',
     description: 'Runs the flow on receiving an HTTP request',
     icon: 'webhook',
     category: 'trigger',
   },
   {
-    type: 'cronTrigger',
-    name: 'n8n-nodes-base.cron',
-    displayName: 'Cron',
-    description: 'Triggers workflow based on cron expression',
-    icon: 'calendar',
+    type: 'errorTrigger',
+    name: 'ErrorTrigger',
+    displayName: 'Error Trigger',
+    description: 'Triggers when another workflow fails',
+    icon: 'alert-triangle',
     category: 'trigger',
   },
 ];
@@ -92,7 +100,7 @@ export const regularNodes: NodeDefinition[] = [
   // Transform Data
   {
     type: 'set',
-    name: 'n8n-nodes-base.set',
+    name: 'Set',
     displayName: 'Set',
     description: 'Sets values on items and optionally remove other values',
     icon: 'pen',
@@ -101,26 +109,18 @@ export const regularNodes: NodeDefinition[] = [
   },
   {
     type: 'code',
-    name: 'n8n-nodes-base.code',
+    name: 'Code',
     displayName: 'Code',
     description: 'Run custom JavaScript code',
     icon: 'code',
     category: 'transform',
     subcategory: 'Transform Data',
   },
-  {
-    type: 'filter',
-    name: 'n8n-nodes-base.filter',
-    displayName: 'Filter',
-    description: 'Filter items based on conditions',
-    icon: 'filter',
-    category: 'transform',
-    subcategory: 'Transform Data',
-  },
+  // Note: Filter node removed - not implemented in backend
   // Flow Control
   {
     type: 'if',
-    name: 'n8n-nodes-base.if',
+    name: 'If',
     displayName: 'If',
     description: 'Route items based on conditions',
     icon: 'git-branch',
@@ -129,7 +129,7 @@ export const regularNodes: NodeDefinition[] = [
   },
   {
     type: 'switch',
-    name: 'n8n-nodes-base.switch',
+    name: 'Switch',
     displayName: 'Switch',
     description: 'Route items based on multiple conditions',
     icon: 'route',
@@ -138,7 +138,7 @@ export const regularNodes: NodeDefinition[] = [
   },
   {
     type: 'merge',
-    name: 'n8n-nodes-base.merge',
+    name: 'Merge',
     displayName: 'Merge',
     description: 'Merge data from multiple inputs',
     icon: 'git-merge',
@@ -147,7 +147,7 @@ export const regularNodes: NodeDefinition[] = [
   },
   {
     type: 'splitInBatches',
-    name: 'n8n-nodes-base.splitInBatches',
+    name: 'SplitInBatches',
     displayName: 'Split In Batches',
     description: 'Split data into batches for processing',
     icon: 'layers',
@@ -157,7 +157,7 @@ export const regularNodes: NodeDefinition[] = [
   // Helpers
   {
     type: 'httpRequest',
-    name: 'n8n-nodes-base.httpRequest',
+    name: 'HttpRequest',
     displayName: 'HTTP Request',
     description: 'Makes HTTP requests and returns the response',
     icon: 'globe',
@@ -166,7 +166,7 @@ export const regularNodes: NodeDefinition[] = [
   },
   {
     type: 'wait',
-    name: 'n8n-nodes-base.wait',
+    name: 'Wait',
     displayName: 'Wait',
     description: 'Wait for a specified amount of time',
     icon: 'clock',

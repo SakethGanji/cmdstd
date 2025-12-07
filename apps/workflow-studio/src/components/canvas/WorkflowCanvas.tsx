@@ -1,25 +1,30 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Background,
   Controls,
   MiniMap,
   type OnConnect,
+  type Connection,
   Panel,
   BackgroundVariant,
+  useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
+import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
 import WorkflowEdge from './edges/WorkflowEdge';
+import StickyNote from './nodes/StickyNote';
 
 // Define custom node types - use 'any' to work around React 19 type incompatibility
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const nodeTypes: any = {
   addNodes: AddNodesButton,
   workflowNode: WorkflowNode,
+  stickyNote: StickyNote,
 };
 
 // Define custom edge types
@@ -36,15 +41,46 @@ export default function WorkflowCanvas() {
     onEdgesChange,
     onConnect,
     setSelectedNode,
+    isValidConnection,
   } = useWorkflowStore();
 
   const openPanel = useNodeCreatorStore((s) => s.openPanel);
+  const { fitView } = useReactFlow();
+
+  // Initialize keyboard shortcuts
+  useKeyboardShortcuts({
+    onSave: () => {
+      // TODO: Implement save to backend
+      console.log('Saving workflow...');
+      // Show a toast notification here in production
+    },
+  });
+
+  // Fit view on initial load when nodes change from placeholder to real nodes
+  useEffect(() => {
+    const hasRealNodes = nodes.some((n) => n.type === 'workflowNode');
+    if (hasRealNodes) {
+      // Small delay to ensure nodes are rendered
+      const timer = setTimeout(() => {
+        fitView({ padding: 0.2, duration: 200, maxZoom: 1 });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [nodes.length > 1]); // Only trigger when we go from 1 node to more
 
   const handleConnect: OnConnect = useCallback(
     (connection) => {
       onConnect(connection);
     },
     [onConnect]
+  );
+
+  // Connection validation callback for ReactFlow
+  const handleIsValidConnection = useCallback(
+    (connection: Connection) => {
+      return isValidConnection(connection);
+    },
+    [isValidConnection]
   );
 
   const handleSelectionChange = useCallback(
@@ -78,6 +114,7 @@ export default function WorkflowCanvas() {
         onConnect={handleConnect}
         onSelectionChange={handleSelectionChange}
         onPaneClick={handlePaneClick}
+        isValidConnection={handleIsValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={{
@@ -128,6 +165,17 @@ export default function WorkflowCanvas() {
           position="bottom-left"
           nodeColor={(node) => {
             if (node.type === 'addNodes') return 'var(--muted)';
+            if (node.type === 'stickyNote') {
+              const color = node.data?.color || 'yellow';
+              const colors: Record<string, string> = {
+                yellow: '#fef08a',
+                blue: '#93c5fd',
+                green: '#86efac',
+                pink: '#f9a8d4',
+                purple: '#c4b5fd',
+              };
+              return colors[color] || colors.yellow;
+            }
             return 'var(--primary)';
           }}
           maskColor="hsl(var(--background) / 0.8)"

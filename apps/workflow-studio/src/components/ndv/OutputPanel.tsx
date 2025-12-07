@@ -1,20 +1,43 @@
 import { useState } from 'react';
 import { Database, Code, List, Pin, Clock } from 'lucide-react';
 import type { NodeExecutionData } from '../../types/workflow';
+import { useWorkflowStore } from '../../stores/workflowStore';
 import RunDataDisplay from './RunDataDisplay';
 
 interface OutputPanelProps {
-  nodeId: string; // Reserved for future use
+  nodeId: string;
   executionData: NodeExecutionData | null;
 }
 
-// nodeId is reserved for future features like pin data storage
-
 type DisplayMode = 'table' | 'json' | 'schema';
 
-export default function OutputPanel({ executionData }: OutputPanelProps) {
+export default function OutputPanel({ nodeId, executionData }: OutputPanelProps) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('table');
-  const [isPinned, setIsPinned] = useState(false);
+
+  const hasPinned = useWorkflowStore((s) => s.hasPinnedData(nodeId));
+  const getPinnedDataForDisplay = useWorkflowStore((s) => s.getPinnedDataForDisplay);
+  const pinNodeData = useWorkflowStore((s) => s.pinNodeData);
+  const unpinNodeData = useWorkflowStore((s) => s.unpinNodeData);
+
+  const isPinned = hasPinned;
+
+  // Use pinned data if available, otherwise use execution data
+  // getPinnedDataForDisplay unwraps { json: {...} } to just {...}
+  const displayData = isPinned
+    ? getPinnedDataForDisplay(nodeId)
+    : executionData?.output?.items;
+
+  const handlePinToggle = () => {
+    if (isPinned) {
+      unpinNodeData(nodeId);
+    } else if (executionData?.output?.items && executionData.output.items.length > 0) {
+      // Convert to backend format: { json: {...} }[]
+      const backendFormat = executionData.output.items.map((item) => ({
+        json: item as Record<string, unknown>,
+      }));
+      pinNodeData(nodeId, backendFormat);
+    }
+  };
 
   const hasData = executionData?.output?.items && executionData.output.items.length > 0;
   const hasError = executionData?.output?.error;
@@ -51,11 +74,12 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
         <div className="flex items-center gap-2">
           {/* Pin button */}
           <button
-            onClick={() => setIsPinned(!isPinned)}
+            onClick={handlePinToggle}
+            disabled={!hasData && !isPinned}
             className={`rounded p-1.5 ${
               isPinned
                 ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
-                : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                : 'text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
             title={isPinned ? 'Unpin data' : 'Pin data'}
           >
@@ -133,9 +157,9 @@ export default function OutputPanel({ executionData }: OutputPanelProps) {
               {executionData.output?.error}
             </p>
           </div>
-        ) : hasData ? (
+        ) : displayData && displayData.length > 0 ? (
           <RunDataDisplay
-            data={executionData.output!.items}
+            data={displayData}
             mode={displayMode}
           />
         ) : (

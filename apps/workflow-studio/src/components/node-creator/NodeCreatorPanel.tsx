@@ -7,8 +7,9 @@ import {
   getNodesByCategory,
 } from '../../stores/nodeCreatorStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import { generateNodeName, getExistingNodeNames } from '../../lib/workflowTransform';
 import NodeItem from './NodeItem';
-import type { NodeDefinition } from '../../types/workflow';
+import type { NodeDefinition, WorkflowNodeData } from '../../types/workflow';
 
 export default function NodeCreatorPanel() {
   const {
@@ -78,16 +79,28 @@ export default function NodeCreatorPanel() {
       const position = getNewNodePosition();
       const newNodeId = `node-${Date.now()}`;
 
+      // Generate unique node name based on backend type
+      // nodeDef.name contains the backend type (e.g., 'HttpRequest', 'Start')
+      const existingNames = getExistingNodeNames(nodes as any);
+      const nodeName = generateNodeName(nodeDef.name, existingNames);
+
+      const nodeData: WorkflowNodeData = {
+        name: nodeName,           // Unique name for backend connections
+        label: nodeDef.displayName,  // Display label in UI
+        type: nodeDef.type,       // UI type (camelCase)
+        icon: nodeDef.icon,
+        description: nodeDef.description,
+        parameters: {},
+        continueOnFail: false,
+        retryOnFail: 0,
+        retryDelay: 1000,
+      };
+
       const newNode = {
         id: newNodeId,
         type: 'workflowNode',
         position,
-        data: {
-          label: nodeDef.displayName,
-          type: nodeDef.type,
-          icon: nodeDef.icon,
-          description: nodeDef.description,
-        },
+        data: nodeData,
       };
 
       addNode(newNode);
@@ -115,6 +128,7 @@ export default function NodeCreatorPanel() {
       closePanel,
       clearConnectionContext,
       getNewNodePosition,
+      nodes,
       onConnect,
       setView,
       sourceNodeId,

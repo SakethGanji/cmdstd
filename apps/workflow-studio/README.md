@@ -1,446 +1,466 @@
 # Workflow Studio
 
-A React Flow-based workflow editor, inspired by n8n's workflow automation UI.
+A visual workflow editor built with React, ReactFlow, and Zustand. This is the frontend for the workflow automation system, inspired by n8n's workflow automation UI.
 
-## n8n Architecture Reference
+## Table of Contents
 
-This document maps n8n's Vue.js workflow editor to our React Flow implementation.
-
----
-
-## n8n Source Code Location
-
-All n8n frontend code is located at:
-```
-apps/temp/n8n/packages/frontend/editor-ui/src/
-```
-
----
-
-## 1. Canvas (Workflow Editor)
-
-### n8n Implementation (VueFlow)
-
-| Component | Path | Description |
-|-----------|------|-------------|
-| `Canvas.vue` | `features/workflows/canvas/components/Canvas.vue` | Main canvas using VueFlow library |
-| `WorkflowCanvas.vue` | `features/workflows/canvas/components/WorkflowCanvas.vue` | Wrapper that manages workflow data mapping |
-| `useCanvasMapping.ts` | `features/workflows/canvas/composables/useCanvasMapping.ts` | Transforms workflow data to VueFlow format |
-
-**Key VueFlow Features Used:**
-- Snap-to-grid (20px grid)
-- Pan on scroll/drag
-- Zoom controls
-- Minimap
-- Custom node/edge types
-- Keyboard shortcuts
-
-### React Flow Equivalent
-
-```tsx
-// Our implementation
-import ReactFlow, {
-  Background,
-  Controls,
-  MiniMap,
-  useNodesState,
-  useEdgesState
-} from 'reactflow';
-```
-
-| n8n (VueFlow) | React Flow |
-|---------------|------------|
-| `<VueFlow>` | `<ReactFlow>` |
-| `@vue-flow/minimap` | `<MiniMap>` |
-| `snap-to-grid` | `snapToGrid={true} snapGrid={[20, 20]}` |
-| `pan-on-scroll` | `panOnScroll={true}` |
-| Custom node types | `nodeTypes` prop |
-| Custom edge types | `edgeTypes` prop |
+- [Architecture Overview](#architecture-overview)
+- [Backend Integration Guide](#backend-integration-guide)
+- [Data Format Differences](#data-format-differences)
+- [Saving a Workflow](#saving-a-workflow)
+- [Loading a Workflow](#loading-a-workflow)
+- [Running a Workflow](#running-a-workflow)
+- [UI State Management](#ui-state-management)
+- [Validation](#validation)
+- [Execution Data Display](#execution-data-display)
+- [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Multi-Output Nodes](#multi-output-nodes)
+- [API Endpoints Reference](#api-endpoints-reference)
+- [Integration Checklist](#integration-checklist)
 
 ---
 
-## 2. "Add First Step" Button (Empty Canvas State)
+## Architecture Overview
 
-### n8n Implementation
+```
+src/
+├── components/
+│   ├── canvas/           # ReactFlow canvas components
+│   │   ├── nodes/        # Custom node types (WorkflowNode, StickyNote, AddNodesButton)
+│   │   └── edges/        # Custom edge types (WorkflowEdge)
+│   ├── ndv/              # Node Details View (configuration modal)
+│   ├── node-creator/     # Node selection panel
+│   ├── workflow-navbar/  # Top navigation bar
+│   └── ui/               # shadcn/ui components
+├── stores/               # Zustand state management
+├── hooks/                # Custom React hooks
+├── lib/                  # Utilities and transformations
+├── types/                # TypeScript type definitions
+└── routes/               # TanStack Router pages
+```
 
-| Component | Path | Description |
-|-----------|------|-------------|
-| `CanvasNodeAddNodes.vue` | `features/workflows/canvas/components/elements/nodes/render-types/CanvasNodeAddNodes.vue` | Legacy single button |
-| `CanvasNodeChoicePrompt.vue` | `features/workflows/canvas/components/elements/nodes/render-types/CanvasNodeChoicePrompt.vue` | Modern two-button variant |
+---
 
-**UI Elements:**
-- Dashed border button with "+" icon (100x100px)
-- Text: "Add first step..." below
-- Optional: "or use a template" link
+## Backend Integration Guide
 
-**On Click Action:**
+### Key Transformation File
+
+**`src/lib/workflowTransform.ts`** - Contains all utilities for converting between UI and backend formats.
+
 ```typescript
-// n8n store action
-nodeCreatorStore.openNodeCreatorForTriggerNodes(NODE_CREATOR_OPEN_SOURCES.TRIGGER_PLACEHOLDER_BUTTON);
+import {
+  toBackendWorkflow,    // ReactFlow → Backend
+  fromBackendWorkflow,  // Backend → ReactFlow
+  toBackendNodeType,    // 'httpRequest' → 'HttpRequest'
+  toUINodeType,         // 'HttpRequest' → 'httpRequest'
+  generateNodeName,     // Generate unique names
+  getExistingNodeNames, // Get all node names
+  hasTriggerNode,       // Validation helper
+  validateUniqueNames,  // Validation helper
+} from './lib/workflowTransform';
 ```
 
-### React Flow Equivalent
+---
 
-Create a custom node type `addNodes`:
-```tsx
-const nodeTypes = {
-  addNodes: AddNodesButton,
-  // ... other node types
+## Data Format Differences
+
+| Concept | UI (ReactFlow) | Backend (API) |
+|---------|----------------|---------------|
+| Node identifier | `node.id` (e.g., `node-1234567890`) | `node.name` (e.g., `HttpRequest`, `HttpRequest1`) |
+| Node type | camelCase (e.g., `httpRequest`) | PascalCase (e.g., `HttpRequest`) |
+| Edge source | `edge.source` (node id) | `connection.sourceNode` (node name) |
+| Edge target | `edge.target` (node id) | `connection.targetNode` (node name) |
+| Handle | `sourceHandle` / `targetHandle` | `sourceOutput` / `targetInput` (default: `'main'`) |
+| Pinned data | `{ json: {...} }[]` | `{ json: {...} }[]` (same format) |
+
+### Node Type Mapping
+
+```typescript
+// UI Type → Backend Type
+const mapping = {
+  'manualTrigger': 'Start',
+  'scheduleTrigger': 'Cron',
+  'webhook': 'Webhook',
+  'errorTrigger': 'ErrorTrigger',
+  'set': 'Set',
+  'code': 'Code',
+  'if': 'If',
+  'switch': 'Switch',
+  'merge': 'Merge',
+  'splitInBatches': 'SplitInBatches',
+  'httpRequest': 'HttpRequest',
+  'wait': 'Wait',
 };
 ```
 
 ---
 
-## 3. Node Creator Panel (Side Panel)
+## Saving a Workflow
 
-### n8n Implementation
+```typescript
+import { toBackendWorkflow } from './lib/workflowTransform';
+import { useWorkflowStore } from './stores/workflowStore';
 
-| Component | Path | Description |
-|-----------|------|-------------|
-| `NodeCreator.vue` | `features/shared/nodeCreator/components/NodeCreator.vue` | Main slide-out container |
-| `NodesListPanel.vue` | `features/shared/nodeCreator/components/Panel/NodesListPanel.vue` | Panel content renderer |
-| `SearchBar.vue` | `features/shared/nodeCreator/components/Panel/SearchBar.vue` | Search input |
-| `NodesMode.vue` | `features/shared/nodeCreator/components/Modes/NodesMode.vue` | Node list rendering |
-| `ActionsMode.vue` | `features/shared/nodeCreator/components/Modes/ActionsMode.vue` | Action list rendering |
-| `viewsData.ts` | `features/shared/nodeCreator/views/viewsData.ts` | View definitions (Trigger/Regular/AI) |
+// Get current state
+const { nodes, edges, workflowName, workflowId } = useWorkflowStore.getState();
 
-**Panel Behavior:**
-- Fixed position on right side of screen
-- Width: `$node-creator-width` (CSS variable)
-- Slide-in animation from right
-- Scrim/overlay behind panel
-- Close on outside click or Escape
+// Transform to backend format
+const backendWorkflow = toBackendWorkflow(nodes, edges, workflowName, workflowId);
 
-### Panel Views
+// API call
+const response = await trpc.workflows.create.mutate(backendWorkflow);
+// or for updates:
+const response = await trpc.workflows.update.mutate({ id: workflowId, ...backendWorkflow });
 
-#### TriggerView ("What triggers this workflow?")
-
-i18n key: `nodeCreator.triggerHelperPanel.selectATrigger`
-
-**Items shown:**
-1. Manual Trigger - "Trigger manually"
-2. App Trigger Nodes (subcategory)
-3. Schedule Trigger - "On a schedule"
-4. Webhook - "On webhook call"
-5. Form Trigger - "On form submission"
-6. Execute Workflow Trigger - "When called by another workflow"
-7. Chat Trigger - "On chat message"
-8. Other Trigger Nodes (subcategory)
-
-#### RegularView ("What happens next?")
-
-i18n key: `nodeCreator.triggerHelperPanel.whatHappensNext`
-
-**Items shown:**
-1. AI Nodes (view link)
-2. App Regular Nodes (subcategory)
-3. Transform Data (subcategory with sections)
-   - Popular: Set, Code, Data Table, DateTime, AI Transform
-   - Add or Remove: Filter, Remove Duplicates, Split Out, Limit
-   - Combine: Summarize, Aggregate, Merge
-   - Convert: HTML, Markdown, XML, Crypto, Extract from File, etc.
-4. Flow Control (subcategory)
-   - Popular: Filter, If, Split In Batches, Merge
-5. Helpers (subcategory)
-   - Popular: HTTP Request, Webhook, Code, Data Table
-6. Human in the Loop (subcategory)
-7. Add another trigger (view link)
-
-### React Equivalent
-
-```tsx
-// Slide-out panel component
-<Sheet open={isOpen} onOpenChange={setIsOpen}>
-  <SheetContent side="right" className="w-[400px]">
-    <SheetHeader>
-      <SheetTitle>{title}</SheetTitle>
-    </SheetHeader>
-    <SearchBar value={search} onChange={setSearch} />
-    <NodeList items={filteredItems} onSelect={handleSelect} />
-  </SheetContent>
-</Sheet>
+// Store the returned ID
+useWorkflowStore.getState().setWorkflowId(response.id);
 ```
 
----
+### Backend Workflow Schema (Expected Format)
 
-## 4. Node Handles (Connection Points)
-
-### n8n Implementation
-
-| Component | Path | Description |
-|-----------|------|-------------|
-| `CanvasHandleRenderer.vue` | `features/workflows/canvas/components/elements/handles/CanvasHandleRenderer.vue` | Handle wrapper |
-| `CanvasHandleMainOutput.vue` | `features/workflows/canvas/components/elements/handles/render-types/CanvasHandleMainOutput.vue` | Output handle with + button |
-| `CanvasHandleMainInput.vue` | `features/workflows/canvas/components/elements/handles/render-types/CanvasHandleMainInput.vue` | Input handle |
-| `CanvasHandlePlus.vue` | `features/workflows/canvas/components/elements/handles/render-types/parts/CanvasHandlePlus.vue` | The "+" add node button |
-
-**Handle Types:**
-- Main (primary data flow)
-- AI connections (Tool, Document, Memory, etc.)
-
-**Plus Button Behavior:**
-- Shows on hover of output handle
-- On click: Opens NodeCreator with `RegularView`
-- Stores connection context for auto-connect
-
-### React Flow Equivalent
-
-```tsx
-import { Handle, Position } from 'reactflow';
-
-// Custom handle with plus button
-<Handle type="source" position={Position.Right}>
-  <button className="plus-button" onClick={handleAddNode}>
-    <Plus size={12} />
-  </button>
-</Handle>
-```
-
----
-
-## 5. Node Details View (NDV) - Three-Panel Editor
-
-### n8n Implementation
-
-| Component | Path | Description |
-|-----------|------|-------------|
-| `NodeDetailsView.vue` | `features/ndv/shared/views/NodeDetailsView.vue` | Main modal container |
-| `NDVDraggablePanels.vue` | `features/ndv/panel/components/NDVDraggablePanels.vue` | Three-panel layout manager |
-| `InputPanel.vue` | `features/ndv/panel/components/InputPanel.vue` | Left panel - input data |
-| `NodeSettings.vue` | `features/ndv/settings/components/NodeSettings.vue` | Center panel - node config |
-| `OutputPanel.vue` | `features/ndv/panel/components/OutputPanel.vue` | Right panel - output data |
-| `RunData.vue` | `features/ndv/runData/components/RunData.vue` | Data visualization component |
-
-**Layout:**
-```
-┌──────────────┬─────────────────────────┬──────────────────┐
-│  InputPanel  │     NodeSettings        │   OutputPanel    │
-│              │                         │                  │
-│  - RunData   │  - Parameter forms      │  - RunData       │
-│  - Node      │  - Credential selector  │  - Pin data      │
-│    selector  │  - Execute button       │  - Toggle logs   │
-│              │                         │                  │
-└──────────────┴─────────────────────────┴──────────────────┘
-```
-
-**Panel Features:**
-- Resizable via drag handles
-- Positions saved to localStorage
-- Main panel min-width: 310px
-- Side panels have margins: 80px
-
-### React Equivalent
-
-```tsx
-import { ResizablePanel, ResizablePanelGroup, ResizableHandle } from '@/components/ui/resizable';
-
-<Dialog open={isOpen} onOpenChange={setIsOpen}>
-  <DialogContent className="max-w-[90vw] h-[90vh]">
-    <ResizablePanelGroup direction="horizontal">
-      <ResizablePanel defaultSize={25}>
-        <InputPanel />
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel defaultSize={50}>
-        <NodeSettings />
-      </ResizablePanel>
-      <ResizableHandle />
-      <ResizablePanel defaultSize={25}>
-        <OutputPanel />
-      </ResizablePanel>
-    </ResizablePanelGroup>
-  </DialogContent>
-</Dialog>
-```
-
----
-
-## 6. State Management
-
-### n8n Implementation (Pinia)
-
-| Store | Path | Purpose |
-|-------|------|---------|
-| `nodeCreator.store.ts` | `features/shared/nodeCreator/nodeCreator.store.ts` | Panel state, node filtering |
-| `workflows.store.ts` | `app/stores/workflows.store.ts` | Nodes, connections, execution |
-| `ndv.store.ts` | `features/ndv/shared/ndv.store.ts` | Active node, panel dimensions |
-| `ui.store.ts` | `app/stores/ui.store.ts` | Global UI state |
-| `nodeTypes.store.ts` | `app/stores/nodeTypes.store.ts` | Available node type definitions |
-
-### React Equivalent (Zustand)
-
-```tsx
-// stores/workflowStore.ts
-import { create } from 'zustand';
-
-interface WorkflowState {
-  nodes: Node[];
-  edges: Edge[];
-  selectedNodeId: string | null;
-
-  addNode: (node: Node) => void;
-  updateNode: (id: string, data: Partial<Node>) => void;
-  deleteNode: (id: string) => void;
-  setSelectedNode: (id: string | null) => void;
+```typescript
+interface BackendWorkflow {
+  id?: string;                    // Optional for create, required for update
+  name: string;                   // Workflow display name
+  nodes: BackendNodeDefinition[];
+  connections: BackendConnection[];
 }
 
-export const useWorkflowStore = create<WorkflowState>((set) => ({
-  nodes: [],
-  edges: [],
-  selectedNodeId: null,
+interface BackendNodeDefinition {
+  name: string;                   // Unique identifier (e.g., 'HttpRequest', 'HttpRequest1')
+  type: string;                   // Node type in PascalCase (e.g., 'HttpRequest')
+  parameters: Record<string, unknown>;
+  position?: { x: number; y: number };
+  continueOnFail?: boolean;       // Continue workflow on error (default: false)
+  retryOnFail?: number;           // Retry count 0-10 (default: 0)
+  retryDelay?: number;            // Delay between retries in ms (default: 1000)
+  pinnedData?: { json: Record<string, unknown> }[];
+}
 
-  addNode: (node) => set((state) => ({
-    nodes: [...state.nodes, node]
-  })),
-  // ...
-}));
-```
-
----
-
-## 7. i18n Keys Reference
-
-Key text strings from `packages/frontend/@n8n/i18n/src/locales/en.json`:
-
-```json
-{
-  "nodeView.canvasAddButton.addFirstStep": "Add first step...",
-  "nodeView.canvasAddButton.addATriggerNodeBeforeExecuting": "Add a trigger node before executing",
-
-  "nodeCreator.triggerHelperPanel.selectATrigger": "What triggers this workflow?",
-  "nodeCreator.triggerHelperPanel.whatHappensNext": "What happens next?",
-  "nodeCreator.triggerHelperPanel.addAnotherTrigger": "Add another trigger",
-
-  "nodeCreator.triggerHelperPanel.manualTriggerDisplayName": "Trigger manually",
-  "nodeCreator.triggerHelperPanel.scheduleTriggerDisplayName": "On a schedule",
-  "nodeCreator.triggerHelperPanel.webhookTriggerDisplayName": "On webhook call",
-  "nodeCreator.triggerHelperPanel.formTriggerDisplayName": "On form submission",
-  "nodeCreator.triggerHelperPanel.chatTriggerDisplayName": "On chat message",
-
-  "nodeCreator.searchBar.searchNodes": "Search nodes...",
-
-  "ndv.backToCanvas": "Back to canvas"
+interface BackendConnection {
+  sourceNode: string;             // Source node name
+  sourceOutput: string;           // Output port (default: 'main')
+  targetNode: string;             // Target node name
+  targetInput: string;            // Input port (default: 'main')
 }
 ```
 
 ---
 
-## 8. Component Mapping Summary
+## Loading a Workflow
 
-| Feature | n8n Vue Component | React Component (to build) |
-|---------|-------------------|---------------------------|
-| Canvas | `Canvas.vue` | `WorkflowCanvas.tsx` |
-| Add Node Button | `CanvasNodeAddNodes.vue` | `AddNodesButton.tsx` |
-| Workflow Node | `CanvasNodeDefault.vue` | `WorkflowNode.tsx` |
-| Node Creator Panel | `NodeCreator.vue` | `NodeCreatorPanel.tsx` |
-| Node List | `NodesListPanel.vue` | `NodeList.tsx` |
-| Node Item | `NodeItem.vue` | `NodeItem.tsx` |
-| Node Details Modal | `NodeDetailsView.vue` | `NodeDetailsModal.tsx` |
-| Three-Panel Layout | `NDVDraggablePanels.vue` | `NDVPanels.tsx` |
-| Input Panel | `InputPanel.vue` | `InputPanel.tsx` |
-| Output Panel | `OutputPanel.vue` | `OutputPanel.tsx` |
-| Node Settings | `NodeSettings.vue` | `NodeSettings.tsx` |
-| Run Data Display | `RunData.vue` | `RunDataDisplay.tsx` |
+```typescript
+import { fromBackendWorkflow } from './lib/workflowTransform';
+import { useWorkflowStore } from './stores/workflowStore';
 
----
+// Fetch from API
+const backendWorkflow = await trpc.workflows.get.query({ id: 'wf_123' });
 
-## 9. Proposed File Structure
+// Transform to ReactFlow format
+const { nodes, edges } = fromBackendWorkflow(backendWorkflow);
 
-```
-apps/workflow-studio/src/
-├── components/
-│   ├── canvas/
-│   │   ├── WorkflowCanvas.tsx        # Main React Flow canvas
-│   │   ├── nodes/
-│   │   │   ├── AddNodesButton.tsx    # Empty state "Add first step"
-│   │   │   ├── WorkflowNode.tsx      # Standard workflow node
-│   │   │   └── StickyNote.tsx        # Sticky note node
-│   │   ├── edges/
-│   │   │   └── WorkflowEdge.tsx      # Custom edge with add button
-│   │   └── handles/
-│   │       └── NodeHandle.tsx        # Custom handle with + button
-│   │
-│   ├── node-creator/
-│   │   ├── NodeCreatorPanel.tsx      # Slide-out panel container
-│   │   ├── NodeList.tsx              # Scrollable node list
-│   │   ├── NodeItem.tsx              # Individual node item
-│   │   ├── CategoryItem.tsx          # Collapsible category
-│   │   └── SearchBar.tsx             # Search input
-│   │
-│   ├── ndv/                          # Node Details View
-│   │   ├── NodeDetailsModal.tsx      # Modal wrapper
-│   │   ├── NDVPanels.tsx             # Three-panel layout
-│   │   ├── InputPanel.tsx            # Left panel
-│   │   ├── OutputPanel.tsx           # Right panel
-│   │   ├── NodeSettings.tsx          # Center panel
-│   │   └── RunDataDisplay.tsx        # Data visualization
-│   │
-│   └── ui/                           # shadcn/ui components
-│       ├── button.tsx
-│       ├── sheet.tsx
-│       ├── dialog.tsx
-│       └── resizable.tsx
-│
-├── stores/
-│   ├── workflowStore.ts              # Nodes, edges, execution
-│   ├── nodeCreatorStore.ts           # Panel state
-│   └── ndvStore.ts                   # Node details state
-│
-├── types/
-│   ├── workflow.ts                   # Workflow types
-│   ├── node.ts                       # Node types
-│   └── execution.ts                  # Execution types
-│
-├── lib/
-│   ├── nodeRegistry.ts               # Available node definitions
-│   └── utils.ts                      # Utility functions
-│
-└── App.tsx                           # Main app entry
+// Update store
+const store = useWorkflowStore.getState();
+store.setNodes(nodes);
+store.setEdges(edges);
+store.setWorkflowName(backendWorkflow.name);
+store.setWorkflowId(backendWorkflow.id);
 ```
 
 ---
 
-## 10. Implementation Phases
+## Running a Workflow
 
-### Phase 1: Canvas Foundation
-- [ ] Set up React Flow with basic configuration
-- [ ] Create `AddNodesButton` node type for empty state
-- [ ] Create `WorkflowNode` node type
-- [ ] Add basic zoom/pan controls
+```typescript
+// Run saved workflow
+const execution = await trpc.workflows.run.mutate({ id: workflowId });
 
-### Phase 2: Node Creator Panel
-- [ ] Create slide-out panel component
-- [ ] Implement TriggerView (initial node selection)
-- [ ] Implement RegularView (subsequent nodes)
-- [ ] Add search functionality
-- [ ] Connect to canvas for node creation
+// Or run ad-hoc (without saving)
+const backendWorkflow = toBackendWorkflow(nodes, edges, workflowName);
+const execution = await trpc.workflows.runAdhoc.mutate(backendWorkflow);
 
-### Phase 3: Node Connections
-- [ ] Custom handles with + button
-- [ ] Edge creation flow
-- [ ] Auto-connect new nodes to source
-
-### Phase 4: Node Details View (NDV)
-- [ ] Modal with three-panel layout
-- [ ] Resizable panels
-- [ ] Input panel with data display
-- [ ] Node settings form
-- [ ] Output panel with data display
-
-### Phase 5: Execution
-- [ ] Execute node button
-- [ ] Display run data
-- [ ] Error handling display
+// Poll for execution status
+const result = await trpc.executions.get.query({ id: execution.id });
+```
 
 ---
 
-## Dependencies to Add
+## UI State Management
+
+### Stores
+
+| Store | Purpose | Key State |
+|-------|---------|-----------|
+| `workflowStore` | Main workflow state | `nodes`, `edges`, `workflowName`, `workflowId`, `executionData`, `pinnedData` |
+| `nodeCreatorStore` | Node picker panel | `isOpen`, `view`, `search`, `sourceNodeId` |
+| `ndvStore` | Node details modal | `isOpen`, `activeNodeId`, `displayMode` |
+
+### WorkflowNodeData Interface
+
+```typescript
+interface WorkflowNodeData {
+  // Backend-compatible fields
+  name: string;           // Unique identifier for connections
+  type: string;           // UI node type (camelCase)
+  parameters?: Record<string, unknown>;
+  continueOnFail?: boolean;
+  retryOnFail?: number;
+  retryDelay?: number;
+  pinnedData?: { json: Record<string, unknown> }[];
+  disabled?: boolean;
+
+  // UI-only fields
+  label: string;          // Display name
+  icon?: string;
+  description?: string;
+
+  // Sticky note fields (when node.type is 'stickyNote')
+  content?: string;
+  color?: 'yellow' | 'blue' | 'green' | 'pink' | 'purple';
+}
+```
+
+---
+
+## Validation
+
+```typescript
+import {
+  hasTriggerNode,
+  validateUniqueNames,
+} from './lib/workflowTransform';
+
+// Before saving, validate:
+
+// 1. Check for at least one trigger
+if (!hasTriggerNode(nodes)) {
+  throw new Error('Workflow must have at least one trigger node');
+}
+
+// 2. Check for unique names
+if (!validateUniqueNames(nodes)) {
+  throw new Error('All nodes must have unique names');
+}
+
+// 3. Check for at least one node
+const workflowNodes = nodes.filter(n => n.type === 'workflowNode');
+if (workflowNodes.length === 0) {
+  throw new Error('Workflow must have at least one node');
+}
+```
+
+---
+
+## Execution Data Display
+
+When displaying execution results in the NDV:
+
+```typescript
+// Execution data from backend
+interface ExecutionRecord {
+  id: string;
+  workflowId: string;
+  status: 'running' | 'success' | 'failed';
+  nodeData: Record<string, { json: Record<string, unknown> }[]>;
+  errors: Array<{ nodeName: string; error: string; timestamp: Date }>;
+}
+
+// Map backend node names to UI node IDs for display
+function mapExecutionDataToUI(
+  executionRecord: ExecutionRecord,
+  nodes: Node[]
+) {
+  const store = useWorkflowStore.getState();
+
+  // Create mapping from node name to node id
+  const nameToId = new Map<string, string>();
+  nodes.forEach(node => {
+    if (node.type === 'workflowNode') {
+      nameToId.set(node.data.name, node.id);
+    }
+  });
+
+  // Update execution data for each node
+  Object.entries(executionRecord.nodeData).forEach(([nodeName, data]) => {
+    const nodeId = nameToId.get(nodeName);
+    if (nodeId) {
+      store.setNodeExecutionData(nodeId, {
+        input: null,
+        output: { items: data.map(d => d.json) },
+        status: 'success',
+        startTime: Date.now(),
+        endTime: Date.now(),
+      });
+    }
+  });
+
+  // Handle errors
+  executionRecord.errors.forEach(({ nodeName, error }) => {
+    const nodeId = nameToId.get(nodeName);
+    if (nodeId) {
+      store.setNodeExecutionData(nodeId, {
+        input: null,
+        output: { items: [], error },
+        status: 'error',
+      });
+    }
+  });
+}
+```
+
+---
+
+## Keyboard Shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| `Ctrl/Cmd + S` | Save workflow |
+| `Ctrl/Cmd + 0` | Fit to view |
+| `Ctrl/Cmd + +/-` | Zoom in/out |
+| `N` | Add new node |
+| `T` | Add trigger node |
+| `S` | Add sticky note |
+| `F` | Fit to view |
+| `Delete/Backspace` | Delete selected |
+| `Escape` | Close panel/modal |
+
+---
+
+## Multi-Output Nodes
+
+Some nodes have multiple outputs that need special handling:
+
+| Node | Outputs | Handle IDs |
+|------|---------|------------|
+| If | true, false | `'true'`, `'false'` |
+| Switch | dynamic + fallback | `'output0'`, `'output1'`, ..., `'fallback'` |
+| SplitInBatches | loop, done | `'loop'`, `'done'` |
+
+When creating connections from these nodes, the `sourceHandle` will contain the output name.
+
+**Note:** Currently the UI only renders a single output handle. To fully support multi-output nodes, you'll need to:
+
+1. Add multiple output handles to the WorkflowNode component based on node type
+2. Map the handle IDs to the correct `sourceOutput` values
+
+---
+
+## API Endpoints Reference
+
+### tRPC Routes (from backend at `apps/workflow-engine`)
+
+```typescript
+// Workflows
+trpc.workflows.list.query()                    // Get all workflows
+trpc.workflows.get.query({ id })               // Get workflow by ID
+trpc.workflows.create.mutate(workflow)         // Create workflow
+trpc.workflows.update.mutate({ id, ...workflow }) // Update workflow
+trpc.workflows.delete.mutate({ id })           // Delete workflow
+trpc.workflows.setActive.mutate({ id, active }) // Toggle active state
+trpc.workflows.run.mutate({ id })              // Execute saved workflow
+trpc.workflows.runAdhoc.mutate(workflow)       // Execute without saving
+
+// Executions
+trpc.executions.list.query({ workflowId? })    // List executions
+trpc.executions.get.query({ id })              // Get execution details
+trpc.executions.delete.mutate({ id })          // Delete execution
+
+// Nodes (for dynamic form generation - future)
+trpc.nodes.list.query()                        // Get all node type schemas
+trpc.nodes.get.query({ type })                 // Get specific node schema
+```
+
+### REST Endpoints (Webhooks)
+
+```
+GET/POST/PUT/DELETE /webhook/:workflowId       # Webhook trigger endpoint
+GET /health                                     # Health check
+```
+
+---
+
+## Integration Checklist
+
+### Setup
+
+- [ ] Set up tRPC client in `src/lib/trpc.ts`
+- [ ] Configure API base URL for backend connection
+- [ ] Add error handling utilities
+
+### Save/Load
+
+- [ ] Add save handler to WorkflowNavbar (Ctrl+S)
+- [ ] Implement "Save" button click handler
+- [ ] Implement "Save As" / duplicate functionality
+- [ ] Add workflow loading on page mount (if editing existing)
+- [ ] Handle unsaved changes warning
+
+### Execution
+
+- [ ] Implement "Test workflow" / run button
+- [ ] Add execution polling and status updates
+- [ ] Map execution results to node execution data
+- [ ] Display errors on failed nodes
+- [ ] Add execution history sidebar/page
+
+### UI Improvements
+
+- [ ] Add toast notifications for save/error states
+- [ ] Show loading states during API calls
+- [ ] Display webhook URLs for Webhook trigger nodes
+- [ ] Add workflow active/inactive toggle with API
+- [ ] Implement workflow list/management page
+
+### Advanced Features
+
+- [ ] Fetch node schemas from backend for dynamic forms
+- [ ] Add credential management UI
+- [ ] Implement import/export workflows as JSON
+- [ ] Add workflow versioning/history
+
+---
+
+## Important Notes
+
+1. **Node Names**: The `name` field is critical - it's used in connections and must be unique within a workflow. The UI auto-generates unique names like `HttpRequest`, `HttpRequest1`, etc.
+
+2. **Sticky Notes**: These are UI-only and are filtered out during `toBackendWorkflow()`. They won't be saved to the backend.
+
+3. **Pinned Data**: Both UI and backend use the same format: `{ json: {...} }[]`. This allows testing nodes with fixed input data.
+
+4. **Expression Syntax**: Both use `{{ expression }}` syntax. Supported variables:
+   - `$json` - Current item's JSON data
+   - `$input` - Input data from previous node
+   - `$node["NodeName"]` - Access data from specific node
+   - `$env.VARIABLE` - Environment variables
+   - `$execution` - Execution context
+   - `$itemIndex` - Current item index
+
+5. **Filter Node**: The UI previously had a "Filter" node that doesn't exist in the backend. It has been removed from the node creator.
+
+6. **Pre-existing TypeScript Errors**: There are React 19 / Radix UI compatibility errors in `src/components/ui/`. These are in shadcn components and don't affect runtime behavior.
+
+---
+
+## Development
 
 ```bash
-npm install reactflow zustand @radix-ui/react-dialog @radix-ui/react-sheet react-resizable-panels
+# Install dependencies
+pnpm install
+
+# Start dev server
+pnpm dev
+
+# Build
+pnpm build
+
+# Type check
+pnpm typecheck
 ```
 
-Or with your package manager:
-```bash
-pnpm add reactflow zustand @radix-ui/react-dialog react-resizable-panels
-```
+---
+
+## Related Packages
+
+- **`apps/workflow-engine`** - Backend API and execution engine
+- **`packages/schemas`** - Shared Zod schemas for workflow definitions
