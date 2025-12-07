@@ -213,15 +213,13 @@ export default function WorkflowNavbar() {
           <div className="h-5 w-px bg-border mx-1" />
 
           {/* Share button */}
-          <Button variant="outline" size="sm" className="gap-1.5">
-            <Share2 size={14} />
-            Share
+          <Button variant="outline" size="icon-sm">
+            <Share2 size={16} />
           </Button>
 
           {/* Save button */}
-          <Button size="sm" className="gap-1.5">
-            <Save size={14} />
-            Save
+          <Button size="icon-sm">
+            <Save size={16} />
           </Button>
 
           {/* History button */}

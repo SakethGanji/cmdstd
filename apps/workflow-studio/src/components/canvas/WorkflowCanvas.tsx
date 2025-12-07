@@ -99,6 +99,7 @@ export default function WorkflowCanvas() {
         nodesDraggable
         nodesConnectable
         elementsSelectable
+        proOptions={{ hideAttribution: true }}
         className="bg-background"
       >
         <Background
@@ -114,11 +115,17 @@ export default function WorkflowCanvas() {
           gap={100}
           className="text-border/40 [&>pattern>path]:stroke-current"
         />
+
+        {/* Controls moved to left and styled for dark mode */}
         <Controls
+          position="top-left"
           showInteractive={false}
-          className="!bg-card !shadow-md !rounded-lg !border !border-border"
+          className="!bg-card !shadow-md !rounded-lg !border !border-border text-foreground [&>button]:!bg-transparent [&>button]:!border-none [&>button]:!text-foreground [&>button:hover]:!bg-accent [&_path]:!fill-current"
         />
+
+        {/* MiniMap moved to left */}
         <MiniMap
+          position="bottom-left"
           nodeColor={(node) => {
             if (node.type === 'addNodes') return 'var(--muted)';
             return 'var(--primary)';
@@ -127,18 +134,41 @@ export default function WorkflowCanvas() {
           className="!bg-card !shadow-md !rounded-lg !border !border-border"
         />
 
-        {/* Right panel button when canvas is not empty */}
-        {!isEmpty && (
-          <Panel position="top-right" className="flex gap-2 mt-14">
-            <button
-              onClick={() => openPanel('regular')}
-              className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md transition-colors hover:bg-primary/90"
-            >
-              + Add Node
-            </button>
-          </Panel>
-        )}
+        {/* Status Panel significantly enhanced for "more things going on" */}
+        <Panel position="bottom-right" className="flex items-center gap-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card/80 backdrop-blur-sm border border-border/50 text-xs font-medium text-muted-foreground shadow-sm">
+            <div className="flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+              </span>
+              System Up
+            </div>
+            <div className="w-px h-3 bg-border"></div>
+            <div>
+              {nodes.length} Node{nodes.length !== 1 && 's'}
+            </div>
+            <div className="w-px h-3 bg-border"></div>
+            <div>
+              {edges.length} Edge{edges.length !== 1 && 's'}
+            </div>
+          </div>
+        </Panel>
+
       </ReactFlow>
+
+      {/* Add node button - positioned outside ReactFlow for reliable click handling */}
+      {!isEmpty && (
+        <button
+          onClick={() => openPanel('regular')}
+          className="fixed top-4 right-4 z-40 flex items-center justify-center size-9 rounded-lg bg-primary text-primary-foreground shadow-md transition-colors hover:bg-primary/90"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M5 12h14" />
+            <path d="M12 5v14" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
