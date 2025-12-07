@@ -1,9 +1,11 @@
 import { useEffect } from 'react';
 import { ReactFlowProvider } from 'reactflow';
 
+import { AppSidebar } from './components/app-sidebar';
 import WorkflowCanvas from './components/canvas/WorkflowCanvas';
 import NodeCreatorPanel from './components/node-creator/NodeCreatorPanel';
 import NodeDetailsModal from './components/ndv/NodeDetailsModal';
+import { SidebarInset, SidebarProvider } from './components/ui/sidebar';
 import { useNodeCreatorStore } from './stores/nodeCreatorStore';
 
 function App() {
@@ -23,18 +25,25 @@ function App() {
   }, [closePanel]);
 
   return (
-    <ReactFlowProvider>
-      <div className="h-full w-full">
-        {/* Main Canvas */}
-        <WorkflowCanvas />
+    <SidebarProvider>
+      <AppSidebar />
+      <SidebarInset>
+        <div className="h-full w-full relative">
+          <ReactFlowProvider>
+            <div className="h-full w-full absolute inset-0">
+              {/* Main Canvas */}
+              <WorkflowCanvas />
 
-        {/* Node Creator Side Panel */}
-        <NodeCreatorPanel />
+              {/* Node Creator Side Panel */}
+              <NodeCreatorPanel />
 
-        {/* Node Details Modal (NDV) */}
-        <NodeDetailsModal />
-      </div>
-    </ReactFlowProvider>
+              {/* Node Details Modal (NDV) */}
+              <NodeDetailsModal />
+            </div>
+          </ReactFlowProvider>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
