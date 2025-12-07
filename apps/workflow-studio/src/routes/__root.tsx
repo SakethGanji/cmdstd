@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { createRootRoute, Outlet } from '@tanstack/react-router'
+import { Toaster } from 'sonner'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -35,6 +36,7 @@ function RootLayout() {
           </div>
         </SidebarInset>
       </SidebarProvider>
+      <Toaster position="bottom-right" richColors closeButton />
     </ThemeProvider>
   )
 }

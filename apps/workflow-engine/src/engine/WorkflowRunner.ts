@@ -41,9 +41,21 @@ export class WorkflowRunner {
     ];
 
     // Process jobs until queue is empty
-    while (queue.length > 0) {
+    // Safety limit to prevent infinite loops
+    let iteration = 0;
+    const maxIterations = 1000;
+    while (queue.length > 0 && iteration < maxIterations) {
+      iteration++;
       const job = queue.shift()!;
       await this.processJob(context, job, queue);
+    }
+
+    if (iteration >= maxIterations) {
+      context.errors.push({
+        nodeName: 'WorkflowRunner',
+        error: 'Execution exceeded maximum iterations (possible infinite loop)',
+        timestamp: new Date(),
+      });
     }
 
     return context;

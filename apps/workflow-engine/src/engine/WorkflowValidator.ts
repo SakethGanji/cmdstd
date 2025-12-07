@@ -1,4 +1,4 @@
-import type { Workflow, NodeDefinition, Connection } from '../schemas/workflow.js';
+import type { Workflow, NodeDefinition } from '../schemas/workflow.js';
 import { NodeRegistry } from './NodeRegistry.js';
 
 export interface ValidationError {

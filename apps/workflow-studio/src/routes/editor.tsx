@@ -5,6 +5,7 @@ import WorkflowCanvas from '@/components/canvas/WorkflowCanvas'
 import NodeCreatorPanel from '@/components/node-creator/NodeCreatorPanel'
 import NodeDetailsModal from '@/components/ndv/NodeDetailsModal'
 import WorkflowNavbar from '@/components/workflow-navbar/WorkflowNavbar'
+import ExecutionLogsPanel from '@/components/execution-logs/ExecutionLogsPanel'
 import { rootRoute } from './__root'
 
 export const editorRoute = createRoute({
@@ -21,6 +22,7 @@ function EditorPage() {
         <WorkflowCanvas />
         <NodeCreatorPanel />
         <NodeDetailsModal />
+        <ExecutionLogsPanel />
       </div>
     </ReactFlowProvider>
   )

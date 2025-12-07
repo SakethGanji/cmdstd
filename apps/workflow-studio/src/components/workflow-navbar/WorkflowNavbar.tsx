@@ -12,6 +12,7 @@ import {
   Download,
   Upload,
   Trash2,
+  Loader2,
 } from 'lucide-react';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useSidebar } from '../ui/sidebar';
@@ -24,17 +25,27 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
+import { useSaveWorkflow, useToggleWorkflowActive } from '@/hooks/useWorkflowApi';
+import { toBackendWorkflow } from '@/lib/workflowTransform';
+import type { WorkflowNodeData } from '@/types/workflow';
+import type { Node } from 'reactflow';
 
 export default function WorkflowNavbar() {
   const {
     workflowName,
     workflowTags,
     isActive,
+    workflowId,
+    nodes,
+    edges,
     setWorkflowName,
     addTag,
     removeTag,
     setIsActive,
   } = useWorkflowStore();
+
+  const { saveWorkflow, isSaving } = useSaveWorkflow();
+  const { toggleActive, isToggling } = useToggleWorkflowActive();
 
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
@@ -206,7 +217,14 @@ export default function WorkflowNavbar() {
             </span>
             <Switch
               checked={isActive}
-              onCheckedChange={setIsActive}
+              onCheckedChange={(checked) => {
+                if (workflowId) {
+                  toggleActive(checked);
+                } else {
+                  setIsActive(checked);
+                }
+              }}
+              disabled={isToggling}
             />
           </div>
 
@@ -218,8 +236,8 @@ export default function WorkflowNavbar() {
           </Button>
 
           {/* Save button */}
-          <Button size="icon-sm">
-            <Save size={16} />
+          <Button size="icon-sm" onClick={() => saveWorkflow()} disabled={isSaving}>
+            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
           </Button>
 
           {/* History button */}
@@ -239,7 +257,21 @@ export default function WorkflowNavbar() {
                 <Copy size={14} className="mr-2" />
                 Duplicate workflow
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => {
+                const workflow = toBackendWorkflow(
+                  nodes as Node<WorkflowNodeData>[],
+                  edges,
+                  workflowName,
+                  workflowId
+                );
+                const blob = new Blob([JSON.stringify(workflow, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${workflowName.replace(/\s+/g, '-').toLowerCase()}.json`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}>
                 <Download size={14} className="mr-2" />
                 Export workflow
               </DropdownMenuItem>

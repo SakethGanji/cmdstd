@@ -10,10 +10,12 @@ import ReactFlow, {
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { Play, Loader2 } from 'lucide-react';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
+import { useSaveWorkflow, useExecuteWorkflow } from '@/hooks/useWorkflowApi';
 import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
 import WorkflowEdge from './edges/WorkflowEdge';
@@ -47,12 +49,13 @@ export default function WorkflowCanvas() {
   const openPanel = useNodeCreatorStore((s) => s.openPanel);
   const { fitView } = useReactFlow();
 
+  const { saveWorkflow } = useSaveWorkflow();
+  const { executeWorkflow, isExecuting } = useExecuteWorkflow();
+
   // Initialize keyboard shortcuts
   useKeyboardShortcuts({
     onSave: () => {
-      // TODO: Implement save to backend
-      console.log('Saving workflow...');
-      // Show a toast notification here in production
+      saveWorkflow();
     },
   });
 
@@ -160,7 +163,7 @@ export default function WorkflowCanvas() {
           className="!bg-card !shadow-md !rounded-lg !border !border-border text-foreground [&>button]:!bg-transparent [&>button]:!border-none [&>button]:!text-foreground [&>button:hover]:!bg-accent [&_path]:!fill-current"
         />
 
-        {/* MiniMap moved to left */}
+        {/* MiniMap */}
         <MiniMap
           position="bottom-left"
           nodeColor={(node) => {
@@ -182,19 +185,40 @@ export default function WorkflowCanvas() {
           className="!bg-card !shadow-md !rounded-lg !border !border-border"
         />
 
-        {/* Status Panel significantly enhanced for "more things going on" */}
+        {/* Status Panel */}
         <Panel position="bottom-right" className="flex items-center gap-4">
+          {/* Test Workflow Button */}
+          {!isEmpty && (
+            <button
+              onClick={() => executeWorkflow()}
+              disabled={isExecuting}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium text-sm shadow-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isExecuting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Play size={16} />
+                  Test Workflow
+                </>
+              )}
+            </button>
+          )}
+
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card/80 backdrop-blur-sm border border-border/50 text-xs font-medium text-muted-foreground shadow-sm">
             <div className="flex items-center gap-1.5">
               <span className="relative flex h-2 w-2">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                <span className={`absolute inline-flex h-full w-full rounded-full ${isExecuting ? 'bg-amber-400 animate-ping' : 'bg-green-400 animate-ping'} opacity-75`}></span>
+                <span className={`relative inline-flex rounded-full h-2 w-2 ${isExecuting ? 'bg-amber-500' : 'bg-green-500'}`}></span>
               </span>
-              System Up
+              {isExecuting ? 'Executing' : 'Ready'}
             </div>
             <div className="w-px h-3 bg-border"></div>
             <div>
-              {nodes.length} Node{nodes.length !== 1 && 's'}
+              {nodes.filter(n => n.type === 'workflowNode').length} Node{nodes.filter(n => n.type === 'workflowNode').length !== 1 && 's'}
             </div>
             <div className="w-px h-3 bg-border"></div>
             <div>

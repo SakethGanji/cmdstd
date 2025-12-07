@@ -1,16 +1,18 @@
 import { useCallback, useEffect } from 'react';
-import { X, ArrowLeft, Play, Trash2 } from 'lucide-react';
+import { X, ArrowLeft, Play, Trash2, Loader2 } from 'lucide-react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 import { useNDVStore } from '../../stores/ndvStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import { useExecuteWorkflow } from '@/hooks/useWorkflowApi';
 import InputPanel from './InputPanel';
 import OutputPanel from './OutputPanel';
 import NodeSettings from './NodeSettings';
 
 export default function NodeDetailsModal() {
   const { isOpen, activeNodeId, closeNDV } = useNDVStore();
-  const { nodes, deleteNode, executionData, setNodeExecutionData } = useWorkflowStore();
+  const { nodes, deleteNode, executionData } = useWorkflowStore();
+  const { executeWorkflow, isExecuting } = useExecuteWorkflow();
 
   // Find the active node
   const activeNode = nodes.find((n) => n.id === activeNodeId);
@@ -27,39 +29,10 @@ export default function NodeDetailsModal() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isOpen, closeNDV]);
 
-  // Simulate node execution (UI only for now)
+  // Execute the entire workflow to test this node
   const handleExecute = useCallback(() => {
-    if (!activeNodeId) return;
-
-    // Set running state
-    setNodeExecutionData(activeNodeId, {
-      input: null,
-      output: null,
-      status: 'running',
-      startTime: Date.now(),
-    });
-
-    // Simulate execution after delay
-    setTimeout(() => {
-      setNodeExecutionData(activeNodeId, {
-        input: {
-          items: [
-            { id: 1, name: 'Item 1', value: 100 },
-            { id: 2, name: 'Item 2', value: 200 },
-          ],
-        },
-        output: {
-          items: [
-            { id: 1, name: 'Item 1', value: 100, processed: true },
-            { id: 2, name: 'Item 2', value: 200, processed: true },
-          ],
-        },
-        status: 'success',
-        startTime: Date.now() - 1000,
-        endTime: Date.now(),
-      });
-    }, 1500);
-  }, [activeNodeId, setNodeExecutionData]);
+    executeWorkflow();
+  }, [executeWorkflow]);
 
   const handleDelete = useCallback(() => {
     if (!activeNodeId) return;
@@ -115,11 +88,20 @@ export default function NodeDetailsModal() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleExecute}
-              disabled={nodeExecution?.status === 'running'}
+              disabled={isExecuting}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
             >
-              <Play size={16} />
-              Test step
+              {isExecuting ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Play size={16} />
+                  Test workflow
+                </>
+              )}
             </button>
             <button
               onClick={handleDelete}

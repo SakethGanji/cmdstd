@@ -151,7 +151,7 @@ export class HttpRequestNode extends BaseNode {
 
     const results: NodeData[] = [];
 
-    for (const item of inputData.length > 0 ? inputData : [{ json: {} }]) {
+    for (const _item of inputData.length > 0 ? inputData : [{ json: {} }]) {
       const fetchOptions: RequestInit = {
         method,
         headers: {

@@ -16,4 +16,19 @@ export default defineConfig({
   optimizeDeps: {
     include: ["react", "react-dom"],
   },
+  server: {
+    port: 5173,
+    proxy: {
+      // Proxy tRPC requests to the backend
+      '/trpc': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      // Proxy webhook requests to the backend
+      '/webhook': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+    },
+  },
 })
