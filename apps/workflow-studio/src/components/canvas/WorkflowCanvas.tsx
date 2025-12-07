@@ -92,9 +92,9 @@ export default function WorkflowCanvas() {
         snapGrid={[20, 20]}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
-        panOnScroll
+        panOnScroll={false}
         zoomOnScroll
-        panOnDrag={[1, 2]}
+        panOnDrag={true}
         selectionOnDrag={false}
         nodesDraggable
         nodesConnectable
@@ -102,10 +102,17 @@ export default function WorkflowCanvas() {
         className="bg-background"
       >
         <Background
+          id="grid-1"
           variant={BackgroundVariant.Dots}
           gap={20}
-          size={1}
-          className="[&>pattern>circle]:fill-border"
+          size={2}
+          className="text-muted-foreground/30 [&>pattern>circle]:fill-current"
+        />
+        <Background
+          id="grid-2"
+          variant={BackgroundVariant.Lines}
+          gap={100}
+          className="text-border/40 [&>pattern>path]:stroke-current"
         />
         <Controls
           showInteractive={false}
@@ -120,18 +127,9 @@ export default function WorkflowCanvas() {
           className="!bg-card !shadow-md !rounded-lg !border !border-border"
         />
 
-        {/* Top toolbar */}
-        <Panel position="top-center" className="flex gap-2">
-          <div className="flex items-center gap-2 rounded-lg bg-card px-4 py-2 shadow-md border border-border">
-            <span className="text-sm font-medium text-foreground">
-              Untitled Workflow
-            </span>
-          </div>
-        </Panel>
-
         {/* Right panel button when canvas is not empty */}
         {!isEmpty && (
-          <Panel position="top-right" className="flex gap-2">
+          <Panel position="top-right" className="flex gap-2 mt-14">
             <button
               onClick={() => openPanel('regular')}
               className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-md transition-colors hover:bg-primary/90"

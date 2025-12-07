@@ -27,7 +27,7 @@ function RootLayout() {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="workflow-studio-theme">
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={false}>
         <AppSidebar />
         <SidebarInset>
           <div className="h-full w-full relative">

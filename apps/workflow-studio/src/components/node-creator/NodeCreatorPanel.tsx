@@ -143,7 +143,7 @@ export default function NodeCreatorPanel() {
       />
 
       {/* Panel */}
-      <div className="fixed right-0 top-0 z-50 flex h-full w-[400px] flex-col bg-card shadow-2xl border-l border-border">
+      <div className="fixed right-2 top-2 bottom-2 z-50 flex w-[400px] flex-col bg-card shadow-2xl border border-border rounded-lg overflow-hidden">
         {/* Header */}
         <div className="border-b border-border px-4 py-4">
           <div className="flex items-center justify-between">

@@ -2,7 +2,7 @@ import { memo, useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
-  getBezierPath,
+  getSmoothStepPath,
   type EdgeProps,
 } from 'reactflow';
 import { Plus } from 'lucide-react';
@@ -23,13 +23,14 @@ function WorkflowEdge({
   const [isHovered, setIsHovered] = useState(false);
   const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
 
-  const [edgePath, labelX, labelY] = getBezierPath({
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
     sourceX,
     sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
+    borderRadius: 16, // Adds a slight curve to corners suitable for polished look
   });
 
   const handleAddNode = (e: React.MouseEvent) => {

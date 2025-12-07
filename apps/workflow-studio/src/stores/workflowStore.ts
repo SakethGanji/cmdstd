@@ -4,6 +4,11 @@ import { addEdge, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import type { WorkflowNodeData, NodeExecutionData } from '../types/workflow';
 
 interface WorkflowState {
+  // Workflow metadata
+  workflowName: string;
+  workflowTags: string[];
+  isActive: boolean;
+
   // Workflow data
   nodes: Node[];
   edges: Edge[];
@@ -13,6 +18,12 @@ interface WorkflowState {
 
   // Execution data per node
   executionData: Record<string, NodeExecutionData>;
+
+  // Metadata actions
+  setWorkflowName: (name: string) => void;
+  addTag: (tag: string) => void;
+  removeTag: (tag: string) => void;
+  setIsActive: (active: boolean) => void;
 
   // Actions
   setNodes: (nodes: Node[]) => void;
@@ -43,10 +54,21 @@ const initialNodes: Node[] = [
 ];
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => ({
+  // Workflow metadata
+  workflowName: 'My workflow',
+  workflowTags: [],
+  isActive: false,
+
   nodes: initialNodes,
   edges: [],
   selectedNodeId: null,
   executionData: {},
+
+  // Metadata actions
+  setWorkflowName: (name) => set({ workflowName: name }),
+  addTag: (tag) => set({ workflowTags: [...get().workflowTags, tag] }),
+  removeTag: (tag) => set({ workflowTags: get().workflowTags.filter((t) => t !== tag) }),
+  setIsActive: (active) => set({ isActive: active }),
 
   setNodes: (nodes) => set({ nodes }),
   setEdges: (edges) => set({ edges }),
