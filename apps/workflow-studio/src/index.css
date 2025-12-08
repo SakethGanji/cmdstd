@@ -254,10 +254,7 @@
   cursor: pointer;
 }
 
-.react-flow__handle {
-  width: 12px !important;
-  height: 12px !important;
-}
+
 
 .react-flow__controls {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;

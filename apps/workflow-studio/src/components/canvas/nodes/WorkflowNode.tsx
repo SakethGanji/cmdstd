@@ -152,7 +152,7 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
             backgroundColor: styles.handleColor,
             borderColor: styles.handleColor,
           }}
-          className="!h-3 !w-3 !border-2"
+          className="!h-1.5 !w-1.5 !border-2"
         />
       );
     });
@@ -175,7 +175,7 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
               backgroundColor: styles.handleColor,
               borderColor: styles.handleColor,
             }}
-            className="!h-3 !w-3 !border-2"
+            className="!h-1.5 !w-1.5 !border-2"
           />
           {/* Add button for this output */}
           <button
