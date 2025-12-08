@@ -10,12 +10,13 @@ import ReactFlow, {
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Play, Loader2 } from 'lucide-react';
+import { Play, Loader2, Square } from 'lucide-react';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
-import { useSaveWorkflow, useExecuteWorkflow } from '@/hooks/useWorkflowApi';
+import { useSaveWorkflow } from '@/hooks/useWorkflowApi';
+import { useExecutionStream } from '@/hooks/useExecutionStream';
 import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
 import WorkflowEdge from './edges/WorkflowEdge';
@@ -51,7 +52,7 @@ export default function WorkflowCanvas() {
   const { fitView } = useReactFlow();
 
   const { saveWorkflow } = useSaveWorkflow();
-  const { executeWorkflow, isExecuting } = useExecuteWorkflow();
+  const { executeWorkflow, isExecuting, progress, cancelExecution } = useExecutionStream();
 
   // Initialize keyboard shortcuts
   useKeyboardShortcuts({
@@ -195,23 +196,34 @@ export default function WorkflowCanvas() {
         <Panel position="bottom-right" className="flex items-center gap-4">
           {/* Test Workflow Button */}
           {!isEmpty && (
-            <button
-              onClick={() => executeWorkflow()}
-              disabled={isExecuting}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium text-sm shadow-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {isExecuting ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" />
-                  Running...
-                </>
-              ) : (
-                <>
-                  <Play size={16} />
-                  Test Workflow
-                </>
+            <div className="flex items-center gap-2">
+              {isExecuting && (
+                <button
+                  onClick={cancelExecution}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive text-destructive-foreground font-medium text-sm shadow-md hover:bg-destructive/90 transition-colors"
+                >
+                  <Square size={14} />
+                  Stop
+                </button>
               )}
-            </button>
+              <button
+                onClick={() => executeWorkflow()}
+                disabled={isExecuting}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium text-sm shadow-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {isExecuting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    {progress ? `${progress.completed}/${progress.total}` : 'Running...'}
+                  </>
+                ) : (
+                  <>
+                    <Play size={16} />
+                    Test Workflow
+                  </>
+                )}
+              </button>
+            </div>
           )}
 
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card/80 backdrop-blur-sm border border-border/50 text-xs font-medium text-muted-foreground shadow-sm">

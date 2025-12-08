@@ -4,6 +4,7 @@ import {
   type FastifyTRPCPluginOptions,
 } from '@trpc/server/adapters/fastify';
 import { workflowRoutes } from './routes/workflows.js';
+import { executionStreamRoutes } from './routes/execution-stream.js';
 import { appRouter, type AppRouter } from './trpc/router.js';
 import { createContext } from './trpc/index.js';
 
@@ -25,6 +26,9 @@ app.register(fastifyTRPCPlugin, {
 
 // REST routes for webhooks only (external callers need REST)
 app.register(workflowRoutes);
+
+// SSE routes for real-time execution streaming
+app.register(executionStreamRoutes);
 
 // Health check
 app.get('/health', async () => ({ status: 'ok' }));

@@ -29,6 +29,11 @@ export default defineConfig({
         target: 'http://localhost:3000',
         changeOrigin: true,
       },
+      // Proxy execution stream SSE requests to the backend
+      '/execution-stream': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
     },
   },
 })

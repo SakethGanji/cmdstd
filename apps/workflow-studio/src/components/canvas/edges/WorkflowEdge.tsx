@@ -1,19 +1,23 @@
 import { memo, useState, useMemo } from 'react';
 import {
-  BaseEdge,
   EdgeLabelRenderer,
-  getSmoothStepPath,
+  getBezierPath,
   useReactFlow,
-  MarkerType,
   type EdgeProps,
 } from 'reactflow';
 import { Plus } from 'lucide-react';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
+import { useWorkflowStore } from '../../../stores/workflowStore';
 import type { WorkflowNodeData } from '../../../types/workflow';
 
-// Gray color for edges
-const EDGE_COLOR = '#9ca3af';
-const EDGE_COLOR_HOVER = '#6b7280';
+// Edge colors for different states
+const EDGE_COLORS = {
+  default: { start: '#9ca3af', end: '#6b7280' },
+  hover: { start: '#6b7280', end: '#4b5563' },
+  running: { start: '#fbbf24', end: '#f59e0b' },  // amber gradient
+  success: { start: '#34d399', end: '#10b981' },  // emerald gradient
+  error: { start: '#f87171', end: '#ef4444' },    // red gradient
+};
 
 function WorkflowEdge({
   id,
@@ -25,11 +29,30 @@ function WorkflowEdge({
   targetPosition,
   style = {},
   source,
+  target,
   sourceHandleId,
 }: EdgeProps) {
   const [isHovered, setIsHovered] = useState(false);
   const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
   const { getNode } = useReactFlow();
+  const executionData = useWorkflowStore((s) => s.executionData);
+
+  // Determine edge status based on source and target node execution states
+  const edgeStatus = useMemo(() => {
+    const sourceExec = executionData[source];
+    const targetExec = executionData[target];
+
+    // If target is running, the edge is "active" (data flowing through)
+    if (targetExec?.status === 'running') return 'running';
+    // If target completed successfully, edge is done
+    if (targetExec?.status === 'success') return 'success';
+    // If target errored, edge shows error
+    if (targetExec?.status === 'error') return 'error';
+    // If source completed but target hasn't started, edge is "pending flow"
+    if (sourceExec?.status === 'success' && !targetExec) return 'running';
+
+    return 'default';
+  }, [source, target, executionData]);
 
   // Get the output label from the source node's outputs array
   const outputLabel = useMemo(() => {
@@ -75,14 +98,17 @@ function WorkflowEdge({
     return label;
   }, [source, sourceHandleId, getNode]);
 
-  const [edgePath, labelX, labelY] = getSmoothStepPath({
-    sourceX,
-    sourceY,
+  // Use bezier path like Turbo style - with small offset hack for straight lines
+  const xEqual = sourceX === targetX;
+  const yEqual = sourceY === targetY;
+
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX: xEqual ? sourceX + 0.0001 : sourceX,
+    sourceY: yEqual ? sourceY + 0.0001 : sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
-    borderRadius: 16,
   });
 
   const handleAddNode = (e: React.MouseEvent) => {
@@ -90,12 +116,40 @@ function WorkflowEdge({
     openForConnection(source, `edge-${id}`);
   };
 
-  const edgeColor = isHovered ? EDGE_COLOR_HOVER : EDGE_COLOR;
+  // Get edge colors based on status and hover state
+  const edgeColors = useMemo(() => {
+    if (edgeStatus !== 'default') {
+      return EDGE_COLORS[edgeStatus];
+    }
+    return isHovered ? EDGE_COLORS.hover : EDGE_COLORS.default;
+  }, [edgeStatus, isHovered]);
+
+  // Animation for running/active edges
+  const isAnimated = edgeStatus === 'running';
+
+  // Unique gradient ID for this edge
+  const gradientId = `edge-gradient-${id}`;
 
   return (
     <>
-      {/* Custom arrow marker definition */}
+      {/* Gradient and marker definitions */}
       <defs>
+        {/* Gradient for the edge */}
+        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stopColor={edgeColors.start} />
+          <stop offset="100%" stopColor={edgeColors.end} />
+        </linearGradient>
+
+        {/* Glow filter for active/running edges */}
+        <filter id={`glow-${id}`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+          <feMerge>
+            <feMergeNode in="coloredBlur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+
+        {/* Arrow marker with gradient color */}
         <marker
           id={`arrow-${id}`}
           markerWidth="12"
@@ -107,35 +161,41 @@ function WorkflowEdge({
         >
           <path
             d="M2,2 L10,6 L2,10 L4,6 Z"
-            fill={edgeColor}
-          />
-        </marker>
-        <marker
-          id={`arrow-${id}-hover`}
-          markerWidth="12"
-          markerHeight="12"
-          refX="10"
-          refY="6"
-          orient="auto"
-          markerUnits="userSpaceOnUse"
-        >
-          <path
-            d="M2,2 L10,6 L2,10 L4,6 Z"
-            fill={EDGE_COLOR_HOVER}
+            fill={edgeColors.end}
           />
         </marker>
       </defs>
 
-      <BaseEdge
-        path={edgePath}
-        markerEnd={`url(#arrow-${id}${isHovered ? '-hover' : ''})`}
+      {/* Glow layer for running/success/error states */}
+      {edgeStatus !== 'default' && (
+        <path
+          d={edgePath}
+          fill="none"
+          stroke={`url(#${gradientId})`}
+          strokeWidth={6}
+          strokeOpacity={0.4}
+          filter={`url(#glow-${id})`}
+          className={isAnimated ? 'animate-pulse' : ''}
+        />
+      )}
+
+      {/* Main edge path with gradient */}
+      <path
+        id={id}
+        className="react-flow__edge-path"
+        d={edgePath}
+        fill="none"
+        stroke={`url(#${gradientId})`}
+        strokeWidth={edgeStatus !== 'default' ? 2.5 : (isHovered ? 2 : 1.5)}
+        markerEnd={`url(#arrow-${id})`}
         style={{
           ...style,
-          strokeWidth: isHovered ? 2.5 : 1.5,
-          stroke: edgeColor,
+          strokeDasharray: isAnimated ? '8 4' : 'none',
+          animation: isAnimated ? 'flowAnimation 0.5s linear infinite' : 'none',
         }}
-        interactionWidth={20}
       />
+
+      {/* Invisible interaction path */}
       <path
         d={edgePath}
         fill="none"
@@ -146,6 +206,20 @@ function WorkflowEdge({
         onMouseLeave={() => setIsHovered(false)}
       />
 
+      {/* CSS for flow animation */}
+      <style>
+        {`
+          @keyframes flowAnimation {
+            from {
+              stroke-dashoffset: 24;
+            }
+            to {
+              stroke-dashoffset: 0;
+            }
+          }
+        `}
+      </style>
+
       {/* Output label near the source node */}
       {outputLabel && (
         <EdgeLabelRenderer>
@@ -154,7 +228,7 @@ function WorkflowEdge({
               position: 'absolute',
               transform: `translate(0, -50%) translate(${sourceX + 14}px, ${sourceY}px)`,
               pointerEvents: 'none',
-              color: EDGE_COLOR,
+              color: edgeColors.end,
             }}
             className="text-[10px] font-medium bg-background/90 px-1.5 py-0.5 rounded"
           >

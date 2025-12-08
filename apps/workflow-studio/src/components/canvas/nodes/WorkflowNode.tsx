@@ -110,27 +110,68 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     openNDV(id);
   };
 
-  // Execution status styles override group colors temporarily
-  const getExecutionStyles = () => {
-    if (!executionData) return {};
+  // Execution status - only affects border, not background
+  const getExecutionBorderColor = () => {
+    if (!executionData) return null;
     switch (executionData.status) {
       case 'running':
-        return {
-          backgroundColor: 'var(--color-amber-100)',
-          borderColor: 'var(--color-amber-400)',
-        };
+        return '#f59e0b'; // amber-500
       case 'success':
-        return {
-          backgroundColor: 'var(--color-emerald-100)',
-          borderColor: 'var(--color-emerald-400)',
-        };
+        return '#10b981'; // emerald-500
       case 'error':
-        return {
-          backgroundColor: 'hsl(var(--destructive) / 0.1)',
-          borderColor: 'var(--destructive)',
-        };
+        return '#ef4444'; // red-500
       default:
-        return {};
+        return null;
+    }
+  };
+
+  // Execution status - icon background color
+  const getExecutionIconBgColor = () => {
+    if (!executionData) return null;
+    switch (executionData.status) {
+      case 'running':
+        return '#fef3c7'; // amber-100
+      case 'success':
+        return '#d1fae5'; // emerald-100
+      case 'error':
+        return '#fee2e2'; // red-100
+      default:
+        return null;
+    }
+  };
+
+  // Execution status - icon color
+  const getExecutionIconColor = () => {
+    if (!executionData) return null;
+    switch (executionData.status) {
+      case 'running':
+        return '#f59e0b'; // amber-500
+      case 'success':
+        return '#10b981'; // emerald-500
+      case 'error':
+        return '#ef4444'; // red-500
+      default:
+        return null;
+    }
+  };
+
+  const executionBorderColor = getExecutionBorderColor();
+  const executionIconBgColor = getExecutionIconBgColor();
+  const executionIconColor = getExecutionIconColor();
+  const hasExecutionStatus = executionData?.status && executionData.status !== 'idle';
+
+  // Get box shadow for glow effect based on execution status
+  const getExecutionGlow = () => {
+    if (!executionData) return undefined;
+    switch (executionData.status) {
+      case 'running':
+        return '0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2)';
+      case 'success':
+        return '0 0 20px rgba(16, 185, 129, 0.4), 0 0 40px rgba(16, 185, 129, 0.2)';
+      case 'error':
+        return '0 0 20px rgba(239, 68, 68, 0.4), 0 0 40px rgba(239, 68, 68, 0.2)';
+      default:
+        return undefined;
     }
   };
 
@@ -207,17 +248,18 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     >
       <div
         className={`
-          relative cursor-grab rounded-xl border shadow-sm transition-all
-          ${selected ? 'shadow-md ring-2 ring-offset-1' : ''}
+          relative cursor-grab rounded-xl border-2 transition-all duration-300
+          ${selected ? 'ring-2 ring-offset-1' : ''}
           ${data.disabled ? 'opacity-50' : ''}
         `}
         style={{
           minHeight,
           backgroundColor: styles.bgColor,
-          borderColor: selected ? styles.accentColor : styles.borderColor,
+          borderColor: executionBorderColor || (selected ? styles.accentColor : styles.borderColor),
+          borderWidth: hasExecutionStatus ? 2 : 1,
+          boxShadow: getExecutionGlow() || (selected ? `0 4px 12px ${styles.accentColor}40` : '0 1px 3px rgba(0,0,0,0.1)'),
           // @ts-expect-error CSS custom property
-          '--tw-ring-color': styles.accentColor,
-          ...getExecutionStyles(),
+          '--tw-ring-color': executionBorderColor || styles.accentColor,
         }}
         onDoubleClick={handleDoubleClick}
       >
@@ -227,25 +269,25 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
         {/* Node Content - Icon only */}
         <div className="flex items-center justify-center p-3">
           <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-300"
             style={{
-              backgroundColor: styles.iconBgColor,
-              color: styles.accentColor,
+              backgroundColor: executionIconBgColor || styles.iconBgColor,
+              color: executionIconColor || styles.accentColor,
             }}
           >
             <IconComponent size={20} />
           </div>
         </div>
 
-        {/* Execution status indicator */}
+        {/* Execution status indicator dot */}
         {executionData?.status === 'running' && (
-          <div className="absolute -right-1 -top-1 h-3 w-3 animate-pulse rounded-full bg-amber-500" />
+          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
         )}
         {executionData?.status === 'success' && (
-          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500" />
+          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
         )}
         {executionData?.status === 'error' && (
-          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-destructive" />
+          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
         )}
 
         {/* Output Handles */}

@@ -30,5 +30,7 @@ export type {
   NodeData,
   NodeExecutionResult,
   ExecutionContext,
+  ExecutionEvent,
+  ExecutionEventType,
   INode,
 } from './engine/types.js';

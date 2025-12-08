@@ -4,6 +4,8 @@ import type {
   NodeData,
   ExecutionJob,
   NodeExecutionResult,
+  ExecutionEvent,
+  ExecutionEventCallback,
 } from './types.js';
 import { NO_OUTPUT_SIGNAL } from './types.js';
 import { NodeRegistry } from './NodeRegistry.js';
@@ -15,18 +17,37 @@ import {
 export class WorkflowRunner {
   /**
    * Run a workflow from a starting node
+   * @param onEvent - Optional callback for real-time execution events
    */
   async run(
     workflow: Workflow,
     startNodeName: string,
     initialData: NodeData[] = [{ json: {} }],
-    mode: 'manual' | 'webhook' | 'cron' = 'manual'
+    mode: 'manual' | 'webhook' | 'cron' = 'manual',
+    onEvent?: ExecutionEventCallback
   ): Promise<ExecutionContext> {
     const context = this.createContext(workflow, mode);
+    const totalNodes = workflow.nodes.length;
+    let completedNodes = 0;
+
+    // Emit execution start event
+    this.emitEvent(onEvent, {
+      type: 'execution:start',
+      executionId: context.executionId,
+      timestamp: new Date(),
+      progress: { completed: 0, total: totalNodes },
+    });
 
     const startNode = workflow.nodes.find((n) => n.name === startNodeName);
     if (!startNode) {
-      throw new Error(`Start node "${startNodeName}" not found in workflow`);
+      const error = `Start node "${startNodeName}" not found in workflow`;
+      this.emitEvent(onEvent, {
+        type: 'execution:error',
+        executionId: context.executionId,
+        timestamp: new Date(),
+        error,
+      });
+      throw new Error(error);
     }
 
     // Initialize job queue with start node
@@ -40,6 +61,9 @@ export class WorkflowRunner {
       },
     ];
 
+    // Track which nodes have been executed (for progress tracking)
+    const executedNodes = new Set<string>();
+
     // Process jobs until queue is empty
     // Safety limit to prevent infinite loops
     let iteration = 0;
@@ -47,38 +71,108 @@ export class WorkflowRunner {
     while (queue.length > 0 && iteration < maxIterations) {
       iteration++;
       const job = queue.shift()!;
-      await this.processJob(context, job, queue);
+
+      // Emit node start event (only first time for each node)
+      const nodeDef = context.workflow.nodes.find((n) => n.name === job.nodeName);
+      if (nodeDef && !executedNodes.has(job.nodeName)) {
+        this.emitEvent(onEvent, {
+          type: 'node:start',
+          executionId: context.executionId,
+          timestamp: new Date(),
+          nodeName: job.nodeName,
+          nodeType: nodeDef.type,
+          progress: { completed: completedNodes, total: totalNodes },
+        });
+      }
+
+      const hadError = await this.processJob(context, job, queue, onEvent);
+
+      // Track completion and emit node complete event
+      if (!executedNodes.has(job.nodeName)) {
+        executedNodes.add(job.nodeName);
+        completedNodes++;
+
+        if (!hadError && nodeDef) {
+          this.emitEvent(onEvent, {
+            type: 'node:complete',
+            executionId: context.executionId,
+            timestamp: new Date(),
+            nodeName: job.nodeName,
+            nodeType: nodeDef.type,
+            data: context.nodeStates.get(job.nodeName),
+            progress: { completed: completedNodes, total: totalNodes },
+          });
+        }
+      }
     }
 
     if (iteration >= maxIterations) {
+      const error = 'Execution exceeded maximum iterations (possible infinite loop)';
       context.errors.push({
         nodeName: 'WorkflowRunner',
-        error: 'Execution exceeded maximum iterations (possible infinite loop)',
+        error,
         timestamp: new Date(),
       });
+      this.emitEvent(onEvent, {
+        type: 'execution:error',
+        executionId: context.executionId,
+        timestamp: new Date(),
+        error,
+      });
     }
+
+    // Emit execution complete event
+    this.emitEvent(onEvent, {
+      type: 'execution:complete',
+      executionId: context.executionId,
+      timestamp: new Date(),
+      progress: { completed: completedNodes, total: totalNodes },
+    });
 
     return context;
   }
 
   /**
+   * Helper to emit events safely
+   */
+  private emitEvent(onEvent: ExecutionEventCallback | undefined, event: ExecutionEvent): void {
+    if (onEvent) {
+      try {
+        onEvent(event);
+      } catch (e) {
+        console.error('Error in execution event callback:', e);
+      }
+    }
+  }
+
+  /**
    * Process a single execution job
+   * @returns true if there was an error, false otherwise
    */
   private async processJob(
     context: ExecutionContext,
     job: ExecutionJob,
-    queue: ExecutionJob[]
-  ): Promise<void> {
+    queue: ExecutionJob[],
+    onEvent?: ExecutionEventCallback
+  ): Promise<boolean> {
     const { nodeName, inputData, sourceNode, sourceOutput, runIndex } = job;
     const nodeDef = context.workflow.nodes.find((n) => n.name === nodeName);
 
     if (!nodeDef) {
+      const error = `Node "${nodeName}" not found`;
       context.errors.push({
         nodeName,
-        error: `Node "${nodeName}" not found`,
+        error,
         timestamp: new Date(),
       });
-      return;
+      this.emitEvent(onEvent, {
+        type: 'node:error',
+        executionId: context.executionId,
+        timestamp: new Date(),
+        nodeName,
+        error,
+      });
+      return true;
     }
 
     const node = NodeRegistry.get(nodeDef.type);
@@ -97,7 +191,7 @@ export class WorkflowRunner {
         runIndex
       );
       if (!handled) {
-        return; // Waiting for more inputs
+        return false; // Waiting for more inputs
       }
     }
 
@@ -105,7 +199,7 @@ export class WorkflowRunner {
     if (nodeDef.pinnedData && nodeDef.pinnedData.length > 0) {
       context.nodeStates.set(nodeName, nodeDef.pinnedData);
       this.queueNextNodes(context, nodeDef, { outputs: { main: nodeDef.pinnedData } }, queue, runIndex);
-      return;
+      return false;
     }
 
     // Resolve expressions in parameters
@@ -142,6 +236,15 @@ export class WorkflowRunner {
         timestamp: new Date(),
       });
 
+      this.emitEvent(onEvent, {
+        type: 'node:error',
+        executionId: context.executionId,
+        timestamp: new Date(),
+        nodeName,
+        nodeType: nodeDef.type,
+        error: errorMsg,
+      });
+
       // Check continueOnFail
       if (nodeDef.continueOnFail) {
         result = {
@@ -152,7 +255,7 @@ export class WorkflowRunner {
       } else {
         // Propagate NO_OUTPUT to downstream nodes
         this.propagateNoOutput(context, nodeDef, queue, runIndex);
-        return;
+        return true;
       }
     }
 
@@ -168,6 +271,7 @@ export class WorkflowRunner {
 
     // Queue next nodes based on outputs
     this.queueNextNodes(context, nodeDef, result, queue, runIndex);
+    return false;
   }
 
   /**

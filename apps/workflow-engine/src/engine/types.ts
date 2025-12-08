@@ -101,3 +101,33 @@ export interface StoredWorkflow {
   createdAt: Date;
   updatedAt: Date;
 }
+
+/**
+ * Real-time execution events for SSE streaming
+ */
+export type ExecutionEventType =
+  | 'execution:start'
+  | 'node:start'
+  | 'node:complete'
+  | 'node:error'
+  | 'execution:complete'
+  | 'execution:error';
+
+export interface ExecutionEvent {
+  type: ExecutionEventType;
+  executionId: string;
+  timestamp: Date;
+  nodeName?: string;
+  nodeType?: string;
+  data?: NodeData[];
+  error?: string;
+  progress?: {
+    completed: number;
+    total: number;
+  };
+}
+
+/**
+ * Callback for receiving execution events
+ */
+export type ExecutionEventCallback = (event: ExecutionEvent) => void;
