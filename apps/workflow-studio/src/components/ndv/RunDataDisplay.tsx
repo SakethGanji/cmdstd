@@ -1,9 +1,9 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, memo, useCallback } from 'react';
 import { GripVertical, ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
 
 interface RunDataDisplayProps {
   data: Record<string, unknown>[];
-  mode: 'table' | 'json' | 'schema';
+  mode: 'json' | 'schema';
 }
 
 // Type for nested schema structure
@@ -14,15 +14,6 @@ interface SchemaNode {
 }
 
 export default function RunDataDisplay({ data, mode }: RunDataDisplayProps) {
-  // Get all unique keys from all items
-  const columns = useMemo(() => {
-    const keys = new Set<string>();
-    data.forEach((item) => {
-      Object.keys(item).forEach((key) => keys.add(key));
-    });
-    return Array.from(keys);
-  }, [data]);
-
   // Generate nested schema from data for tree view
   const schema = useMemo(() => {
     const buildSchema = (
@@ -73,105 +64,53 @@ export default function RunDataDisplay({ data, mode }: RunDataDisplayProps) {
     return buildSchema(merged);
   }, [data]);
 
-  // Handle drag start for field
-  const handleDragStart = (e: React.DragEvent, fieldPath: string) => {
+  // Handle drag start for field - use native drag image for better performance
+  const handleDragStart = useCallback((e: React.DragEvent, fieldPath: string) => {
     e.dataTransfer.setData('text/plain', fieldPath);
     e.dataTransfer.setData('application/x-field-path', fieldPath);
     e.dataTransfer.effectAllowed = 'copy';
-
-    // Create a custom drag image
-    const dragEl = document.createElement('div');
-    dragEl.textContent = `{{ ${fieldPath} }}`;
-    dragEl.style.cssText = 'position: absolute; top: -1000px; background: #1e1e1e; color: #10b981; padding: 4px 8px; border-radius: 4px; font-family: monospace; font-size: 12px;';
-    document.body.appendChild(dragEl);
-    e.dataTransfer.setDragImage(dragEl, 0, 0);
-    setTimeout(() => document.body.removeChild(dragEl), 0);
-  };
+    // Use native drag ghost (the element itself) - much smoother than custom drag image
+  }, []);
 
   if (mode === 'json') {
     return (
-      <div className="rounded-lg bg-foreground p-4">
-        <pre className="overflow-auto text-sm text-emerald-400">
-          {JSON.stringify(data, null, 2)}
-        </pre>
-      </div>
-    );
-  }
-
-  if (mode === 'schema') {
-    return (
-      <div className="space-y-2">
-        <p className="text-sm font-medium text-muted-foreground">
-          {data.length} item{data.length !== 1 ? 's' : ''} · Drag fields to map them
-        </p>
-        <div className="rounded-lg border border-border bg-card">
-          {Object.entries(schema).map(([key, node]) => (
-            <SchemaFieldRow
-              key={key}
-              name={key}
-              node={node}
-              depth={0}
-              onDragStart={handleDragStart}
-            />
-          ))}
+      <div className="space-y-1.5">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center rounded bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+            JSON
+          </span>
+          <span className="text-xs text-muted-foreground">
+            {data.length} item{data.length !== 1 ? 's' : ''}
+          </span>
+        </div>
+        <div className="rounded-md bg-zinc-900 dark:bg-zinc-950 p-3 overflow-auto max-h-[calc(100vh-300px)]">
+          <pre className="text-xs text-emerald-400 font-mono leading-relaxed select-text whitespace-pre">
+            {JSON.stringify(data, null, 2)}
+          </pre>
         </div>
       </div>
     );
   }
 
-  // Table mode (default)
+  // Schema mode (default)
   return (
-    <div className="overflow-auto rounded-lg border border-border bg-card">
-      <table className="min-w-full divide-y divide-border">
-        <thead className="bg-muted">
-          <tr>
-            <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground">
-              #
-            </th>
-            {columns.map((column) => (
-              <th
-                key={column}
-                draggable
-                onDragStart={(e) => handleDragStart(e, `$json.${column}`)}
-                className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground cursor-grab hover:bg-primary/10 hover:text-primary transition-colors select-none group"
-                title={`Drag to insert {{ $json.${column} }}`}
-              >
-                <span className="flex items-center gap-1">
-                  <GripVertical size={12} className="opacity-0 group-hover:opacity-50 flex-shrink-0" />
-                  {column}
-                </span>
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {data.map((item, index) => (
-            <tr key={index} className="hover:bg-accent">
-              <td className="whitespace-nowrap px-4 py-2 text-sm text-muted-foreground">
-                {index}
-              </td>
-              {columns.map((column) => (
-                <td
-                  key={column}
-                  className="whitespace-nowrap px-4 py-2 text-sm text-foreground"
-                >
-                  {formatValue(item[column])}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="space-y-1.5">
+      <p className="text-xs text-muted-foreground">
+        {data.length} item{data.length !== 1 ? 's' : ''} · Drag to map
+      </p>
+      <div className="rounded-md border border-border bg-card">
+        {Object.entries(schema).map(([key, node]) => (
+          <SchemaFieldRow
+            key={key}
+            name={key}
+            node={node}
+            depth={0}
+            onDragStart={handleDragStart}
+          />
+        ))}
+      </div>
     </div>
   );
-}
-
-function formatValue(value: unknown): string {
-  if (value === null) return 'null';
-  if (value === undefined) return 'undefined';
-  if (typeof value === 'object') return JSON.stringify(value);
-  if (typeof value === 'boolean') return value ? 'true' : 'false';
-  return String(value);
 }
 
 // Type badge colors
@@ -192,19 +131,19 @@ interface SchemaFieldRowProps {
   onDragStart: (e: React.DragEvent, path: string) => void;
 }
 
-function SchemaFieldRow({ name, node, depth, onDragStart }: SchemaFieldRowProps) {
-  const [isExpanded, setIsExpanded] = useState(depth === 0);
+const SchemaFieldRow = memo(function SchemaFieldRow({ name, node, depth, onDragStart }: SchemaFieldRowProps) {
+  const [isExpanded, setIsExpanded] = useState(depth < 2); // Auto-expand first 2 levels
   const [copied, setCopied] = useState(false);
   const hasChildren = node.children && Object.keys(node.children).length > 0;
-  const paddingLeft = depth * 16 + 12;
+  const paddingLeft = depth * 12 + 8;
 
-  const handleCopyPath = (e: React.MouseEvent) => {
+  const handleCopyPath = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     const expression = `{{ ${node.path} }}`;
     navigator.clipboard.writeText(expression);
     setCopied(true);
     setTimeout(() => setCopied(false), 1500);
-  };
+  }, [node.path]);
 
   return (
     <>
@@ -214,9 +153,9 @@ function SchemaFieldRow({ name, node, depth, onDragStart }: SchemaFieldRowProps)
         className="flex items-center justify-between border-b border-border last:border-b-0 hover:bg-primary/5 cursor-grab transition-colors group"
         style={{ paddingLeft }}
       >
-        <div className="flex items-center gap-1 py-2 pr-2 flex-1 min-w-0">
+        <div className="flex items-center gap-0.5 py-1.5 pr-1 flex-1 min-w-0">
           {/* Drag handle */}
-          <GripVertical size={14} className="opacity-30 group-hover:opacity-70 flex-shrink-0 text-muted-foreground" />
+          <GripVertical size={12} className="opacity-20 group-hover:opacity-60 flex-shrink-0 text-muted-foreground" />
 
           {/* Expand/collapse for nested */}
           {hasChildren ? (
@@ -228,36 +167,36 @@ function SchemaFieldRow({ name, node, depth, onDragStart }: SchemaFieldRowProps)
               className="p-0.5 hover:bg-accent rounded flex-shrink-0"
             >
               {isExpanded ? (
-                <ChevronDown size={14} className="text-muted-foreground" />
+                <ChevronDown size={12} className="text-muted-foreground" />
               ) : (
-                <ChevronRight size={14} className="text-muted-foreground" />
+                <ChevronRight size={12} className="text-muted-foreground" />
               )}
             </button>
           ) : (
-            <span className="w-5" /> // Spacer
+            <span className="w-4" /> // Smaller spacer
           )}
 
           {/* Field name */}
-          <span className="font-mono text-sm text-foreground truncate">{name}</span>
+          <span className="font-mono text-xs text-foreground truncate">{name}</span>
         </div>
 
-        <div className="flex items-center gap-2 pr-3 py-2">
+        <div className="flex items-center gap-1 pr-2 py-1.5">
           {/* Copy button */}
           <button
             onClick={handleCopyPath}
-            className="p-1 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
+            className="p-0.5 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
             title={`Copy {{ ${node.path} }}`}
           >
             {copied ? (
-              <Check size={14} className="text-emerald-500" />
+              <Check size={12} className="text-emerald-500" />
             ) : (
-              <Copy size={14} className="text-muted-foreground" />
+              <Copy size={12} className="text-muted-foreground" />
             )}
           </button>
 
-          {/* Type badge */}
+          {/* Type badge - compact */}
           <span
-            className={`rounded px-2 py-0.5 font-mono text-xs flex-shrink-0 ${typeBadgeColors[node.type] || 'bg-muted text-muted-foreground'}`}
+            className={`rounded px-1.5 py-0.5 font-mono text-[10px] flex-shrink-0 ${typeBadgeColors[node.type] || 'bg-muted text-muted-foreground'}`}
           >
             {node.type}
           </span>
@@ -280,4 +219,4 @@ function SchemaFieldRow({ name, node, depth, onDragStart }: SchemaFieldRowProps)
       )}
     </>
   );
-}
+});

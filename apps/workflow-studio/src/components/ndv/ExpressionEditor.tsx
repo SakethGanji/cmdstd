@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { Code2, X, ChevronDown } from 'lucide-react';
+import { Code2, X, ChevronDown, Eye, EyeOff } from 'lucide-react';
 
 // Type definitions for output schema (matching workflow-engine)
 interface OutputSchemaProperty {
@@ -24,6 +24,8 @@ interface ExpressionEditorProps {
   label?: string;
   /** Output schema from connected upstream node for autocomplete */
   outputSchema?: OutputSchema;
+  /** Sample data from upstream node execution for preview */
+  sampleData?: Record<string, unknown>[];
 }
 
 // Simple expression syntax highlighting
@@ -61,6 +63,47 @@ function highlightExpression(text: string): React.ReactNode[] {
   }
 
   return parts.length > 0 ? parts : [text];
+}
+
+// Resolve expression paths against sample data
+function resolveExpression(text: string, sampleData: Record<string, unknown>[] | undefined): string {
+  if (!sampleData || sampleData.length === 0) return text;
+
+  const firstItem = sampleData[0];
+
+  return text.replace(/\{\{\s*([^}]+)\s*\}\}/g, (match, expr) => {
+    const trimmedExpr = expr.trim();
+
+    // Handle $json.path expressions
+    if (trimmedExpr.startsWith('$json.')) {
+      const path = trimmedExpr.slice(6); // Remove '$json.'
+      const value = getNestedValue(firstItem, path);
+      if (value !== undefined) {
+        return typeof value === 'object' ? JSON.stringify(value) : String(value);
+      }
+    }
+
+    // Handle $json directly
+    if (trimmedExpr === '$json') {
+      return JSON.stringify(firstItem);
+    }
+
+    return match; // Return original if can't resolve
+  });
+}
+
+// Get nested value from object by dot path
+function getNestedValue(obj: Record<string, unknown>, path: string): unknown {
+  const parts = path.split('.');
+  let current: unknown = obj;
+
+  for (const part of parts) {
+    if (current === null || current === undefined) return undefined;
+    if (typeof current !== 'object') return undefined;
+    current = (current as Record<string, unknown>)[part];
+  }
+
+  return current;
 }
 
 // Base expression suggestions (always available)
@@ -115,35 +158,58 @@ export default function ExpressionEditor({
   placeholder = 'Enter value or expression...',
   label,
   outputSchema,
+  sampleData,
 }: ExpressionEditorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasExpression = value.includes('{{');
+  const canPreview = hasExpression && sampleData && sampleData.length > 0;
 
-  // Handle drag over
+  // Resolved/preview value
+  const previewValue = useMemo(() => {
+    if (!showPreview || !canPreview) return null;
+    return resolveExpression(value, sampleData);
+  }, [showPreview, canPreview, value, sampleData]);
+
+  // Handle drag events - use refs to avoid re-renders during drag
+  const dragCountRef = useRef(0);
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCountRef.current++;
+    if (dragCountRef.current === 1) {
+      if (e.dataTransfer.types.includes('application/x-field-path') || e.dataTransfer.types.includes('text/plain')) {
+        setIsDragOver(true);
+      }
+    }
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Check if it's a field path being dragged
-    if (e.dataTransfer.types.includes('application/x-field-path') || e.dataTransfer.types.includes('text/plain')) {
-      e.dataTransfer.dropEffect = 'copy';
-      setIsDragOver(true);
-    }
+    e.dataTransfer.dropEffect = 'copy';
+    // Don't setState here - fires too frequently
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragOver(false);
+    dragCountRef.current--;
+    if (dragCountRef.current === 0) {
+      setIsDragOver(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    dragCountRef.current = 0;
     setIsDragOver(false);
 
     // Try to get the field path from custom type first, then fall back to text
@@ -215,17 +281,18 @@ export default function ExpressionEditor({
   return (
     <div className="space-y-1">
       {label && (
-        <label className="text-sm font-medium text-foreground">{label}</label>
+        <label className="text-xs font-medium text-foreground">{label}</label>
       )}
 
       <div className="relative">
         {/* Main input with drop zone */}
         <div
+          onDragEnter={handleDragEnter}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`
-            flex items-start gap-2 rounded-lg border bg-secondary transition-all
+            flex items-start gap-1 rounded-md border bg-secondary transition-all
             ${isExpanded ? 'border-primary ring-1 ring-primary' : 'border-input'}
             ${hasExpression ? 'bg-primary/5' : ''}
             ${isDragOver ? 'border-primary ring-2 ring-primary/50 bg-primary/10' : ''}
@@ -236,12 +303,12 @@ export default function ExpressionEditor({
             type="button"
             onClick={toggleExpressionMode}
             className={`
-              flex-shrink-0 p-2 rounded-l-lg transition-colors
+              flex-shrink-0 p-1.5 rounded-l-md transition-colors
               ${hasExpression ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground'}
             `}
             title={hasExpression ? 'Expression mode' : 'Enable expression mode'}
           >
-            <Code2 size={16} />
+            <Code2 size={14} />
           </button>
 
           {/* Input area */}
@@ -254,44 +321,63 @@ export default function ExpressionEditor({
                 setCursorPosition((e.target as HTMLTextAreaElement).selectionStart)
               }
               placeholder={placeholder}
-              rows={3}
-              className="flex-1 bg-transparent py-2 pr-8 text-sm focus:outline-none resize-none font-mono"
+              rows={2}
+              className="flex-1 bg-transparent py-1.5 pr-6 text-sm focus:outline-none resize-none font-mono"
             />
           ) : (
             <div
-              className="flex-1 py-2 pr-8 text-sm cursor-text min-h-[36px] flex items-center"
-              onClick={() => setIsExpanded(true)}
+              className="flex-1 py-1.5 pr-6 text-sm cursor-text min-h-[30px] flex items-center"
+              onClick={() => {
+                setIsExpanded(true);
+                // Focus textarea after expansion
+                setTimeout(() => inputRef.current?.focus(), 0);
+              }}
             >
               {value ? (
-                <span className="truncate">
+                <span className="truncate text-xs">
                   {hasExpression ? highlightExpression(value) : value}
                 </span>
               ) : (
-                <span className="text-muted-foreground">{placeholder}</span>
+                <span className="text-muted-foreground text-xs">{placeholder}</span>
               )}
             </div>
           )}
 
-          {/* Clear / Expand buttons */}
-          <div className="flex-shrink-0 flex items-center gap-1 p-1">
+          {/* Preview / Clear / Expand buttons */}
+          <div className="flex-shrink-0 flex items-center gap-0.5 p-0.5">
+            {/* Preview toggle - only show if we have expressions and sample data */}
+            {canPreview && (
+              <button
+                type="button"
+                onClick={() => setShowPreview(!showPreview)}
+                className={`p-0.5 rounded transition-colors ${
+                  showPreview
+                    ? 'text-amber-500 bg-amber-500/10'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+                title={showPreview ? 'Show expression' : 'Preview resolved value'}
+              >
+                {showPreview ? <EyeOff size={12} /> : <Eye size={12} />}
+              </button>
+            )}
             {value && (
               <button
                 type="button"
                 onClick={() => onChange('')}
-                className="p-1 text-muted-foreground hover:text-foreground rounded"
+                className="p-0.5 text-muted-foreground hover:text-foreground rounded"
                 title="Clear"
               >
-                <X size={14} />
+                <X size={12} />
               </button>
             )}
             <button
               type="button"
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-1 text-muted-foreground hover:text-foreground rounded"
+              className="p-0.5 text-muted-foreground hover:text-foreground rounded"
               title={isExpanded ? 'Collapse' : 'Expand'}
             >
               <ChevronDown
-                size={14}
+                size={12}
                 className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`}
               />
             </button>
@@ -299,35 +385,46 @@ export default function ExpressionEditor({
 
           {/* Drop indicator overlay */}
           {isDragOver && (
-            <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-primary/10 border-2 border-dashed border-primary pointer-events-none">
-              <span className="text-sm font-medium text-primary">Drop to insert field</span>
+            <div className="absolute inset-0 flex items-center justify-center rounded-md bg-primary/10 border-2 border-dashed border-primary pointer-events-none">
+              <span className="text-xs font-medium text-primary">Drop to insert</span>
             </div>
           )}
         </div>
 
+        {/* Preview display */}
+        {showPreview && previewValue && (
+          <div className="mt-1 rounded-md bg-amber-500/10 border border-amber-500/20 px-2 py-1">
+            <div className="flex items-center gap-1 mb-0.5">
+              <Eye size={10} className="text-amber-500" />
+              <span className="text-[10px] font-medium text-amber-600 dark:text-amber-400">Preview</span>
+            </div>
+            <p className="text-xs font-mono text-foreground break-all">{previewValue}</p>
+          </div>
+        )}
+
         {/* Expression suggestions dropdown */}
         {isExpanded && (
-          <div className="mt-2">
+          <div className="mt-1">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setShowSuggestions(!showSuggestions);
               }}
-              className="text-xs text-primary hover:underline"
+              className="text-[10px] text-primary hover:underline"
             >
-              Insert expression variable...
+              Insert variable...
             </button>
 
             {showSuggestions && (
               <div
-                className="absolute z-50 mt-1 w-full max-h-64 overflow-auto rounded-lg border border-border bg-popover shadow-lg"
+                className="absolute z-50 mt-1 w-full max-h-48 overflow-auto rounded-md border border-border bg-popover shadow-lg"
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Schema fields section */}
                 {expressionSuggestions.some((s) => s.category === 'field') && (
-                  <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border-b border-border">
-                    Available Fields
+                  <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground bg-muted/50 border-b border-border">
+                    Fields
                   </div>
                 )}
                 {expressionSuggestions
@@ -337,20 +434,17 @@ export default function ExpressionEditor({
                       key={suggestion.label}
                       type="button"
                       onClick={() => insertExpression(suggestion.label)}
-                      className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
+                      className="w-full px-2 py-1.5 text-left hover:bg-accent flex items-center justify-between gap-1"
                     >
-                      <code className="text-sm font-mono text-primary">
+                      <code className="text-xs font-mono text-primary truncate">
                         {suggestion.label}
                       </code>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {suggestion.description}
-                      </span>
                     </button>
                   ))}
 
                 {/* Data variables section */}
-                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border-b border-border">
-                  Data Variables
+                <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground bg-muted/50 border-b border-border">
+                  Data
                 </div>
                 {expressionSuggestions
                   .filter((s) => s.category === 'data')
@@ -359,19 +453,16 @@ export default function ExpressionEditor({
                       key={suggestion.label}
                       type="button"
                       onClick={() => insertExpression(suggestion.label)}
-                      className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
+                      className="w-full px-2 py-1.5 text-left hover:bg-accent flex items-center justify-between gap-1"
                     >
-                      <code className="text-sm font-mono text-foreground">
+                      <code className="text-xs font-mono text-foreground truncate">
                         {suggestion.label}
                       </code>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {suggestion.description}
-                      </span>
                     </button>
                   ))}
 
                 {/* Helper variables section */}
-                <div className="px-3 py-1.5 text-xs font-medium text-muted-foreground bg-muted/50 border-b border-border">
+                <div className="px-2 py-1 text-[10px] font-medium text-muted-foreground bg-muted/50 border-b border-border">
                   Helpers
                 </div>
                 {expressionSuggestions
@@ -381,14 +472,11 @@ export default function ExpressionEditor({
                       key={suggestion.label}
                       type="button"
                       onClick={() => insertExpression(suggestion.label)}
-                      className="w-full px-3 py-2 text-left hover:bg-accent flex items-center justify-between gap-2"
+                      className="w-full px-2 py-1.5 text-left hover:bg-accent flex items-center justify-between gap-1"
                     >
-                      <code className="text-sm font-mono text-foreground">
+                      <code className="text-xs font-mono text-foreground truncate">
                         {suggestion.label}
                       </code>
-                      <span className="text-xs text-muted-foreground truncate">
-                        {suggestion.description}
-                      </span>
                     </button>
                   ))}
               </div>
@@ -396,13 +484,6 @@ export default function ExpressionEditor({
           </div>
         )}
       </div>
-
-      {/* Expression mode hint */}
-      {hasExpression && !isExpanded && (
-        <p className="text-xs text-muted-foreground">
-          Expression mode: Click to edit
-        </p>
-      )}
     </div>
   );
 }

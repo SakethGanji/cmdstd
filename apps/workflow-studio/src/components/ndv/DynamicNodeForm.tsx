@@ -76,6 +76,8 @@ interface DynamicNodeFormProps {
   allValues?: Record<string, unknown>;
   /** Output schema from upstream node for expression autocomplete */
   upstreamSchema?: OutputSchema;
+  /** Sample data from upstream node execution for preview */
+  sampleData?: Record<string, unknown>[];
 }
 
 export default function DynamicNodeForm({
@@ -84,6 +86,7 @@ export default function DynamicNodeForm({
   onChange,
   allValues,
   upstreamSchema,
+  sampleData,
 }: DynamicNodeFormProps) {
   // Filter properties based on displayOptions
   const visibleProperties = properties.filter((prop) =>
@@ -91,7 +94,7 @@ export default function DynamicNodeForm({
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {visibleProperties.map((property) => (
         <PropertyField
           key={property.name}
@@ -100,6 +103,7 @@ export default function DynamicNodeForm({
           onChange={(value) => onChange(property.name, value)}
           allValues={allValues || values}
           upstreamSchema={upstreamSchema}
+          sampleData={sampleData}
         />
       ))}
     </div>
@@ -152,9 +156,10 @@ interface PropertyFieldProps {
   onChange: (value: unknown) => void;
   allValues: Record<string, unknown>;
   upstreamSchema?: OutputSchema;
+  sampleData?: Record<string, unknown>[];
 }
 
-function PropertyField({ property, value, onChange, allValues, upstreamSchema }: PropertyFieldProps) {
+function PropertyField({ property, value, onChange, allValues, upstreamSchema, sampleData }: PropertyFieldProps) {
   const { type } = property;
 
   switch (type) {
@@ -172,6 +177,7 @@ function PropertyField({ property, value, onChange, allValues, upstreamSchema }:
           onChange={(v) => onChange(v)}
           placeholder={property.placeholder}
           outputSchema={upstreamSchema}
+          sampleData={sampleData}
         />
       ) : (
         <StringField
@@ -179,6 +185,7 @@ function PropertyField({ property, value, onChange, allValues, upstreamSchema }:
           value={(value as string) || ''}
           onChange={onChange}
           upstreamSchema={upstreamSchema}
+          sampleData={sampleData}
         />
       );
 
@@ -246,11 +253,13 @@ function StringField({
   value,
   onChange,
   upstreamSchema,
+  sampleData,
 }: {
   property: NodeProperty;
   value: string;
   onChange: (value: string) => void;
   upstreamSchema?: OutputSchema;
+  sampleData?: Record<string, unknown>[];
 }) {
   return (
     <div>
@@ -263,6 +272,7 @@ function StringField({
         onChange={onChange}
         placeholder={property.placeholder}
         outputSchema={upstreamSchema}
+        sampleData={sampleData}
       />
       {property.description && (
         <p className="mt-1 text-xs text-muted-foreground">{property.description}</p>
