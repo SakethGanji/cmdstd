@@ -5,12 +5,11 @@ import ReactFlow, {
   MiniMap,
   type OnConnect,
   type Connection,
-  Panel,
   BackgroundVariant,
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Play, Loader2, Square } from 'lucide-react';
+import { Play, Loader2, Square, Plus, Minus } from 'lucide-react';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
@@ -22,6 +21,7 @@ import WorkflowNode from './nodes/WorkflowNode';
 import WorkflowEdge from './edges/WorkflowEdge';
 import StickyNote from './nodes/StickyNote';
 import { getNodeGroupFromType, getMiniMapColor } from '../../lib/nodeStyles';
+import { cn } from '@/lib/utils';
 
 // Define custom node types - use 'any' to work around React 19 type incompatibility
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -49,7 +49,7 @@ export default function WorkflowCanvas() {
   } = useWorkflowStore();
 
   const openPanel = useNodeCreatorStore((s) => s.openPanel);
-  const { fitView } = useReactFlow();
+  const { fitView, zoomIn, zoomOut } = useReactFlow();
 
   const { saveWorkflow } = useSaveWorkflow();
   const { executeWorkflow, isExecuting, progress, cancelExecution } = useExecutionStream();
@@ -158,13 +158,6 @@ export default function WorkflowCanvas() {
           className="text-border/40 [&>pattern>path]:stroke-current"
         />
 
-        {/* Controls moved to left and styled for dark mode */}
-        <Controls
-          position="top-left"
-          showInteractive={false}
-          className="!bg-card !shadow-md !rounded-lg !border !border-border text-foreground [&>button]:!bg-transparent [&>button]:!border-none [&>button]:!text-foreground [&>button:hover]:!bg-accent [&_path]:!fill-current"
-        />
-
         {/* MiniMap - colored by node group */}
         <MiniMap
           position="bottom-left"
@@ -192,72 +185,63 @@ export default function WorkflowCanvas() {
           className="!bg-card !shadow-md !rounded-lg !border !border-border"
         />
 
-        {/* Status Panel */}
-        <Panel position="bottom-right" className="flex items-center gap-4">
-          {/* Test Workflow Button */}
-          {!isEmpty && (
-            <div className="flex items-center gap-2">
-              {isExecuting && (
-                <button
-                  onClick={cancelExecution}
-                  className="flex items-center gap-2 px-3 py-2 rounded-lg bg-destructive text-destructive-foreground font-medium text-sm shadow-md hover:bg-destructive/90 transition-colors"
-                >
-                  <Square size={14} />
-                  Stop
-                </button>
-              )}
-              <button
-                onClick={() => executeWorkflow()}
-                disabled={isExecuting}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground font-medium text-sm shadow-md hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                {isExecuting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    {progress ? `${progress.completed}/${progress.total}` : 'Running...'}
-                  </>
-                ) : (
-                  <>
-                    <Play size={16} />
-                    Test Workflow
-                  </>
-                )}
-              </button>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-card/80 backdrop-blur-sm border border-border/50 text-xs font-medium text-muted-foreground shadow-sm">
-            <div className="flex items-center gap-1.5">
-              <span className="relative flex h-2 w-2">
-                <span className={`absolute inline-flex h-full w-full rounded-full ${isExecuting ? 'bg-amber-400 animate-ping' : 'bg-green-400 animate-ping'} opacity-75`}></span>
-                <span className={`relative inline-flex rounded-full h-2 w-2 ${isExecuting ? 'bg-amber-500' : 'bg-green-500'}`}></span>
-              </span>
-              {isExecuting ? 'Executing' : 'Ready'}
-            </div>
-            <div className="w-px h-3 bg-border"></div>
-            <div>
-              {nodes.filter(n => n.type === 'workflowNode').length} Node{nodes.filter(n => n.type === 'workflowNode').length !== 1 && 's'}
-            </div>
-            <div className="w-px h-3 bg-border"></div>
-            <div>
-              {edges.length} Edge{edges.length !== 1 && 's'}
-            </div>
-          </div>
-        </Panel>
-
       </ReactFlow>
 
-      {/* Add node button - positioned outside ReactFlow for reliable click handling */}
+      {/* Top-right toolbar - Zoom, Play, and Add buttons */}
       {!isEmpty && (
-        <button
-          onClick={() => openPanel('regular')}
-          className="fixed top-4 right-4 z-40 flex items-center justify-center size-9 rounded-lg bg-primary text-primary-foreground shadow-md transition-colors hover:bg-primary/90"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M5 12h14" />
-            <path d="M12 5v14" />
-          </svg>
-        </button>
+        <div className="fixed top-4 right-4 z-40 flex items-center gap-1.5">
+          {/* Zoom controls - horizontal */}
+          <div className="flex flex-row bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 shadow-md overflow-hidden">
+            <button
+              onClick={() => zoomOut()}
+              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border-r border-border/50"
+              title="Zoom out"
+            >
+              <Minus size={14} strokeWidth={2} />
+            </button>
+            <button
+              onClick={() => zoomIn()}
+              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              title="Zoom in"
+            >
+              <Plus size={14} strokeWidth={2} />
+            </button>
+          </div>
+
+          {/* Play/Stop button */}
+          {isExecuting ? (
+            <button
+              onClick={cancelExecution}
+              className={cn(
+                "flex items-center justify-center size-9 rounded-lg shadow-md transition-all",
+                "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              )}
+              title="Stop execution"
+            >
+              <Square size={16} fill="currentColor" />
+            </button>
+          ) : (
+            <button
+              onClick={() => executeWorkflow()}
+              className={cn(
+                "flex items-center justify-center size-9 rounded-lg shadow-md transition-all",
+                "bg-emerald-500 text-white hover:bg-emerald-600"
+              )}
+              title="Run workflow"
+            >
+              <Play size={16} fill="currentColor" />
+            </button>
+          )}
+
+          {/* Add node button */}
+          <button
+            onClick={() => openPanel('regular')}
+            className="flex items-center justify-center size-9 rounded-lg bg-primary text-primary-foreground shadow-md transition-colors hover:bg-primary/90"
+            title="Add node"
+          >
+            <Plus size={18} strokeWidth={2.5} />
+          </button>
+        </div>
       )}
     </div>
   );

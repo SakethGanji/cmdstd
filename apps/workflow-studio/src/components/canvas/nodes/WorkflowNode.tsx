@@ -165,11 +165,11 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     if (!executionData) return undefined;
     switch (executionData.status) {
       case 'running':
-        return '0 0 20px rgba(245, 158, 11, 0.4), 0 0 40px rgba(245, 158, 11, 0.2)';
+        return '0 0 8px rgba(245, 158, 11, 0.25)';
       case 'success':
-        return '0 0 20px rgba(16, 185, 129, 0.4), 0 0 40px rgba(16, 185, 129, 0.2)';
+        return '0 0 8px rgba(16, 185, 129, 0.25)';
       case 'error':
-        return '0 0 20px rgba(239, 68, 68, 0.4), 0 0 40px rgba(239, 68, 68, 0.2)';
+        return '0 0 8px rgba(239, 68, 68, 0.25)';
       default:
         return undefined;
     }
@@ -281,13 +281,13 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
 
         {/* Execution status indicator dot */}
         {executionData?.status === 'running' && (
-          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]" />
+          <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.4)]" />
         )}
         {executionData?.status === 'success' && (
-          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]" />
+          <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.4)]" />
         )}
         {executionData?.status === 'error' && (
-          <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]" />
+          <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.4)]" />
         )}
 
         {/* Output Handles */}

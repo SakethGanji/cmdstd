@@ -1,5 +1,6 @@
 import { useMemo, useState, memo, useCallback } from 'react';
 import { GripVertical, ChevronRight, ChevronDown, Copy, Check } from 'lucide-react';
+import JsonViewer from '../ui/json-viewer';
 
 interface RunDataDisplayProps {
   data: Record<string, unknown>[];
@@ -83,11 +84,7 @@ export default function RunDataDisplay({ data, mode }: RunDataDisplayProps) {
             {data.length} item{data.length !== 1 ? 's' : ''}
           </span>
         </div>
-        <div className="rounded-md bg-zinc-900 dark:bg-zinc-950 p-3 overflow-auto max-h-[calc(100vh-300px)]">
-          <pre className="text-xs text-emerald-400 font-mono leading-relaxed select-text whitespace-pre">
-            {JSON.stringify(data, null, 2)}
-          </pre>
-        </div>
+        <JsonViewer value={data} maxHeight="calc(100vh - 300px)" />
       </div>
     );
   }

@@ -8,6 +8,7 @@
 import { useState } from 'react';
 import { Eye, EyeOff, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import ExpressionEditor from './ExpressionEditor';
+import CodeEditor from '../ui/code-editor';
 
 // Type definitions matching the API schema
 // These are compatible with INodeProperty from workflow-engine
@@ -460,18 +461,23 @@ function JsonField({
     }
   };
 
+  // Calculate min height based on rows
+  const minHeight = `${Math.max(rows * 24, 100)}px`;
+  const maxHeight = `${Math.max(rows * 24, 300)}px`;
+
   return (
     <div>
       <label className="mb-1 block text-sm font-medium text-foreground">
         {property.displayName}
         {property.required && <span className="text-destructive ml-1">*</span>}
       </label>
-      <textarea
+      <CodeEditor
         value={stringValue}
-        onChange={(e) => handleChange(e.target.value)}
-        rows={rows}
+        onChange={handleChange}
+        language={language === 'javascript' ? 'javascript' : 'json'}
         placeholder={property.placeholder}
-        className="w-full rounded-lg border border-input bg-secondary px-3 py-2 font-mono text-sm focus:border-ring focus:outline-none focus:ring-1 focus:ring-ring"
+        minHeight={minHeight}
+        maxHeight={maxHeight}
       />
       {property.description && (
         <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap">

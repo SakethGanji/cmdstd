@@ -1,7 +1,7 @@
 import { memo, useState, useMemo } from 'react';
 import {
   EdgeLabelRenderer,
-  getBezierPath,
+  getSmoothStepPath,
   useReactFlow,
   type EdgeProps,
 } from 'reactflow';
@@ -98,18 +98,25 @@ function WorkflowEdge({
     return label;
   }, [source, sourceHandleId, getNode]);
 
-  // Use bezier path like Turbo style - with small offset hack for straight lines
-  const xEqual = sourceX === targetX;
-  const yEqual = sourceY === targetY;
-
-  const [edgePath, labelX, labelY] = getBezierPath({
-    sourceX: xEqual ? sourceX + 0.0001 : sourceX,
-    sourceY: yEqual ? sourceY + 0.0001 : sourceY,
+  // Use smooth step path - right-angle turns with rounded corners
+  const [edgePath, labelX, labelY] = getSmoothStepPath({
+    sourceX,
+    sourceY,
     sourcePosition,
     targetX,
     targetY,
     targetPosition,
+    borderRadius: 8,
   });
+
+  // Use userSpaceOnUse with actual coordinates to ensure gradient works on straight lines
+  // objectBoundingBox (default) fails when the bounding box has zero width or height
+  const gradientCoords = {
+    x1: sourceX,
+    y1: sourceY,
+    x2: targetX,
+    y2: targetY,
+  };
 
   const handleAddNode = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -134,8 +141,8 @@ function WorkflowEdge({
     <>
       {/* Gradient and marker definitions */}
       <defs>
-        {/* Gradient for the edge */}
-        <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+        {/* Gradient for the edge - use userSpaceOnUse to work with straight lines */}
+        <linearGradient id={gradientId} gradientUnits="userSpaceOnUse" {...gradientCoords}>
           <stop offset="0%" stopColor={edgeColors.start} />
           <stop offset="100%" stopColor={edgeColors.end} />
         </linearGradient>
@@ -173,7 +180,7 @@ function WorkflowEdge({
           fill="none"
           stroke={`url(#${gradientId})`}
           strokeWidth={6}
-          strokeOpacity={0.4}
+          strokeOpacity={0.35}
           filter={`url(#glow-${id})`}
           className={isAnimated ? 'animate-pulse' : ''}
         />

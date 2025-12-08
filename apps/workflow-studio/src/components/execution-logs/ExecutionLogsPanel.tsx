@@ -1,20 +1,20 @@
 /**
  * Execution Logs Panel
  *
- * A collapsible floating panel at the bottom of the canvas that shows
- * workflow execution logs similar to n8n's design.
+ * A minimal corner icon that expands into a panel when clicked.
+ * Shows execution status at a glance.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  ChevronUp,
-  ChevronDown,
+  X,
   Trash2,
   CheckCircle2,
   XCircle,
   Loader2,
   Clock,
-  Play,
+  ScrollText,
+  ChevronUp,
 } from 'lucide-react';
 import { useWorkflowStore } from '@/stores/workflowStore';
 import { cn } from '@/lib/utils';
@@ -34,7 +34,7 @@ export default function ExecutionLogsPanel() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedLogId, setSelectedLogId] = useState<string | null>(null);
 
-  const { executionData, nodes, clearExecutionData } = useWorkflowStore();
+  const { executionData, nodes, edges, clearExecutionData } = useWorkflowStore();
 
   // Convert execution data to logs format
   const logs: ExecutionLog[] = Object.entries(executionData)
@@ -62,6 +62,7 @@ export default function ExecutionLogsPanel() {
   const hasLogs = logs.length > 0;
   const isRunning = logs.some((l) => l.status === 'running');
   const hasErrors = logs.some((l) => l.status === 'error');
+  const allSuccess = hasLogs && !isRunning && !hasErrors;
   const totalDuration = logs.reduce((sum, l) => sum + (l.duration || 0), 0);
 
   const selectedLog = selectedLogId
@@ -69,72 +70,83 @@ export default function ExecutionLogsPanel() {
     : null;
   const selectedNodeData = selectedLogId ? executionData[selectedLogId] : null;
 
+  // Auto-select first log when execution starts
+  useEffect(() => {
+    if (hasLogs && !selectedLogId) {
+      setSelectedLogId(logs[0]?.id || null);
+    }
+  }, [hasLogs, logs, selectedLogId]);
+
   const handleClear = () => {
     clearExecutionData();
     setSelectedLogId(null);
+    setIsExpanded(false);
   };
 
-  // Collapsed state - floating pill at bottom
+  const nodeCount = nodes.filter(n => n.type === 'workflowNode').length;
+
+  // Collapsed state - combined status bar in bottom-right corner
   if (!isExpanded) {
     return (
-      <div
-        className={cn(
-          'absolute bottom-4 left-1/2 -translate-x-1/2 z-30',
-          'flex items-center gap-3 px-4 py-2 cursor-pointer',
-          'bg-card/95 backdrop-blur-sm border border-border rounded-full shadow-lg',
-          'hover:bg-accent/50 hover:shadow-xl transition-all'
-        )}
+      <button
         onClick={() => setIsExpanded(true)}
-      >
-        <ChevronUp size={16} className="text-muted-foreground" />
-        <span className="text-sm font-medium text-foreground">Logs</span>
-        {hasLogs && (
-          <>
-            <div className="w-px h-4 bg-border" />
-            {isRunning ? (
-              <span className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-                <Loader2 size={12} className="animate-spin" />
-                Running...
-              </span>
-            ) : hasErrors ? (
-              <span className="flex items-center gap-1.5 text-xs text-destructive">
-                <XCircle size={12} />
-                Failed
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
-                <CheckCircle2 size={12} />
-                Success in {totalDuration}ms
-              </span>
-            )}
-            <div className="w-px h-4 bg-border" />
-            <span className="text-xs text-muted-foreground">
-              {logs.length} node{logs.length !== 1 && 's'}
-            </span>
-          </>
+        className={cn(
+          'absolute bottom-4 right-4 z-30',
+          'flex items-center gap-2 px-3 py-1.5 rounded-lg',
+          'bg-card/95 backdrop-blur-sm border shadow-sm text-xs',
+          'transition-all hover:shadow-md cursor-pointer',
+          !hasLogs ? 'border-border' : isRunning ? 'border-amber-500/50' : hasErrors ? 'border-destructive/50' : 'border-emerald-500/50'
         )}
-      </div>
+        title="Click to view execution logs"
+      >
+        {/* Node/Edge count */}
+        <span className="text-muted-foreground font-medium">{nodeCount} nodes</span>
+        <div className="w-px h-3 bg-border" />
+        <span className="text-muted-foreground font-medium">{edges.length} edges</span>
+
+        {/* Divider */}
+        <div className="w-px h-3 bg-border" />
+
+        {/* Logs status */}
+        <div className="flex items-center gap-1.5">
+          {isRunning ? (
+            <Loader2 size={14} className="animate-spin text-amber-500" />
+          ) : hasErrors ? (
+            <XCircle size={14} className="text-destructive" />
+          ) : allSuccess ? (
+            <CheckCircle2 size={14} className="text-emerald-500" />
+          ) : (
+            <ScrollText size={14} className="text-muted-foreground" />
+          )}
+          <span className="font-medium text-muted-foreground">Logs</span>
+          {hasLogs && (
+            <span className={cn(
+              'font-medium',
+              isRunning && 'text-amber-600 dark:text-amber-400',
+              hasErrors && 'text-destructive',
+              allSuccess && 'text-emerald-600 dark:text-emerald-400'
+            )}>
+              {isRunning ? 'Running...' : hasErrors ? 'Failed' : `${totalDuration}ms`}
+            </span>
+          )}
+          <ChevronUp size={14} className="text-muted-foreground" />
+        </div>
+      </button>
     );
   }
 
-  // Expanded state - floating panel
+  // Expanded state - panel anchored to bottom-right
   return (
     <div
       className={cn(
-        'absolute bottom-4 left-4 right-4 z-30',
-        'h-72 bg-card/95 backdrop-blur-sm border border-border rounded-xl flex flex-col',
+        'absolute bottom-4 right-4 z-30',
+        'w-[560px] max-w-[calc(100vw-2rem)] h-72 bg-card/95 backdrop-blur-sm border border-border rounded-xl flex flex-col',
         'shadow-2xl'
       )}
     >
       {/* Header */}
-      <div className="flex items-center justify-between h-10 px-4 border-b border-border bg-muted/50 rounded-t-xl">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setIsExpanded(false)}
-            className="p-1 rounded hover:bg-accent text-muted-foreground"
-          >
-            <ChevronDown size={16} />
-          </button>
+      <div className="flex items-center justify-between h-10 px-3 border-b border-border bg-muted/50 rounded-t-xl">
+        <div className="flex items-center gap-2">
           <span className="text-sm font-medium text-foreground">Logs</span>
           {hasLogs && (
             <>
@@ -142,52 +154,58 @@ export default function ExecutionLogsPanel() {
               {isRunning ? (
                 <span className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
                   <Loader2 size={12} className="animate-spin" />
-                  Running...
+                  Running
                 </span>
               ) : hasErrors ? (
                 <span className="flex items-center gap-1.5 text-xs text-destructive">
                   <XCircle size={12} />
-                  Execution failed
+                  Failed
                 </span>
               ) : (
                 <span className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
                   <CheckCircle2 size={12} />
-                  Success in {totalDuration}ms
+                  {totalDuration}ms
                 </span>
               )}
             </>
           )}
         </div>
-        <button
-          onClick={handleClear}
-          disabled={!hasLogs}
-          className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          <Trash2 size={12} />
-          Clear execution
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={handleClear}
+            disabled={!hasLogs}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Clear logs"
+          >
+            <Trash2 size={14} />
+          </button>
+          <button
+            onClick={() => setIsExpanded(false)}
+            className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-accent rounded"
+            title="Close"
+          >
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 flex overflow-hidden">
         {/* Node list */}
-        <div className="w-64 border-r border-border overflow-y-auto bg-muted/30 rounded-bl-xl">
+        <div className="w-44 border-r border-border overflow-y-auto bg-muted/30 rounded-bl-xl">
           {!hasLogs ? (
-            <div className="flex flex-col items-center justify-center h-full text-center p-4">
-              <Play size={24} className="text-muted-foreground/50 mb-2" />
-              <p className="text-sm text-muted-foreground">No execution data</p>
-              <p className="text-xs text-muted-foreground/70 mt-1">
-                Run the workflow to see logs
-              </p>
+            <div className="flex flex-col items-center justify-center h-full text-center p-3">
+              <ScrollText size={20} className="text-muted-foreground/50 mb-2" />
+              <p className="text-xs text-muted-foreground">No logs yet</p>
             </div>
           ) : (
-            <div className="p-2 space-y-1">
+            <div className="p-1.5 space-y-0.5">
               {logs.map((log) => (
                 <button
                   key={log.id}
                   onClick={() => setSelectedLogId(log.id)}
                   className={cn(
-                    'w-full flex items-center gap-2 px-3 py-2 rounded-md text-left transition-colors',
+                    'w-full flex items-center gap-2 px-2 py-1.5 rounded text-left transition-colors',
                     selectedLogId === log.id
                       ? 'bg-primary/10 text-primary'
                       : 'hover:bg-accent text-foreground'
@@ -195,22 +213,22 @@ export default function ExecutionLogsPanel() {
                 >
                   {log.status === 'running' && (
                     <Loader2
-                      size={14}
+                      size={12}
                       className="animate-spin text-amber-500 flex-shrink-0"
                     />
                   )}
                   {log.status === 'success' && (
                     <CheckCircle2
-                      size={14}
+                      size={12}
                       className="text-emerald-500 flex-shrink-0"
                     />
                   )}
                   {log.status === 'error' && (
-                    <XCircle size={14} className="text-destructive flex-shrink-0" />
+                    <XCircle size={12} className="text-destructive flex-shrink-0" />
                   )}
-                  <span className="text-sm truncate flex-1">{log.nodeLabel}</span>
+                  <span className="text-xs truncate flex-1">{log.nodeLabel}</span>
                   {log.duration !== undefined && (
-                    <span className="text-xs text-muted-foreground flex-shrink-0">
+                    <span className="text-[10px] text-muted-foreground flex-shrink-0">
                       {log.duration}ms
                     </span>
                   )}
@@ -221,30 +239,30 @@ export default function ExecutionLogsPanel() {
         </div>
 
         {/* Output preview */}
-        <div className="flex-1 overflow-auto p-4 bg-background/50 rounded-br-xl">
+        <div className="flex-1 overflow-auto p-3 bg-background/50 rounded-br-xl">
           {selectedLog && selectedNodeData ? (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {/* Node header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <h3 className="font-medium text-foreground">
+                  <h3 className="text-sm font-medium text-foreground">
                     {selectedLog.nodeLabel}
                   </h3>
                   {selectedLog.status === 'success' && (
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
+                    <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-400">
                       Success
                     </span>
                   )}
                   {selectedLog.status === 'error' && (
-                    <span className="px-2 py-0.5 text-xs rounded-full bg-destructive/10 text-destructive">
+                    <span className="px-1.5 py-0.5 text-[10px] rounded-full bg-destructive/10 text-destructive">
                       Error
                     </span>
                   )}
                 </div>
-                <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                   {selectedLog.duration !== undefined && (
                     <span className="flex items-center gap-1">
-                      <Clock size={12} />
+                      <Clock size={10} />
                       {selectedLog.duration}ms
                     </span>
                   )}
@@ -256,19 +274,19 @@ export default function ExecutionLogsPanel() {
 
               {/* Error message */}
               {selectedLog.error && (
-                <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/20">
-                  <p className="text-sm text-destructive">{selectedLog.error}</p>
+                <div className="p-2 rounded-lg bg-destructive/10 border border-destructive/20">
+                  <p className="text-xs text-destructive">{selectedLog.error}</p>
                 </div>
               )}
 
               {/* Output data */}
               {selectedNodeData.output?.items &&
                 selectedNodeData.output.items.length > 0 && (
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  <div className="space-y-1">
+                    <h4 className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">
                       Output
                     </h4>
-                    <pre className="p-3 rounded-lg bg-muted text-xs overflow-auto max-h-32 font-mono">
+                    <pre className="p-2 rounded-lg bg-muted text-[11px] overflow-auto max-h-40 font-mono">
                       {JSON.stringify(selectedNodeData.output.items, null, 2)}
                     </pre>
                   </div>
@@ -276,10 +294,10 @@ export default function ExecutionLogsPanel() {
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs text-muted-foreground">
                 {hasLogs
                   ? 'Select a node to view output'
-                  : 'Execute the workflow to see logs'}
+                  : 'Run workflow to see logs'}
               </p>
             </div>
           )}
