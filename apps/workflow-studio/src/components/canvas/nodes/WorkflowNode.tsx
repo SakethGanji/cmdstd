@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useMemo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import {
   Plus,
@@ -24,24 +24,41 @@ import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
 import { useNDVStore } from '../../../stores/ndvStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
 import type { WorkflowNodeData } from '../../../types/workflow';
+import {
+  getNodeGroupFromType,
+  getNodeStyles,
+  calculateHandlePositions,
+  calculateNodeMinHeight,
+} from '../../../lib/nodeStyles';
 
 // Icon mapping
 const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
   'mouse-pointer': MousePointer,
+  play: MousePointer,
   clock: Clock,
   webhook: Webhook,
+  bolt: Webhook,
   code: Code,
   filter: Filter,
   'git-branch': GitBranch,
+  'code-branch': GitBranch,
   route: Route,
+  random: Route,
   'git-merge': GitMerge,
+  'compress-arrows-alt': GitMerge,
   layers: Layers,
+  'th-large': Layers,
   globe: Globe,
   pen: Pen,
+  edit: Pen,
   calendar: Calendar,
+  'calendar-alt': Calendar,
   'alert-triangle': AlertTriangle,
+  'exclamation-triangle': AlertTriangle,
   'message-square': MessageSquare,
+  'comment-dots': MessageSquare,
   bot: Bot,
+  robot: Bot,
 };
 
 function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
@@ -51,8 +68,35 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const executionData = useWorkflowStore((s) => s.executionData[id]);
 
   const IconComponent = iconMap[data.icon || 'code'] || Code;
-  const isTrigger = data.type?.includes('Trigger') || data.type?.includes('trigger');
-  // Note: isTrigger is used below for handle visibility
+  const isTrigger = data.type?.includes('Trigger') || data.type?.includes('trigger') ||
+    data.type === 'Start' || data.type === 'manualTrigger' ||
+    data.type === 'Webhook' || data.type === 'webhook' ||
+    data.type === 'Cron' || data.type === 'scheduleTrigger';
+
+  // Get group-based styling
+  const nodeGroup = useMemo(
+    () => getNodeGroupFromType(data.type, data.group ? [data.group] : undefined),
+    [data.type, data.group]
+  );
+  const styles = useMemo(() => getNodeStyles(nodeGroup), [nodeGroup]);
+
+  // Calculate input/output counts
+  const inputCount = isTrigger ? 0 : (data.inputCount ?? data.inputs?.length ?? 1);
+  const outputCount = data.outputCount ?? data.outputs?.length ?? 1;
+
+  // Calculate dimensions and handle positions
+  const minHeight = useMemo(
+    () => calculateNodeMinHeight(inputCount, outputCount),
+    [inputCount, outputCount]
+  );
+  const inputPositions = useMemo(
+    () => calculateHandlePositions(inputCount),
+    [inputCount]
+  );
+  const outputPositions = useMemo(
+    () => calculateHandlePositions(outputCount),
+    [outputCount]
+  );
 
   // Show actions when hovered OR selected
   const showActions = isHovered || selected;
@@ -66,18 +110,125 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     openNDV(id);
   };
 
-  const getStatusColor = () => {
-    if (!executionData) return 'bg-muted';
+  // Execution status styles override group colors temporarily
+  const getExecutionStyles = () => {
+    if (!executionData) return {};
     switch (executionData.status) {
       case 'running':
-        return 'bg-amber-100 border-amber-400 dark:bg-amber-950 dark:border-amber-600';
+        return {
+          backgroundColor: 'var(--color-amber-100)',
+          borderColor: 'var(--color-amber-400)',
+        };
       case 'success':
-        return 'bg-emerald-100 border-emerald-400 dark:bg-emerald-950 dark:border-emerald-600';
+        return {
+          backgroundColor: 'var(--color-emerald-100)',
+          borderColor: 'var(--color-emerald-400)',
+        };
       case 'error':
-        return 'bg-destructive/10 border-destructive';
+        return {
+          backgroundColor: 'hsl(var(--destructive) / 0.1)',
+          borderColor: 'var(--destructive)',
+        };
       default:
-        return 'bg-muted';
+        return {};
     }
+  };
+
+  // Determine if we should show input labels
+  const shouldShowInputLabels = useMemo(() => {
+    if (!data.inputs || data.inputs.length === 0) return false;
+    if (inputCount > 1) return true;
+    // For single input, show label if it has a specific name
+    const firstInput = data.inputs[0];
+    const genericNames = ['main', 'input', 'Input'];
+    return firstInput?.displayName && !genericNames.includes(firstInput.displayName);
+  }, [data.inputs, inputCount]);
+
+  // Render input handles with labels
+  const renderInputHandles = () => {
+    if (isTrigger || inputCount === 0) return null;
+
+    return inputPositions.map((position, index) => {
+      const inputDef = data.inputs?.[index];
+      const label = inputDef?.displayName || inputDef?.name;
+      const showLabel = shouldShowInputLabels && label;
+
+      return (
+        <div key={`input-wrapper-${index}`}>
+          <Handle
+            type="target"
+            position={Position.Left}
+            id={inputDef?.name || `input-${index}`}
+            style={{
+              top: `${position}%`,
+              backgroundColor: styles.handleColor,
+              borderColor: styles.handleColor,
+            }}
+            className="!h-3 !w-3 !border-2"
+          />
+          {showLabel && (
+            <span
+              className="absolute text-[10px] text-muted-foreground whitespace-nowrap pointer-events-none"
+              style={{
+                left: '20px',
+                top: `${position}%`,
+                transform: 'translateY(-50%)',
+              }}
+            >
+              {label}
+            </span>
+          )}
+        </div>
+      );
+    });
+  };
+
+  // Determine if we should show output labels
+  // Show labels when: multiple outputs OR single output with a meaningful name (not generic "Output" or "main")
+  const shouldShowOutputLabels = useMemo(() => {
+    if (!data.outputs || data.outputs.length === 0) return false;
+    if (outputCount > 1) return true;
+    // For single output, show label if it has a specific name
+    const firstOutput = data.outputs[0];
+    const genericNames = ['main', 'output', 'Output'];
+    return firstOutput?.displayName && !genericNames.includes(firstOutput.displayName);
+  }, [data.outputs, outputCount]);
+
+  // Render output handles with labels
+  const renderOutputHandles = () => {
+    return outputPositions.map((position, index) => {
+      const outputDef = data.outputs?.[index];
+      const label = outputDef?.displayName || outputDef?.name;
+      const showLabel = shouldShowOutputLabels && label;
+
+      return (
+        <div key={`output-wrapper-${index}`}>
+          <Handle
+            type="source"
+            position={Position.Right}
+            id={outputDef?.name || `output-${index}`}
+            style={{
+              top: `${position}%`,
+              backgroundColor: styles.handleColor,
+              borderColor: styles.handleColor,
+            }}
+            className="!h-3 !w-3 !border-2"
+          />
+          {showLabel && (
+            <span
+              className="absolute text-[10px] text-muted-foreground whitespace-nowrap pointer-events-none"
+              style={{
+                right: '20px',
+                top: `${position}%`,
+                transform: 'translateY(-50%)',
+              }}
+            >
+              {label}
+            </span>
+          )}
+        </div>
+      );
+    });
   };
 
   return (
@@ -88,34 +239,38 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     >
       <div
         className={`
-        relative flex min-w-[150px] cursor-grab flex-col rounded-lg border-2 bg-card shadow-md transition-all
-        ${selected ? 'border-primary shadow-lg' : 'border-border'}
-        ${data.disabled ? 'opacity-50' : ''}
-        ${getStatusColor()}
-      `}
+          relative flex min-w-[150px] cursor-grab flex-col rounded-lg border-2 shadow-md transition-all
+          ${selected ? 'shadow-lg ring-2 ring-offset-1' : ''}
+          ${data.disabled ? 'opacity-50' : ''}
+        `}
+        style={{
+          minHeight,
+          backgroundColor: styles.bgColor,
+          borderColor: selected ? styles.accentColor : styles.borderColor,
+          // @ts-expect-error CSS custom property
+          '--tw-ring-color': styles.accentColor,
+          ...getExecutionStyles(),
+        }}
         onDoubleClick={handleDoubleClick}
       >
-        {/* Input Handle - not shown for trigger nodes */}
-        {!isTrigger && (
-          <Handle
-            type="target"
-            position={Position.Left}
-            className="!h-3 !w-3 !border-2 !border-border !bg-card"
-          />
-        )}
+        {/* Input Handles */}
+        {renderInputHandles()}
 
         {/* Node Content */}
         <div className="flex items-center gap-3 px-4 py-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <div
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+            style={{
+              backgroundColor: styles.iconBgColor,
+              color: styles.accentColor,
+            }}
+          >
             <IconComponent size={20} />
           </div>
-          <div className="flex flex-col">
-            <span className="text-sm font-semibold text-foreground">
+          <div className="flex flex-col min-w-0">
+            <span className="text-sm font-semibold text-foreground truncate">
               {data.label}
             </span>
-            {data.description && (
-              <span className="text-xs text-muted-foreground">{data.description}</span>
-            )}
           </div>
         </div>
 
@@ -130,13 +285,8 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
           <div className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-destructive" />
         )}
 
-        {/* Output Handle with + button */}
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="!h-3 !w-3 !border-2 !border-border !bg-card"
-        />
-
+        {/* Output Handles */}
+        {renderOutputHandles()}
       </div>
 
       {/* Add Node Button - always rendered, visibility controlled by opacity */}
@@ -144,11 +294,15 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
         onClick={handleAddNode}
         className={`
           nodrag absolute -right-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center
-          rounded-full bg-primary text-primary-foreground shadow-md transition-all
-          hover:bg-primary/90 hover:scale-110
+          rounded-full shadow-md transition-all
+          hover:scale-110
           ${showActions ? 'opacity-100' : 'opacity-0'}
         `}
-        style={{ pointerEvents: 'all' }}
+        style={{
+          backgroundColor: styles.accentColor,
+          color: 'white',
+          pointerEvents: 'all',
+        }}
       >
         <Plus size={16} />
       </button>

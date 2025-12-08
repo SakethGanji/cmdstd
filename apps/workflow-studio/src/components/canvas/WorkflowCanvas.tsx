@@ -20,6 +20,7 @@ import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
 import WorkflowEdge from './edges/WorkflowEdge';
 import StickyNote from './nodes/StickyNote';
+import { getNodeGroupFromType, getMiniMapColor } from '../../lib/nodeStyles';
 
 // Define custom node types - use 'any' to work around React 19 type incompatibility
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,7 +164,7 @@ export default function WorkflowCanvas() {
           className="!bg-card !shadow-md !rounded-lg !border !border-border text-foreground [&>button]:!bg-transparent [&>button]:!border-none [&>button]:!text-foreground [&>button:hover]:!bg-accent [&_path]:!fill-current"
         />
 
-        {/* MiniMap */}
+        {/* MiniMap - colored by node group */}
         <MiniMap
           position="bottom-left"
           nodeColor={(node) => {
@@ -179,7 +180,12 @@ export default function WorkflowCanvas() {
               };
               return colors[color] || colors.yellow;
             }
-            return 'var(--primary)';
+            // Get group-based color for workflow nodes
+            const nodeGroup = getNodeGroupFromType(
+              node.data?.type || '',
+              node.data?.group ? [node.data.group] : undefined
+            );
+            return getMiniMapColor(nodeGroup);
           }}
           maskColor="hsl(var(--background) / 0.8)"
           className="!bg-card !shadow-md !rounded-lg !border !border-border"

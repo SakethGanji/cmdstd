@@ -1,4 +1,5 @@
 import type { Node, Edge } from 'reactflow';
+import type { NodeGroup, NodeIO } from '../lib/nodeStyles';
 
 // Node data types - aligned with backend schema
 export interface WorkflowNodeData {
@@ -26,6 +27,13 @@ export interface WorkflowNodeData {
   // For sticky notes (UI-only)
   content?: string;
   color?: 'yellow' | 'blue' | 'green' | 'pink' | 'purple';
+
+  // Dynamic node UI metadata
+  group?: NodeGroup;                    // Node category for coloring
+  inputCount?: number;                  // Number of input handles
+  outputCount?: number;                 // Number of output handles
+  inputs?: NodeIO[];                    // Input handle definitions with names
+  outputs?: NodeIO[];                   // Output handle definitions with names
 }
 
 export interface AddNodesButtonData {

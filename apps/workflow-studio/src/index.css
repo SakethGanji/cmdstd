@@ -6,6 +6,32 @@
 :root {
   --background: #ffffff;
   --foreground: #1c1c1e;
+
+  /* Node Group Colors - Light Mode */
+  --node-trigger: #f97316;
+  --node-trigger-light: #fff7ed;
+  --node-trigger-border: #fdba74;
+  --node-trigger-icon-bg: rgba(249, 115, 22, 0.15);
+
+  --node-transform: #3b82f6;
+  --node-transform-light: #eff6ff;
+  --node-transform-border: #93c5fd;
+  --node-transform-icon-bg: rgba(59, 130, 246, 0.15);
+
+  --node-flow: #8b5cf6;
+  --node-flow-light: #f5f3ff;
+  --node-flow-border: #c4b5fd;
+  --node-flow-icon-bg: rgba(139, 92, 246, 0.15);
+
+  --node-ai: #10b981;
+  --node-ai-light: #ecfdf5;
+  --node-ai-border: #6ee7b7;
+  --node-ai-icon-bg: rgba(16, 185, 129, 0.15);
+
+  --node-action: #6b7280;
+  --node-action-light: #f9fafb;
+  --node-action-border: #d1d5db;
+  --node-action-icon-bg: rgba(107, 114, 128, 0.15);
   --card: #ffffff;
   --card-foreground: #1c1c1e;
   --popover: #ffffff;
@@ -61,6 +87,32 @@
 .dark {
   --background: #0e1117;
   --foreground: #e0e6eb;
+
+  /* Node Group Colors - Dark Mode */
+  --node-trigger: #fb923c;
+  --node-trigger-light: #431407;
+  --node-trigger-border: #c2410c;
+  --node-trigger-icon-bg: rgba(251, 146, 60, 0.2);
+
+  --node-transform: #60a5fa;
+  --node-transform-light: #172554;
+  --node-transform-border: #1d4ed8;
+  --node-transform-icon-bg: rgba(96, 165, 250, 0.2);
+
+  --node-flow: #a78bfa;
+  --node-flow-light: #2e1065;
+  --node-flow-border: #6d28d9;
+  --node-flow-icon-bg: rgba(167, 139, 250, 0.2);
+
+  --node-ai: #34d399;
+  --node-ai-light: #022c22;
+  --node-ai-border: #047857;
+  --node-ai-icon-bg: rgba(52, 211, 153, 0.2);
+
+  --node-action: #9ca3af;
+  --node-action-light: #1f2937;
+  --node-action-border: #4b5563;
+  --node-action-icon-bg: rgba(156, 163, 175, 0.2);
   --card: #1c222b;
   --card-foreground: #e0e6eb;
   --popover: #1c222b;

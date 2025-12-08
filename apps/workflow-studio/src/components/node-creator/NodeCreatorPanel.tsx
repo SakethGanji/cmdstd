@@ -6,6 +6,16 @@ import { generateNodeName, getExistingNodeNames, getDefaultParameters } from '..
 import { useNodeTypes, getNodeIcon, backendTypeToUIType } from '../../hooks/useNodeTypes';
 import NodeItem from './NodeItem';
 import type { NodeDefinition, WorkflowNodeData } from '../../types/workflow';
+import type { NodeGroup, NodeIO } from '../../lib/nodeStyles';
+
+// Extended node definition with API metadata for dynamic UI
+interface ExtendedNodeDefinition extends NodeDefinition {
+  group?: NodeGroup;
+  inputCount?: number;
+  outputCount?: number;
+  inputs?: NodeIO[];
+  outputs?: NodeIO[];
+}
 
 export default function NodeCreatorPanel() {
   const {
@@ -24,12 +34,12 @@ export default function NodeCreatorPanel() {
   // Fetch node types from API
   const { data: apiNodes, isLoading, isError } = useNodeTypes();
 
-  // Transform API nodes to NodeDefinition format
+  // Transform API nodes to ExtendedNodeDefinition format with dynamic UI metadata
   const { triggerNodes, regularNodes } = useMemo(() => {
     if (!apiNodes) return { triggerNodes: [], regularNodes: [] };
 
-    const triggers: NodeDefinition[] = [];
-    const regular: NodeDefinition[] = [];
+    const triggers: ExtendedNodeDefinition[] = [];
+    const regular: ExtendedNodeDefinition[] = [];
 
     apiNodes.forEach((node) => {
       const isTrigger = node.group?.includes('trigger');
@@ -45,7 +55,24 @@ export default function NodeCreatorPanel() {
         other: 'action',
       };
 
-      const nodeDef: NodeDefinition = {
+      // Parse inputs/outputs from API
+      const inputs: NodeIO[] = (node.inputs || []).map((input: { name: string; displayName?: string }) => ({
+        name: input.name,
+        displayName: input.displayName || input.name,
+      }));
+
+      const outputs: NodeIO[] = (node.outputs || []).map((output: { name: string; displayName?: string }) => ({
+        name: output.name,
+        displayName: output.displayName || output.name,
+      }));
+
+      // Calculate input/output counts (handle dynamic output nodes)
+      const inputCount = typeof node.inputCount === 'number' ? node.inputCount : inputs.length;
+      const outputCount = typeof node.outputCount === 'number'
+        ? node.outputCount
+        : (node.outputCount === 'dynamic' ? outputs.length || 1 : outputs.length);
+
+      const nodeDef: ExtendedNodeDefinition = {
         type: backendTypeToUIType(node.type),
         name: node.type, // Backend type (PascalCase)
         displayName: node.displayName,
@@ -53,6 +80,12 @@ export default function NodeCreatorPanel() {
         icon: getNodeIcon(node.type, node.icon),
         category: categoryMap[category] || 'action',
         subcategory: getCategoryLabel(category),
+        // Dynamic UI metadata
+        group: category as NodeGroup,
+        inputCount,
+        outputCount,
+        inputs,
+        outputs,
       };
 
       if (isTrigger) {
@@ -124,7 +157,7 @@ export default function NodeCreatorPanel() {
 
   // Handle node selection
   const handleNodeSelect = useCallback(
-    (nodeDef: NodeDefinition) => {
+    (nodeDef: ExtendedNodeDefinition) => {
       const position = getNewNodePosition();
       const newNodeId = `node-${Date.now()}`;
 
@@ -143,6 +176,12 @@ export default function NodeCreatorPanel() {
         continueOnFail: false,
         retryOnFail: 0,
         retryDelay: 1000,
+        // Dynamic UI metadata from API
+        group: nodeDef.group,
+        inputCount: nodeDef.inputCount,
+        outputCount: nodeDef.outputCount,
+        inputs: nodeDef.inputs,
+        outputs: nodeDef.outputs,
       };
 
       const newNode = {
