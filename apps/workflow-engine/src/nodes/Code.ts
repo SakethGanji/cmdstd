@@ -6,11 +6,11 @@ import type {
 } from '../engine/types.js';
 import type { INodeTypeDescription } from '../engine/nodeSchema.js';
 import { BaseNode } from './BaseNode.js';
-import ivm from 'isolated-vm';
+import { VM } from 'vm2';
 
 /**
  * Code node - execute arbitrary JavaScript in a sandboxed environment
- * Uses isolated-vm for V8 isolate-based sandboxing (more secure than vm2)
+ * Uses vm2 for sandboxed execution
  *
  * Input: items array (NodeData[])
  * Expected return: array of { json: {} } objects
@@ -65,7 +65,7 @@ Helper functions:
 
 Return an array of { json: {} } objects.
 
-Note: Code runs in a V8 isolate with a 5 second timeout.
+Note: Code runs in a sandbox with a 5 second timeout.
 Process, require, and file system access are not available.`,
       },
     ],
@@ -95,93 +95,53 @@ Process, require, and file system access are not available.`,
     // Captured logs
     const logs: unknown[][] = [];
 
-    // Create isolated VM
-    const isolate = new ivm.Isolate({ memoryLimit: 128 }); // 128MB memory limit
+    // Create sandboxed VM with vm2
+    const vm = new VM({
+      timeout: 5000, // 5 second timeout
+      sandbox: {
+        items,
+        $input,
+        $json,
+        $node,
+        $execution,
+        getItem: (index: number) => items[index],
+        getItems: () => items,
+        newItem: (json: Record<string, unknown>) => ({ json }),
+        log: (...args: unknown[]) => {
+          logs.push(args);
+          console.log('[Code Node]', ...args);
+        },
+        console: {
+          log: (...args: unknown[]) => {
+            logs.push(args);
+            console.log('[Code Node]', ...args);
+          },
+          warn: (...args: unknown[]) => {
+            logs.push(args);
+            console.log('[Code Node]', ...args);
+          },
+          error: (...args: unknown[]) => {
+            logs.push(args);
+            console.log('[Code Node]', ...args);
+          },
+          info: (...args: unknown[]) => {
+            logs.push(args);
+            console.log('[Code Node]', ...args);
+          },
+        },
+      },
+    });
 
     try {
-      const vmContext = await isolate.createContext();
-      const jail = vmContext.global;
-
-      // Set global reference
-      await jail.set('global', jail.derefInto());
-
-      // Serialize data to JSON strings for safe transfer (avoids non-transferable value errors)
-      const serializedData = {
-        items: JSON.stringify(items),
-        $input: JSON.stringify($input),
-        $json: JSON.stringify($json),
-        $node: JSON.stringify($node),
-        $execution: JSON.stringify($execution),
-      };
-
-      // Inject serialized data
-      await jail.set('__itemsJson', serializedData.items);
-      await jail.set('__$inputJson', serializedData.$input);
-      await jail.set('__$jsonJson', serializedData.$json);
-      await jail.set('__$nodeJson', serializedData.$node);
-      await jail.set('__$executionJson', serializedData.$execution);
-
-      // Inject log function that captures to our logs array
-      await jail.set('__log', new ivm.Reference((...args: unknown[]) => {
-        logs.push(args);
-        console.log('[Code Node]', ...args);
-      }));
-
-      // Bootstrap script to set up the environment - parse JSON inside isolate
-      const bootstrap = `
-        const items = JSON.parse(__itemsJson);
-        const $input = JSON.parse(__$inputJson);
-        const $json = JSON.parse(__$jsonJson);
-        const $node = JSON.parse(__$nodeJson);
-        const $execution = JSON.parse(__$executionJson);
-
-        function getItem(index) { return items[index]; }
-        function getItems() { return items; }
-        function newItem(json) { return { json }; }
-        function log(...args) {
-          __log.applySync(undefined, args.map(a =>
-            typeof a === 'object' ? JSON.stringify(a) : String(a)
-          ));
-        }
-
-        const console = {
-          log: log,
-          warn: log,
-          error: log,
-          info: log
-        };
-      `;
-
-      // Compile and run bootstrap
-      const bootstrapScript = await isolate.compileScript(bootstrap);
-      await bootstrapScript.run(vmContext);
-
-      // Wrap user code - serialize result back to JSON for safe transfer out
+      // Wrap user code to handle async execution
       const wrappedCode = `
         (async () => {
-          const __result = await (async () => {
-            ${code}
-          })();
-          return JSON.stringify(__result);
+          ${code}
         })()
       `;
 
-      // Compile user code
-      const userScript = await isolate.compileScript(wrappedCode);
-
-      // Run with timeout (5 seconds)
-      const resultJson = await userScript.run(vmContext, {
-        timeout: 5000,
-        promise: true,
-      });
-
-      // Parse result from JSON
-      let result: unknown;
-      if (typeof resultJson === 'string') {
-        result = JSON.parse(resultJson);
-      } else {
-        result = resultJson;
-      }
+      // Run the code
+      const result = await vm.run(wrappedCode);
 
       // Validate and normalize result
       const output = this.normalizeOutput(result);
@@ -189,9 +149,6 @@ Process, require, and file system access are not available.`,
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       throw new Error(`Code execution failed: ${message}`);
-    } finally {
-      // Always dispose the isolate to free memory
-      isolate.dispose();
     }
   }
 
