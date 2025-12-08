@@ -53,7 +53,7 @@ export function getNodeStyles(group: NodeGroup): NodeStyleConfig {
       borderColor: 'var(--node-trigger-border)',
       iconBgColor: 'var(--node-trigger-icon-bg)',
       accentColor: 'var(--node-trigger)',
-      handleColor: 'var(--node-trigger)',
+      handleColor: 'var(--node-handle)',
     },
     transform: {
       group: 'transform',
@@ -61,7 +61,7 @@ export function getNodeStyles(group: NodeGroup): NodeStyleConfig {
       borderColor: 'var(--node-transform-border)',
       iconBgColor: 'var(--node-transform-icon-bg)',
       accentColor: 'var(--node-transform)',
-      handleColor: 'var(--node-transform)',
+      handleColor: 'var(--node-handle)',
     },
     flow: {
       group: 'flow',
@@ -69,7 +69,7 @@ export function getNodeStyles(group: NodeGroup): NodeStyleConfig {
       borderColor: 'var(--node-flow-border)',
       iconBgColor: 'var(--node-flow-icon-bg)',
       accentColor: 'var(--node-flow)',
-      handleColor: 'var(--node-flow)',
+      handleColor: 'var(--node-handle)',
     },
     ai: {
       group: 'ai',
@@ -77,7 +77,7 @@ export function getNodeStyles(group: NodeGroup): NodeStyleConfig {
       borderColor: 'var(--node-ai-border)',
       iconBgColor: 'var(--node-ai-icon-bg)',
       accentColor: 'var(--node-ai)',
-      handleColor: 'var(--node-ai)',
+      handleColor: 'var(--node-handle)',
     },
     action: {
       group: 'action',
@@ -85,7 +85,7 @@ export function getNodeStyles(group: NodeGroup): NodeStyleConfig {
       borderColor: 'var(--node-action-border)',
       iconBgColor: 'var(--node-action-icon-bg)',
       accentColor: 'var(--node-action)',
-      handleColor: 'var(--node-action)',
+      handleColor: 'var(--node-handle)',
     },
   };
 
@@ -114,8 +114,8 @@ export function calculateHandlePositions(handleCount: number): number[] {
  * Calculate minimum node height based on handle count
  */
 export function calculateNodeMinHeight(inputCount: number, outputCount: number): number {
-  const baseHeight = 64; // Base height for icon + label
-  const handleSpacing = 28; // Pixels per additional handle
+  const baseHeight = 48; // Base height for icon-only node (label is now outside)
+  const handleSpacing = 24; // Pixels per additional handle
   const maxHandles = Math.max(inputCount, outputCount);
 
   if (maxHandles <= 1) return baseHeight;

@@ -80,9 +80,9 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   );
   const styles = useMemo(() => getNodeStyles(nodeGroup), [nodeGroup]);
 
-  // Calculate input/output counts
-  const inputCount = isTrigger ? 0 : (data.inputCount ?? data.inputs?.length ?? 1);
-  const outputCount = data.outputCount ?? data.outputs?.length ?? 1;
+  // Calculate input/output counts (ensure at least 1 input for non-triggers, at least 1 output)
+  const inputCount = isTrigger ? 0 : Math.max(1, data.inputCount ?? data.inputs?.length ?? 1);
+  const outputCount = Math.max(1, data.outputCount ?? data.outputs?.length ?? 1);
 
   // Calculate dimensions and handle positions
   const minHeight = useMemo(
@@ -101,9 +101,9 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   // Show actions when hovered OR selected
   const showActions = isHovered || selected;
 
-  const handleAddNode = (e: React.MouseEvent) => {
+  const handleAddNode = (e: React.MouseEvent, handleId: string) => {
     e.stopPropagation();
-    openForConnection(id, 'source');
+    openForConnection(id, handleId);
   };
 
   const handleDoubleClick = () => {
@@ -134,79 +134,42 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     }
   };
 
-  // Determine if we should show input labels
-  const shouldShowInputLabels = useMemo(() => {
-    if (!data.inputs || data.inputs.length === 0) return false;
-    if (inputCount > 1) return true;
-    // For single input, show label if it has a specific name
-    const firstInput = data.inputs[0];
-    const genericNames = ['main', 'input', 'Input'];
-    return firstInput?.displayName && !genericNames.includes(firstInput.displayName);
-  }, [data.inputs, inputCount]);
-
-  // Render input handles with labels
+  // Render input handles (labels shown on edges if needed)
   const renderInputHandles = () => {
     if (isTrigger || inputCount === 0) return null;
 
     return inputPositions.map((position, index) => {
       const inputDef = data.inputs?.[index];
-      const label = inputDef?.displayName || inputDef?.name;
-      const showLabel = shouldShowInputLabels && label;
 
       return (
-        <div key={`input-wrapper-${index}`}>
-          <Handle
-            type="target"
-            position={Position.Left}
-            id={inputDef?.name || `input-${index}`}
-            style={{
-              top: `${position}%`,
-              backgroundColor: styles.handleColor,
-              borderColor: styles.handleColor,
-            }}
-            className="!h-3 !w-3 !border-2"
-          />
-          {showLabel && (
-            <span
-              className="absolute text-[10px] text-muted-foreground whitespace-nowrap pointer-events-none"
-              style={{
-                left: '20px',
-                top: `${position}%`,
-                transform: 'translateY(-50%)',
-              }}
-            >
-              {label}
-            </span>
-          )}
-        </div>
+        <Handle
+          key={`input-${index}`}
+          type="target"
+          position={Position.Left}
+          id={inputDef?.name || `input-${index}`}
+          style={{
+            top: `${position}%`,
+            backgroundColor: styles.handleColor,
+            borderColor: styles.handleColor,
+          }}
+          className="!h-3 !w-3 !border-2"
+        />
       );
     });
   };
 
-  // Determine if we should show output labels
-  // Show labels when: multiple outputs OR single output with a meaningful name (not generic "Output" or "main")
-  const shouldShowOutputLabels = useMemo(() => {
-    if (!data.outputs || data.outputs.length === 0) return false;
-    if (outputCount > 1) return true;
-    // For single output, show label if it has a specific name
-    const firstOutput = data.outputs[0];
-    const genericNames = ['main', 'output', 'Output'];
-    return firstOutput?.displayName && !genericNames.includes(firstOutput.displayName);
-  }, [data.outputs, outputCount]);
-
-  // Render output handles with labels
+  // Render output handles with add buttons (labels are shown on edges)
   const renderOutputHandles = () => {
     return outputPositions.map((position, index) => {
       const outputDef = data.outputs?.[index];
-      const label = outputDef?.displayName || outputDef?.name;
-      const showLabel = shouldShowOutputLabels && label;
+      const handleId = outputDef?.name || `output-${index}`;
 
       return (
         <div key={`output-wrapper-${index}`}>
           <Handle
             type="source"
             position={Position.Right}
-            id={outputDef?.name || `output-${index}`}
+            id={handleId}
             style={{
               top: `${position}%`,
               backgroundColor: styles.handleColor,
@@ -214,18 +177,23 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
             }}
             className="!h-3 !w-3 !border-2"
           />
-          {showLabel && (
-            <span
-              className="absolute text-[10px] text-muted-foreground whitespace-nowrap pointer-events-none"
-              style={{
-                right: '20px',
-                top: `${position}%`,
-                transform: 'translateY(-50%)',
-              }}
-            >
-              {label}
-            </span>
-          )}
+          {/* Add button for this output */}
+          <button
+            onClick={(e) => handleAddNode(e, handleId)}
+            className={`
+              nodrag absolute -right-7 flex h-5 w-5 items-center justify-center
+              rounded-full border border-border bg-card shadow-sm transition-all
+              hover:scale-110 hover:bg-accent hover:shadow-md
+              ${showActions ? 'opacity-100' : 'opacity-0'}
+            `}
+            style={{
+              top: `${position}%`,
+              transform: 'translateY(-50%)',
+              pointerEvents: 'all',
+            }}
+          >
+            <Plus size={12} className="text-muted-foreground" />
+          </button>
         </div>
       );
     });
@@ -233,14 +201,14 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
 
   return (
     <div
-      className="relative"
+      className="relative flex flex-col items-center"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       <div
         className={`
-          relative flex min-w-[150px] cursor-grab flex-col rounded-lg border-2 shadow-md transition-all
-          ${selected ? 'shadow-lg ring-2 ring-offset-1' : ''}
+          relative cursor-grab rounded-xl border shadow-sm transition-all
+          ${selected ? 'shadow-md ring-2 ring-offset-1' : ''}
           ${data.disabled ? 'opacity-50' : ''}
         `}
         style={{
@@ -256,8 +224,8 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
         {/* Input Handles */}
         {renderInputHandles()}
 
-        {/* Node Content */}
-        <div className="flex items-center gap-3 px-4 py-3">
+        {/* Node Content - Icon only */}
+        <div className="flex items-center justify-center p-3">
           <div
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
             style={{
@@ -266,11 +234,6 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
             }}
           >
             <IconComponent size={20} />
-          </div>
-          <div className="flex flex-col min-w-0">
-            <span className="text-sm font-semibold text-foreground truncate">
-              {data.label}
-            </span>
           </div>
         </div>
 
@@ -289,23 +252,10 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
         {renderOutputHandles()}
       </div>
 
-      {/* Add Node Button - always rendered, visibility controlled by opacity */}
-      <button
-        onClick={handleAddNode}
-        className={`
-          nodrag absolute -right-4 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center
-          rounded-full shadow-md transition-all
-          hover:scale-110
-          ${showActions ? 'opacity-100' : 'opacity-0'}
-        `}
-        style={{
-          backgroundColor: styles.accentColor,
-          color: 'white',
-          pointerEvents: 'all',
-        }}
-      >
-        <Plus size={16} />
-      </button>
+      {/* Node Label - Below the node */}
+      <span className="mt-2 max-w-[120px] text-center text-xs font-medium text-muted-foreground leading-tight">
+        {data.label}
+      </span>
 
       {/* Quick Actions - shows on hover or when selected */}
       {showActions && (

@@ -23,6 +23,7 @@ export default function NodeCreatorPanel() {
     view,
     search,
     sourceNodeId,
+    sourceHandleId,
     closePanel,
     setView,
     setSearch,
@@ -198,7 +199,7 @@ export default function NodeCreatorPanel() {
         onConnect({
           source: sourceNodeId,
           target: newNodeId,
-          sourceHandle: null,
+          sourceHandle: sourceHandleId,
           targetHandle: null,
         });
       }
@@ -220,6 +221,7 @@ export default function NodeCreatorPanel() {
       onConnect,
       setView,
       sourceNodeId,
+      sourceHandleId,
       view,
     ]
   );
