@@ -104,6 +104,9 @@ export function backendTypeToUIType(backendType: string): string {
     SplitInBatches: 'splitInBatches',
     LLMChat: 'llmChat',
     AIAgent: 'aiAgent',
+    ReadFile: 'readFile',
+    PandasExplore: 'pandasExplore',
+    HTMLDisplay: 'htmlDisplay',
   };
   return map[backendType] || backendType.charAt(0).toLowerCase() + backendType.slice(1);
 }
@@ -127,6 +130,9 @@ export function uiTypeToBackendType(uiType: string): string {
     splitInBatches: 'SplitInBatches',
     llmChat: 'LLMChat',
     aiAgent: 'AIAgent',
+    readFile: 'ReadFile',
+    pandasExplore: 'PandasExplore',
+    htmlDisplay: 'HTMLDisplay',
   };
   return map[uiType] || uiType.charAt(0).toUpperCase() + uiType.slice(1);
 }

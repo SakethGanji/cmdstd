@@ -8,52 +8,39 @@ import type { INodeTypeDescription } from '../engine/nodeSchema.js';
 import { BaseNode } from './BaseNode.js';
 
 /**
- * Gemini API types (minimal, avoiding full SDK dependency)
+ * LLM Proxy API types
  */
-interface GeminiContent {
-  role: 'user' | 'model';
-  parts: Array<{ text: string }>;
+interface LLMProxyRequest {
+  system_prompt: string;
+  user_prompt: string;
+  temperature: number;
+  max_output_tokens: number;
 }
 
-interface GeminiRequest {
-  contents: GeminiContent[];
-  systemInstruction?: { parts: Array<{ text: string }> };
-  generationConfig?: {
-    temperature?: number;
-    maxOutputTokens?: number;
-  };
-}
-
-interface GeminiResponse {
-  candidates: Array<{
-    content: {
-      parts: Array<{ text: string }>;
-      role: string;
-    };
-    finishReason: string;
-  }>;
-  usageMetadata?: {
-    promptTokenCount: number;
-    candidatesTokenCount: number;
-    totalTokenCount: number;
+interface LLMProxyResponse {
+  response: string;
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+    total_tokens?: number;
   };
 }
 
 /**
- * LLM Chat Node - Simple single-call LLM integration using Google Gemini
+ * LLM Chat Node - Simple single-call LLM integration via proxy service
  *
- * This node makes a single request to the Gemini API and returns the response.
+ * This node makes a single request to the LLM proxy and returns the response.
  * No tool calling, no conversation history - just prompt in, response out.
  */
 export class LLMChatNode extends BaseNode {
   readonly type = 'LLMChat';
-  readonly description = 'Make a simple LLM call using Google Gemini';
+  readonly description = 'Make a simple LLM call via proxy service';
 
   static readonly nodeDescription: INodeTypeDescription = {
     name: 'LLMChat',
     displayName: 'LLM Chat',
     icon: 'fa:comment-dots',
-    description: 'Make a simple LLM call using Google Gemini',
+    description: 'Make a simple LLM call via proxy service',
     group: ['ai'],
     inputs: [{ name: 'main', displayName: 'Input', type: 'main' }],
     outputs: [
@@ -65,7 +52,6 @@ export class LLMChatNode extends BaseNode {
           type: 'object',
           properties: {
             response: { type: 'string', description: 'LLM response text' },
-            model: { type: 'string', description: 'Model used for generation' },
             usage: {
               type: 'object',
               description: 'Token usage statistics',
@@ -82,38 +68,12 @@ export class LLMChatNode extends BaseNode {
 
     properties: [
       {
-        displayName: 'API Key',
-        name: 'apiKey',
+        displayName: 'LLM Proxy URL',
+        name: 'proxyUrl',
         type: 'string',
-        default: '',
+        default: 'http://localhost:8000/run_llm',
         required: true,
-        description:
-          'Google AI API Key. Get yours at https://aistudio.google.com/app/apikey',
-        typeOptions: { password: true },
-      },
-      {
-        displayName: 'Model',
-        name: 'model',
-        type: 'options',
-        default: 'gemini-2.5-flash',
-        required: true,
-        options: [
-          {
-            name: 'Gemini 2.5 Flash',
-            value: 'gemini-2.5-flash',
-            description: 'Fast and efficient, supports 1M tokens',
-          },
-          {
-            name: 'Gemini 2.5 Pro',
-            value: 'gemini-2.5-pro',
-            description: 'Most capable, best for complex tasks',
-          },
-          {
-            name: 'Gemini 2.0 Flash',
-            value: 'gemini-2.0-flash',
-            description: 'Fast and versatile multimodal model',
-          },
-        ],
+        description: 'URL of the LLM proxy service',
       },
       {
         displayName: 'System Prompt',
@@ -159,16 +119,11 @@ export class LLMChatNode extends BaseNode {
     nodeDefinition: NodeDefinition,
     inputData: NodeData[]
   ): Promise<NodeExecutionResult> {
-    // Get API key from parameter, fallback to environment variable
-    const apiKeyParam = this.getParameter<string>(nodeDefinition, 'apiKey', '');
-    const apiKey = apiKeyParam || process.env.GOOGLE_AI_API_KEY;
-    if (!apiKey) {
-      throw new Error(
-        'API Key is required. Enter it in the node settings or set GOOGLE_AI_API_KEY environment variable.'
-      );
-    }
-
-    const model = this.getParameter<string>(nodeDefinition, 'model');
+    const proxyUrl = this.getParameter<string>(
+      nodeDefinition,
+      'proxyUrl',
+      'http://localhost:8000/run_llm'
+    );
     const systemPrompt = this.getParameter<string>(
       nodeDefinition,
       'systemPrompt',
@@ -190,8 +145,7 @@ export class LLMChatNode extends BaseNode {
 
     // Process each input item
     for (const item of inputData.length > 0 ? inputData : [{ json: {} }]) {
-      const response = await this.callGemini(apiKey, {
-        model,
+      const response = await this.callLLMProxy(proxyUrl, {
         systemPrompt,
         userPrompt,
         temperature,
@@ -202,7 +156,6 @@ export class LLMChatNode extends BaseNode {
         json: {
           ...item.json,
           response: response.text,
-          model,
           usage: response.usage,
         },
       });
@@ -211,43 +164,28 @@ export class LLMChatNode extends BaseNode {
     return this.output(results);
   }
 
-  private async callGemini(
-    apiKey: string,
+  private async callLLMProxy(
+    proxyUrl: string,
     options: {
-      model: string;
       systemPrompt: string;
       userPrompt: string;
       temperature: number;
       maxTokens: number;
     }
   ): Promise<{ text: string; usage: Record<string, number> }> {
-    const { model, systemPrompt, userPrompt, temperature, maxTokens } = options;
+    const { systemPrompt, userPrompt, temperature, maxTokens } = options;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-
-    const requestBody: GeminiRequest = {
-      contents: [
-        {
-          role: 'user',
-          parts: [{ text: userPrompt }],
-        },
-      ],
-      generationConfig: {
-        temperature,
-        maxOutputTokens: maxTokens,
-      },
+    const requestBody: LLMProxyRequest = {
+      system_prompt: systemPrompt,
+      user_prompt: userPrompt,
+      temperature,
+      max_output_tokens: maxTokens,
     };
 
-    // Add system instruction if provided
-    if (systemPrompt) {
-      requestBody.systemInstruction = {
-        parts: [{ text: systemPrompt }],
-      };
-    }
-
-    const response = await fetch(url, {
+    const response = await fetch(proxyUrl, {
       method: 'POST',
       headers: {
+        'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(requestBody),
@@ -255,25 +193,21 @@ export class LLMChatNode extends BaseNode {
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`Gemini API error (${response.status}): ${error}`);
+      throw new Error(`LLM Proxy error (${response.status}): ${error}`);
     }
 
-    const data = (await response.json()) as GeminiResponse;
+    const data = (await response.json()) as LLMProxyResponse;
 
-    if (!data.candidates || data.candidates.length === 0) {
-      throw new Error('No response from Gemini API');
+    if (!data.response) {
+      throw new Error('No response from LLM Proxy');
     }
-
-    const text = data.candidates[0].content.parts
-      .map((p) => p.text)
-      .join('');
 
     return {
-      text,
+      text: data.response,
       usage: {
-        promptTokens: data.usageMetadata?.promptTokenCount || 0,
-        completionTokens: data.usageMetadata?.candidatesTokenCount || 0,
-        totalTokens: data.usageMetadata?.totalTokenCount || 0,
+        promptTokens: data.usage?.prompt_tokens || 0,
+        completionTokens: data.usage?.completion_tokens || 0,
+        totalTokens: data.usage?.total_tokens || 0,
       },
     };
   }

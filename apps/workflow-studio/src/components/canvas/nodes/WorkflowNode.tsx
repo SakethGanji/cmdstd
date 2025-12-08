@@ -19,6 +19,8 @@ import {
   AlertTriangle,
   MessageSquare,
   Bot,
+  File,
+  BarChart3,
 } from 'lucide-react';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
 import { useNDVStore } from '../../../stores/ndvStore';
@@ -59,6 +61,8 @@ const iconMap: Record<string, React.ComponentType<{ size?: number; className?: s
   'comment-dots': MessageSquare,
   bot: Bot,
   robot: Bot,
+  file: File,
+  'chart-bar': BarChart3,
 };
 
 function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {

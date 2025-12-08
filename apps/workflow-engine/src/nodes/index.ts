@@ -13,3 +13,6 @@ export { CronNode, CronManager, cronManager } from './Cron.js';
 export { ErrorTriggerNode, ErrorWorkflowManager } from './ErrorTrigger.js';
 export { LLMChatNode } from './LLMChat.js';
 export { AIAgentNode } from './AIAgent.js';
+export { ReadFileNode } from './ReadFile.js';
+export { PandasExploreNode } from './PandasExplore.js';
+export { HTMLDisplayNode } from './HTMLDisplay.js';

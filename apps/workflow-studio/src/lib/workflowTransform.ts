@@ -75,6 +75,11 @@ const UI_TO_BACKEND_NODE_TYPE: Record<string, string> = {
   // AI
   llmChat: 'LLMChat',
   aiAgent: 'AIAgent',
+
+  // Data/File
+  readFile: 'ReadFile',
+  pandasExplore: 'PandasExplore',
+  htmlDisplay: 'HTMLDisplay',
 };
 
 /**
@@ -95,6 +100,9 @@ const BACKEND_TO_UI_NODE_TYPE: Record<string, string> = {
   Wait: 'wait',
   LLMChat: 'llmChat',
   AIAgent: 'aiAgent',
+  ReadFile: 'readFile',
+  PandasExplore: 'pandasExplore',
+  HTMLDisplay: 'htmlDisplay',
 };
 
 /**
@@ -130,6 +138,9 @@ const NODE_TYPE_ICONS: Record<string, string> = {
   Wait: 'clock',
   LLMChat: 'message-square',
   AIAgent: 'bot',
+  ReadFile: 'file',
+  PandasExplore: 'chart-bar',
+  HTMLDisplay: 'code',
 };
 
 export function getNodeIcon(backendType: string): string {
@@ -166,6 +177,16 @@ export function getDefaultParameters(backendType: string): Record<string, unknow
       method: 'GET',
       url: '',
       responseType: 'json',
+    },
+    ReadFile: {
+      filePath: '',
+    },
+    PandasExplore: {
+      filePath: '={{ $json.filePath }}',
+      analysisType: 'profile',
+    },
+    HTMLDisplay: {
+      htmlField: 'html',
     },
   };
 
@@ -346,6 +367,9 @@ function getNodeDescription(backendType: string): string {
     Wait: 'Wait for a specified amount of time',
     LLMChat: 'Make a simple LLM call using Google Gemini',
     AIAgent: 'AI Agent with tool calling capabilities',
+    ReadFile: 'Provides a file path for downstream processing',
+    PandasExplore: 'Analyzes CSV data using Python pandas',
+    HTMLDisplay: 'Displays HTML content in the output panel',
   };
   return descriptions[backendType] || 'Configure this node';
 }

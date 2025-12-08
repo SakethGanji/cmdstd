@@ -20,6 +20,9 @@ import {
   ErrorTriggerNode,
   LLMChatNode,
   AIAgentNode,
+  ReadFileNode,
+  PandasExploreNode,
+  HTMLDisplayNode,
 } from '../nodes/index.js';
 
 /**
@@ -236,3 +239,6 @@ NodeRegistry.register(CronNode);
 NodeRegistry.register(ErrorTriggerNode);
 NodeRegistry.register(LLMChatNode);
 NodeRegistry.register(AIAgentNode);
+NodeRegistry.register(ReadFileNode);
+NodeRegistry.register(PandasExploreNode);
+NodeRegistry.register(HTMLDisplayNode);
