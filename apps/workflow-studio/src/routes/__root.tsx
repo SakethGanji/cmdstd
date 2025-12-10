@@ -4,6 +4,7 @@ import { Toaster } from 'sonner'
 
 import { AppSidebar } from '@/components/app-sidebar'
 import { ThemeProvider } from '@/components/theme-provider'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
 import { useNodeCreatorStore } from '@/stores/nodeCreatorStore'
 
@@ -28,14 +29,16 @@ function RootLayout() {
 
   return (
     <ThemeProvider defaultTheme="system" storageKey="workflow-studio-theme">
-      <SidebarProvider defaultOpen={false}>
-        <AppSidebar />
-        <SidebarInset>
-          <div className="h-full w-full relative">
-            <Outlet />
-          </div>
-        </SidebarInset>
-      </SidebarProvider>
+      <ErrorBoundary>
+        <SidebarProvider defaultOpen={false}>
+          <AppSidebar />
+          <SidebarInset>
+            <div className="h-full w-full relative">
+              <Outlet />
+            </div>
+          </SidebarInset>
+        </SidebarProvider>
+      </ErrorBoundary>
       <Toaster position="bottom-right" richColors closeButton />
     </ThemeProvider>
   )

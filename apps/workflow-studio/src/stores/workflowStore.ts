@@ -170,7 +170,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   onConnect: (connection) => {
     const validation = get().validateConnection(connection);
     if (!validation.isValid) {
-      console.warn('Invalid connection:', validation.message);
       return;
     }
 

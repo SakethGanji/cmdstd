@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useReactFlow } from 'reactflow';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useNodeCreatorStore } from '../stores/nodeCreatorStore';
@@ -6,11 +6,13 @@ import { useNDVStore } from '../stores/ndvStore';
 
 interface KeyboardShortcutsOptions {
   onSave?: () => void;
+  onSaveAs?: () => void;
 }
 
 export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
-  const { onSave } = options;
-  const { fitView, zoomIn, zoomOut, getNodes } = useReactFlow();
+  const { onSave, onSaveAs } = options;
+  const { fitView, zoomIn, zoomOut, getNodes, setNodes } = useReactFlow();
+  const [isShortcutsHelpOpen, setIsShortcutsHelpOpen] = useState(false);
 
   const deleteNode = useWorkflowStore((s) => s.deleteNode);
   const selectedNodeId = useWorkflowStore((s) => s.selectedNodeId);
@@ -58,10 +60,10 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         return;
       }
 
-      // Ctrl/Cmd + Shift + S: Save as (placeholder)
+      // Ctrl/Cmd + Shift + S: Save as
       if (modifierKey && event.shiftKey && event.key === 'S') {
         event.preventDefault();
-        console.log('Save As - not implemented');
+        onSaveAs?.();
         return;
       }
 
@@ -86,10 +88,19 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
         return;
       }
 
-      // Ctrl/Cmd + A: Select all (prevent default, would select all text)
+      // Ctrl/Cmd + A: Select all nodes
       if (modifierKey && event.key === 'a') {
         event.preventDefault();
-        // TODO: Implement select all nodes
+        const nodes = getNodes();
+        const selectableNodes = nodes.filter(
+          (n) => n.type !== 'addNodes' && n.type !== 'stickyNote'
+        );
+        setNodes(
+          nodes.map((n) => ({
+            ...n,
+            selected: selectableNodes.some((sn) => sn.id === n.id),
+          }))
+        );
         return;
       }
 
@@ -141,13 +152,13 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
       // ?: Show keyboard shortcuts help (Shift + /)
       if (event.shiftKey && event.key === '?') {
         event.preventDefault();
-        // TODO: Show shortcuts modal
-        console.log('Keyboard shortcuts help - not implemented');
+        setIsShortcutsHelpOpen(true);
         return;
       }
     },
     [
       onSave,
+      onSaveAs,
       fitView,
       zoomIn,
       zoomOut,
@@ -160,6 +171,7 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
       isNDVOpen,
       addStickyNote,
       getNodes,
+      setNodes,
     ]
   );
 
@@ -171,6 +183,8 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
   return {
     shortcuts: [
       { key: 'Ctrl/Cmd + S', description: 'Save workflow' },
+      { key: 'Ctrl/Cmd + Shift + S', description: 'Save as' },
+      { key: 'Ctrl/Cmd + A', description: 'Select all nodes' },
       { key: 'Ctrl/Cmd + 0', description: 'Fit to view' },
       { key: 'Ctrl/Cmd + +', description: 'Zoom in' },
       { key: 'Ctrl/Cmd + -', description: 'Zoom out' },
@@ -180,6 +194,9 @@ export function useKeyboardShortcuts(options: KeyboardShortcutsOptions = {}) {
       { key: 'F', description: 'Fit to view' },
       { key: 'Delete/Backspace', description: 'Delete selected node' },
       { key: 'Escape', description: 'Close panel/modal' },
+      { key: '?', description: 'Show shortcuts help' },
     ],
+    isShortcutsHelpOpen,
+    setIsShortcutsHelpOpen,
   };
 }

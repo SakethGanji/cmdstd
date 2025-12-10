@@ -19,6 +19,7 @@ import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
 import WorkflowEdge from './edges/WorkflowEdge';
 import StickyNote from './nodes/StickyNote';
+import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
 import { getNodeGroupFromType, getMiniMapColor } from '../../lib/nodeStyles';
 import { cn } from '@/lib/utils';
 
@@ -54,7 +55,7 @@ export default function WorkflowCanvas() {
   const { executeWorkflow, isExecuting, cancelExecution } = useExecutionStream();
 
   // Initialize keyboard shortcuts
-  useKeyboardShortcuts({
+  const { shortcuts, isShortcutsHelpOpen, setIsShortcutsHelpOpen } = useKeyboardShortcuts({
     onSave: () => {
       saveWorkflow();
     },
@@ -242,6 +243,13 @@ export default function WorkflowCanvas() {
           </button>
         </div>
       )}
+
+      {/* Keyboard shortcuts help modal */}
+      <KeyboardShortcutsHelp
+        open={isShortcutsHelpOpen}
+        onOpenChange={setIsShortcutsHelpOpen}
+        shortcuts={shortcuts}
+      />
     </div>
   );
 }

@@ -18,10 +18,7 @@ function AddNodesButton({ data }: NodeProps<AddNodesButtonData>) {
       <div
         role="button"
         tabIndex={0}
-        onClick={() => {
-          console.log('AddNodesButton clicked, opening panel');
-          openPanel('trigger');
-        }}
+        onClick={() => openPanel('trigger')}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             openPanel('trigger');
