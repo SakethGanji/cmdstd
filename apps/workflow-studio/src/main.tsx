@@ -1,14 +1,14 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { RouterProvider } from '@tanstack/react-router'
-import { TRPCProvider } from '@/providers/TRPCProvider'
+import { QueryProvider } from '@/providers/QueryProvider'
 import './index.css'
 import { router } from './routes'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <TRPCProvider>
+    <QueryProvider>
       <RouterProvider router={router} />
-    </TRPCProvider>
+    </QueryProvider>
   </StrictMode>,
 )

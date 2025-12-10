@@ -5,16 +5,16 @@
  * and provides schema-driven UI generation.
  */
 
-import { trpc } from '../lib/trpc';
-
-// Types are inferred from tRPC - no explicit import needed
-// The API returns INodeTypeInfo[] from nodes.list
+import { useQuery } from '@tanstack/react-query';
+import { nodesApi, type NodeTypeInfo } from '@/lib/api';
 
 /**
  * Fetch all available node types with their schemas
  */
 export function useNodeTypes() {
-  return trpc.nodes.list.useQuery(undefined, {
+  return useQuery({
+    queryKey: ['nodes'],
+    queryFn: nodesApi.list,
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
     refetchOnWindowFocus: false,
   });
@@ -24,14 +24,13 @@ export function useNodeTypes() {
  * Fetch a specific node type's schema
  */
 export function useNodeType(type: string) {
-  return trpc.nodes.get.useQuery(
-    { type },
-    {
-      enabled: !!type,
-      staleTime: 1000 * 60 * 5,
-      refetchOnWindowFocus: false,
-    }
-  );
+  return useQuery({
+    queryKey: ['nodes', type],
+    queryFn: () => nodesApi.get(type),
+    enabled: !!type,
+    staleTime: 1000 * 60 * 5,
+    refetchOnWindowFocus: false,
+  });
 }
 
 /**
@@ -49,7 +48,7 @@ export function useNodesByCategory() {
       acc[category].push(node);
       return acc;
     },
-    {} as Record<string, typeof nodes>
+    {} as Record<string, NodeTypeInfo[]>
   );
 
   return { grouped, nodes, ...rest };

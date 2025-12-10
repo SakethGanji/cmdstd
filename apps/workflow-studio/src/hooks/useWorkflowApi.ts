@@ -2,14 +2,16 @@
  * Workflow API Hooks
  *
  * Custom hooks for workflow CRUD and execution operations.
- * Uses tRPC for type-safe API calls.
+ * Uses fetch-based REST API.
  */
 
-import { trpc } from '@/lib/trpc';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { workflowsApi } from '@/lib/api';
 import { useWorkflowStore } from '@/stores/workflowStore';
 import {
   toBackendWorkflow,
   fromBackendWorkflow,
+  type BackendWorkflow,
 } from '@/lib/workflowTransform';
 import { toast } from 'sonner';
 import type { WorkflowNodeData } from '@/types/workflow';
@@ -27,8 +29,22 @@ export function useSaveWorkflow() {
     setWorkflowId,
   } = useWorkflowStore();
 
-  const createMutation = trpc.workflows.create.useMutation();
-  const updateMutation = trpc.workflows.update.useMutation();
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: (workflow: BackendWorkflow) => workflowsApi.create(workflow),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, workflow }: { id: string; workflow: BackendWorkflow }) =>
+      workflowsApi.update(id, workflow),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+    },
+  });
 
   const saveWorkflow = async () => {
     const backendWorkflow = toBackendWorkflow(
@@ -85,9 +101,9 @@ export function useLoadWorkflow() {
     setIsActive,
   } = useWorkflowStore();
 
-  const loadWorkflow = async (id: string, queryClient: ReturnType<typeof trpc.useUtils>) => {
+  const loadWorkflow = async (id: string) => {
     try {
-      const result = await queryClient.workflows.get.fetch({ id });
+      const result = await workflowsApi.get(id);
 
       if (result) {
         const { nodes, edges } = fromBackendWorkflow(result.definition);
@@ -128,8 +144,13 @@ export function useExecuteWorkflow() {
     clearExecutionData,
   } = useWorkflowStore();
 
-  const runMutation = trpc.workflows.run.useMutation();
-  const runAdhocMutation = trpc.workflows.runAdhoc.useMutation();
+  const runMutation = useMutation({
+    mutationFn: (id: string) => workflowsApi.run(id),
+  });
+
+  const runAdhocMutation = useMutation({
+    mutationFn: (workflow: BackendWorkflow) => workflowsApi.runAdhoc(workflow),
+  });
 
   const executeWorkflow = async () => {
     // Clear previous execution data
@@ -151,7 +172,7 @@ export function useExecuteWorkflow() {
 
       if (workflowId) {
         // Run saved workflow
-        result = await runMutation.mutateAsync({ id: workflowId });
+        result = await runMutation.mutateAsync(workflowId);
       } else {
         // Run ad-hoc (unsaved) workflow
         const backendWorkflow = toBackendWorkflow(
@@ -245,7 +266,11 @@ export function useExecuteWorkflow() {
  */
 export function useToggleWorkflowActive() {
   const { workflowId, setIsActive } = useWorkflowStore();
-  const setActiveMutation = trpc.workflows.setActive.useMutation();
+
+  const setActiveMutation = useMutation({
+    mutationFn: ({ id, active }: { id: string; active: boolean }) =>
+      workflowsApi.setActive(id, active),
+  });
 
   const toggleActive = async (active: boolean) => {
     if (!workflowId) {
@@ -282,11 +307,18 @@ export function useToggleWorkflowActive() {
  * Hook for deleting a workflow
  */
 export function useDeleteWorkflow() {
-  const deleteMutation = trpc.workflows.delete.useMutation();
+  const queryClient = useQueryClient();
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => workflowsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+    },
+  });
 
   const deleteWorkflow = async (id: string) => {
     try {
-      await deleteMutation.mutateAsync({ id });
+      await deleteMutation.mutateAsync(id);
       toast.success('Workflow deleted');
       return true;
     } catch (error) {

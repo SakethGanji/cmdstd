@@ -1,30 +1,16 @@
 import Fastify from 'fastify';
-import {
-  fastifyTRPCPlugin,
-  type FastifyTRPCPluginOptions,
-} from '@trpc/server/adapters/fastify';
 import { workflowRoutes } from './routes/workflows.js';
 import { executionStreamRoutes } from './routes/execution-stream.js';
-import { appRouter, type AppRouter } from './trpc/router.js';
-import { createContext } from './trpc/index.js';
+import { apiRoutes } from './routes/api.js';
 
 const app = Fastify({
   logger: true,
 });
 
-// Register tRPC (main API for frontend)
-app.register(fastifyTRPCPlugin, {
-  prefix: '/trpc',
-  trpcOptions: {
-    router: appRouter,
-    createContext,
-    onError({ path, error }) {
-      console.error(`tRPC error on ${path}:`, error);
-    },
-  } satisfies FastifyTRPCPluginOptions<AppRouter>['trpcOptions'],
-});
+// REST API routes (replaces tRPC)
+app.register(apiRoutes);
 
-// REST routes for webhooks only (external callers need REST)
+// REST routes for webhooks (external callers)
 app.register(workflowRoutes);
 
 // SSE routes for real-time execution streaming
