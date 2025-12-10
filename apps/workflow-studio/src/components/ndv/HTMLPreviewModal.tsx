@@ -1,4 +1,4 @@
-import { X, Maximize2, ExternalLink } from 'lucide-react';
+import { X, ExternalLink } from 'lucide-react';
 
 interface HTMLPreviewModalProps {
   html: string;

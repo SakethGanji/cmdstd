@@ -2,18 +2,9 @@
   "name": "cmdstd",
   "private": true,
   "packageManager": "npm@10.9.2",
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "dev": "turbo dev",
-    "build": "turbo build",
-    "lint": "turbo lint",
-    "clean": "turbo clean"
   },
   "devDependencies": {
-    "turbo": "^2.3.3",
     "typescript": "^5.7.2"
   }
 }

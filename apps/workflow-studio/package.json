@@ -10,7 +10,6 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@cmdstd/schemas": "*",
     "@codemirror/autocomplete": "^6.20.0",
     "@codemirror/commands": "^6.10.0",
     "@codemirror/lang-javascript": "^6.2.4",
@@ -41,6 +40,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
     "tailwindcss": "^4.1.17",
+    "vaul": "^1.1.2",
     "zustand": "^4.5.5"
   },
   "devDependencies": {

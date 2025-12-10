@@ -23,7 +23,7 @@ interface ExecutionLog {
   id: string;
   nodeName: string;
   nodeLabel: string;
-  status: 'running' | 'success' | 'error';
+  status: 'idle' | 'running' | 'success' | 'error';
   timestamp: number;
   duration?: number;
   itemCount?: number;
@@ -38,7 +38,7 @@ export default function ExecutionLogsPanel() {
 
   // Convert execution data to logs format
   const logs: ExecutionLog[] = Object.entries(executionData)
-    .map(([nodeId, data]) => {
+    .map(([nodeId, data]): ExecutionLog | null => {
       const node = nodes.find((n) => n.id === nodeId);
       if (!node || node.type !== 'workflowNode') return null;
 

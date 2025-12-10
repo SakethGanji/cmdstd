@@ -17,7 +17,6 @@ import {
   SidebarRail,
   SidebarGroup,
   SidebarGroupContent,
-  useSidebar,
 } from "@/components/ui/sidebar"
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {

@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import ReactFlow, {
   Background,
-  Controls,
   MiniMap,
   type OnConnect,
   type Connection,
@@ -9,7 +8,7 @@ import ReactFlow, {
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Play, Loader2, Square, Plus, Minus } from 'lucide-react';
+import { Play, Square, Plus, Minus } from 'lucide-react';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
@@ -52,7 +51,7 @@ export default function WorkflowCanvas() {
   const { fitView, zoomIn, zoomOut } = useReactFlow();
 
   const { saveWorkflow } = useSaveWorkflow();
-  const { executeWorkflow, isExecuting, progress, cancelExecution } = useExecutionStream();
+  const { executeWorkflow, isExecuting, cancelExecution } = useExecutionStream();
 
   // Initialize keyboard shortcuts
   useKeyboardShortcuts({

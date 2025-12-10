@@ -9,7 +9,7 @@ import {
 import type { Node } from 'reactflow';
 import type { WorkflowNodeData } from '../../types/workflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import DynamicNodeForm, { type NodeProperty } from './DynamicNodeForm';
+import DynamicNodeForm, { type NodeProperty, type OutputSchema } from './DynamicNodeForm';
 import { useNodeTypes, uiTypeToBackendType } from '../../hooks/useNodeTypes';
 
 interface NodeSettingsProps {
@@ -48,7 +48,7 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
     : null;
 
   // Get the output schema from the upstream node's first output
-  const upstreamOutputSchema = upstreamNodeSchema?.outputs?.[0]?.schema;
+  const upstreamOutputSchema = upstreamNodeSchema?.outputs?.[0]?.schema as OutputSchema | undefined;
 
   // Get sample data from upstream node's execution output
   const upstreamSampleData = useMemo(() => {

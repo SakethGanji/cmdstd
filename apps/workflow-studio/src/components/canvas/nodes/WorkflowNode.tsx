@@ -33,8 +33,9 @@ import {
   calculateNodeMinHeight,
 } from '../../../lib/nodeStyles';
 
-// Icon mapping
-const iconMap: Record<string, React.ComponentType<{ size?: number; className?: string }>> = {
+// Icon mapping - using LucideIcon type for proper typing
+type LucideIconComponent = React.ComponentType<{ size?: string | number; className?: string }>;
+const iconMap: Record<string, LucideIconComponent> = {
   'mouse-pointer': MousePointer,
   play: MousePointer,
   clock: Clock,
