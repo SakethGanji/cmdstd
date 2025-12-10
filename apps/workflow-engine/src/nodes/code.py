@@ -97,8 +97,9 @@ External imports and file system access are limited.""",
         logs: list[list[Any]] = []
 
         def log(*args: Any) -> None:
-            logs.append(list(args))
-            print("[Code Node]", *args)
+            if len(logs) < 100:  # Limit logs to prevent memory issues
+                logs.append(list(args))
+                print("[Code Node]", *args)
 
         def get_item(index: int) -> dict[str, Any] | None:
             return items[index] if 0 <= index < len(items) else None
@@ -184,8 +185,12 @@ __result__ = __user_code__()
 
             def execute_code() -> Any:
                 exec_locals: dict[str, Any] = {}
-                exec(wrapped_code, restricted_globals, exec_locals)
-                return exec_locals.get("__result__")
+                try:
+                    exec(wrapped_code, restricted_globals, exec_locals)
+                    return exec_locals.get("__result__")
+                except SyntaxError as e:
+                    # Enhance syntax error message with line number
+                    raise SyntaxError(f"Line {e.lineno}: {e.msg}") from e
 
             loop = asyncio.get_event_loop()
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -198,6 +203,8 @@ __result__ = __user_code__()
 
         except asyncio.TimeoutError:
             raise RuntimeError("Code execution timed out (5 second limit)")
+        except SyntaxError as e:
+            raise RuntimeError(f"Syntax Error in code: {e}")
         except Exception as e:
             raise RuntimeError(f"Code execution failed: {e}")
 

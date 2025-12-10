@@ -172,7 +172,7 @@ class HttpRequestNode(BaseNode):
         results: list[NodeData] = []
         items = input_data if input_data else [NodeData(json={})]
 
-        async with httpx.AsyncClient() as client:
+        async def make_requests(client: httpx.AsyncClient) -> None:
             for _item in items:
                 response = await client.request(
                     method=method,
@@ -203,5 +203,11 @@ class HttpRequestNode(BaseNode):
                         "body": response_data,
                     })
                 )
+
+        if hasattr(context, "http_client") and context.http_client:
+             await make_requests(context.http_client)
+        else:
+             async with httpx.AsyncClient() as client:
+                 await make_requests(client)
 
         return self.output(results)

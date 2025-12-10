@@ -62,6 +62,9 @@ class ExecutionContext:
     # For Wait node webhook resume
     waiting_nodes: dict[str, Any] = field(default_factory=dict)
 
+    # Shared HTTP client for performance
+    http_client: Any | None = None  # httpx.AsyncClient
+
 
 @dataclass
 class ExecutionError:

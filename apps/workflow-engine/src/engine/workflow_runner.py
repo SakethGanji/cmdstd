@@ -12,6 +12,8 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 from .expression_engine import ExpressionEngine, expression_engine
@@ -66,8 +68,13 @@ class WorkflowRunner:
             initial_data = [NodeData(json={})]
 
         context = self._create_context(workflow, mode)
-        total_nodes = len(workflow.nodes)
-        completed_nodes = 0
+        
+        # Shared HTTP client
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            context.http_client = http_client
+            
+            total_nodes = len(workflow.nodes)
+            completed_nodes = 0
 
         # Build node lookup dict for O(1) access
         node_map: dict[str, NodeDefinition] = {n.name: n for n in workflow.nodes}
@@ -119,43 +126,61 @@ class WorkflowRunner:
 
         while queue and iteration < max_iterations:
             iteration += 1
-            job = queue.pop(0)
-
-            # Emit node start event (only first time for each node)
-            node_def = node_map.get(job.node_name)
-            if node_def and job.node_name not in executed_nodes:
-                self._emit_event(
-                    on_event,
-                    ExecutionEvent(
-                        type=ExecutionEventType.NODE_START,
-                        execution_id=context.execution_id,
-                        timestamp=datetime.now(),
-                        node_name=job.node_name,
-                        node_type=node_def.type,
-                        progress={"completed": completed_nodes, "total": total_nodes},
-                    ),
-                )
-
-            had_error = await self._process_job(context, job, queue, node_map, on_event)
-
-            # Track completion and emit node complete event
-            if job.node_name not in executed_nodes:
-                executed_nodes.add(job.node_name)
-                completed_nodes += 1
-
-                if not had_error and node_def:
+            
+            # Process all currently available jobs in parallel (BFS layer)
+            current_batch = queue[:]
+            queue.clear()
+            
+            tasks = []
+            for job in current_batch:
+                # Emit node start event (only first time for each node)
+                node_def = node_map.get(job.node_name)
+                if node_def and job.node_name not in executed_nodes:
                     self._emit_event(
                         on_event,
                         ExecutionEvent(
-                            type=ExecutionEventType.NODE_COMPLETE,
+                            type=ExecutionEventType.NODE_START,
                             execution_id=context.execution_id,
                             timestamp=datetime.now(),
                             node_name=job.node_name,
                             node_type=node_def.type,
-                            data=context.node_states.get(job.node_name),
                             progress={"completed": completed_nodes, "total": total_nodes},
                         ),
                     )
+                
+                tasks.append(self._process_job(context, job, queue, node_map, on_event))
+
+            # Run batch
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for job, result in zip(current_batch, results):
+                had_error = False
+                if isinstance(result, Exception):
+                    logger.error(f"Error processing job {job.node_name}: {result}")
+                    had_error = True
+                else:
+                    had_error = result
+
+                # Track completion and emit node complete event
+                node_def = node_map.get(job.node_name)
+                if job.node_name not in executed_nodes:
+                    executed_nodes.add(job.node_name)
+                    completed_nodes += 1
+
+                    if not had_error and node_def:
+                        self._emit_event(
+                            on_event,
+                            ExecutionEvent(
+                                type=ExecutionEventType.NODE_COMPLETE,
+                                execution_id=context.execution_id,
+                                timestamp=datetime.now(),
+                                node_name=job.node_name,
+                                node_type=node_def.type,
+                                data=context.node_states.get(job.node_name),
+                                progress={"completed": completed_nodes, "total": total_nodes},
+                            ),
+                        )
 
         if iteration >= max_iterations:
             error = "Execution exceeded maximum iterations (possible infinite loop)"
@@ -175,6 +200,7 @@ class WorkflowRunner:
                     error=error,
                 ),
             )
+
 
         # Emit execution complete event
         self._emit_event(

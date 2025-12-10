@@ -11,24 +11,35 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  server: {
-    port: 5173,
-    proxy: {
-      // Proxy REST API requests to the backend
-      '/api': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-      // Proxy webhook requests to the backend
-      '/webhook': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
-      // Proxy execution stream SSE requests to the backend
-      '/execution-stream': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+
+          // Group by package scope/name automatically
+          if (id.includes('react-dom') || id.includes('node_modules/react/')) {
+            return 'vendor-react'
+          }
+          if (id.includes('reactflow') || id.includes('@reactflow/')) {
+            return 'vendor-reactflow'
+          }
+          if (id.includes('@codemirror/') || id.includes('@lezer/')) {
+            return 'vendor-codemirror'
+          }
+          if (id.includes('@radix-ui/')) {
+            return 'vendor-radix'
+          }
+          if (id.includes('@tanstack/')) {
+            return 'vendor-tanstack'
+          }
+          // All other node_modules go to a common vendor chunk
+          return 'vendor'
+        },
       },
     },
+  },
+  server: {
+    port: 5173,
   },
 })
