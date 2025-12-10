@@ -79,7 +79,7 @@ const darkTheme = EditorView.theme({
   },
 });
 
-export function JsonViewer({ value, className = '', maxHeight = 'calc(100vh - 300px)' }: JsonViewerProps) {
+export default function JsonViewer({ value, className = '', maxHeight = 'calc(100vh - 300px)' }: JsonViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const themeCompartment = useRef(new Compartment());
@@ -156,5 +156,3 @@ export function JsonViewer({ value, className = '', maxHeight = 'calc(100vh - 30
     />
   );
 }
-
-export default JsonViewer;

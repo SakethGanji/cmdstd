@@ -1,4 +1,3 @@
-import type { Node, Edge } from 'reactflow';
 import type { NodeGroup, NodeIO } from '../lib/nodeStyles';
 
 // Node data types - aligned with backend schema
@@ -36,23 +35,10 @@ export interface WorkflowNodeData {
   outputs?: NodeIO[];                   // Output handle definitions with names
 }
 
-export interface AddNodesButtonData {
-  label: string;
-}
-
 export interface StickyNoteData {
   content: string;
   color: 'yellow' | 'blue' | 'green' | 'pink' | 'purple';
 }
-
-// Custom node types
-export type WorkflowNode = Node<WorkflowNodeData, 'workflowNode'>;
-export type AddNodesNode = Node<AddNodesButtonData, 'addNodes'>;
-export type StickyNoteNode = Node<StickyNoteData, 'stickyNote'>;
-export type CanvasNode = WorkflowNode | AddNodesNode;
-
-// Edge types
-export type WorkflowEdge = Edge;
 
 // Node definition for the node creator panel
 export interface NodeDefinition {
@@ -69,7 +55,7 @@ export interface NodeDefinition {
 export type NodeCreatorView = 'trigger' | 'regular' | 'ai';
 
 // Execution data
-export interface ExecutionData {
+interface ExecutionData {
   items: Record<string, unknown>[];
   error?: string;
 }

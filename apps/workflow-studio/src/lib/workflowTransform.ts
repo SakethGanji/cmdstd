@@ -11,13 +11,13 @@
 import type { Node, Edge } from 'reactflow';
 import type { WorkflowNodeData } from '../types/workflow';
 
-// Backend types (matching @cmdstd/schemas)
-export interface BackendNodeData {
+// Backend types (internal)
+interface BackendNodeData {
   json: Record<string, unknown>;
   binary?: Record<string, unknown>;
 }
 
-export interface BackendNodeDefinition {
+interface BackendNodeDefinition {
   name: string;
   type: string;
   parameters: Record<string, unknown>;
@@ -28,7 +28,7 @@ export interface BackendNodeDefinition {
   pinnedData?: BackendNodeData[];
 }
 
-export interface BackendConnection {
+interface BackendConnection {
   sourceNode: string;
   sourceOutput: string;
   targetNode: string;
@@ -83,68 +83,10 @@ const UI_TO_BACKEND_NODE_TYPE: Record<string, string> = {
 };
 
 /**
- * Maps backend node types (PascalCase) to UI node types (camelCase)
- */
-const BACKEND_TO_UI_NODE_TYPE: Record<string, string> = {
-  Start: 'manualTrigger',
-  Cron: 'scheduleTrigger',
-  Webhook: 'webhook',
-  ErrorTrigger: 'errorTrigger',
-  Set: 'set',
-  Code: 'code',
-  If: 'if',
-  Switch: 'switch',
-  Merge: 'merge',
-  SplitInBatches: 'splitInBatches',
-  HttpRequest: 'httpRequest',
-  Wait: 'wait',
-  LLMChat: 'llmChat',
-  AIAgent: 'aiAgent',
-  ReadFile: 'readFile',
-  PandasExplore: 'pandasExplore',
-  HTMLDisplay: 'htmlDisplay',
-};
-
-/**
  * Get the backend node type for a UI node type
  */
-export function toBackendNodeType(uiType: string): string {
+function toBackendNodeType(uiType: string): string {
   return UI_TO_BACKEND_NODE_TYPE[uiType] || uiType;
-}
-
-/**
- * Get the UI node type for a backend node type
- */
-export function toUINodeType(backendType: string): string {
-  return BACKEND_TO_UI_NODE_TYPE[backendType] || backendType.toLowerCase();
-}
-
-// ============================================================================
-// Icon Mapping (for loading from backend)
-// ============================================================================
-
-const NODE_TYPE_ICONS: Record<string, string> = {
-  Start: 'mouse-pointer',
-  Cron: 'calendar',
-  Webhook: 'webhook',
-  ErrorTrigger: 'alert-triangle',
-  Set: 'pen',
-  Code: 'code',
-  If: 'git-branch',
-  Switch: 'route',
-  Merge: 'git-merge',
-  SplitInBatches: 'layers',
-  HttpRequest: 'globe',
-  Wait: 'clock',
-  LLMChat: 'message-square',
-  AIAgent: 'bot',
-  ReadFile: 'file',
-  PandasExplore: 'chart-bar',
-  HTMLDisplay: 'code',
-};
-
-export function getNodeIcon(backendType: string): string {
-  return NODE_TYPE_ICONS[backendType] || 'code';
 }
 
 // ============================================================================
@@ -292,101 +234,8 @@ export function toBackendWorkflow(
 }
 
 // ============================================================================
-// Backend → ReactFlow Transformation
-// ============================================================================
-
-/**
- * Transforms backend workflow to ReactFlow nodes and edges.
- *
- * @param workflow - Backend workflow format
- * @returns Object with nodes and edges arrays for ReactFlow
- */
-export function fromBackendWorkflow(workflow: BackendWorkflow): {
-  nodes: Node<WorkflowNodeData>[];
-  edges: Edge[];
-} {
-  // Build a map from node name to generated React Flow ID
-  const nameToId = new Map<string, string>();
-
-  // Transform nodes
-  const nodes: Node<WorkflowNodeData>[] = workflow.nodes.map((node, index) => {
-    const id = `node-${Date.now()}-${index}`;
-    nameToId.set(node.name, id);
-
-    const uiType = toUINodeType(node.type);
-
-    return {
-      id,
-      type: 'workflowNode',
-      position: node.position || { x: 250 + index * 200, y: 200 },
-      data: {
-        name: node.name,
-        type: uiType,
-        label: node.name, // Use name as label initially
-        icon: getNodeIcon(node.type),
-        description: getNodeDescription(node.type),
-        parameters: node.parameters,
-        disabled: false,
-        continueOnFail: node.continueOnFail,
-        retryOnFail: node.retryOnFail,
-        retryDelay: node.retryDelay,
-        pinnedData: node.pinnedData,
-      },
-    };
-  });
-
-  // Transform connections to edges
-  const edges: Edge[] = workflow.connections.map((conn, index) => ({
-    id: `edge-${Date.now()}-${index}`,
-    source: nameToId.get(conn.sourceNode) || '',
-    target: nameToId.get(conn.targetNode) || '',
-    sourceHandle: conn.sourceOutput === 'main' ? null : conn.sourceOutput,
-    targetHandle: conn.targetInput === 'main' ? null : conn.targetInput,
-    type: 'workflowEdge',
-  }));
-
-  return { nodes, edges };
-}
-
-/**
- * Get a description for a node type
- */
-function getNodeDescription(backendType: string): string {
-  const descriptions: Record<string, string> = {
-    Start: 'Runs the flow on clicking a button',
-    Cron: 'Triggers workflow based on schedule',
-    Webhook: 'Runs the flow on receiving an HTTP request',
-    ErrorTrigger: 'Triggers when another workflow fails',
-    Set: 'Sets values on items',
-    Code: 'Run custom JavaScript code',
-    If: 'Route items based on conditions',
-    Switch: 'Route items based on multiple conditions',
-    Merge: 'Merge data from multiple inputs',
-    SplitInBatches: 'Split data into batches for processing',
-    HttpRequest: 'Makes HTTP requests and returns the response',
-    Wait: 'Wait for a specified amount of time',
-    LLMChat: 'Make a simple LLM call using Google Gemini',
-    AIAgent: 'AI Agent with tool calling capabilities',
-    ReadFile: 'Provides a file path for downstream processing',
-    PandasExplore: 'Analyzes CSV data using Python pandas',
-    HTMLDisplay: 'Displays HTML content in the output panel',
-  };
-  return descriptions[backendType] || 'Configure this node';
-}
-
-// ============================================================================
 // Validation Helpers
 // ============================================================================
-
-/**
- * Validates that all node names are unique
- */
-export function validateUniqueNames(nodes: Node<WorkflowNodeData>[]): boolean {
-  const names = nodes
-    .filter((n) => n.type === 'workflowNode')
-    .map((n) => n.data.name);
-  return new Set(names).size === names.length;
-}
 
 /**
  * Gets all existing node names from the nodes array
@@ -397,20 +246,3 @@ export function getExistingNodeNames(nodes: Node<WorkflowNodeData>[]): string[] 
     .map((n) => n.data.name);
 }
 
-/**
- * Checks if a node type is a trigger node
- */
-export function isTriggerNode(backendType: string): boolean {
-  return ['Start', 'Cron', 'Webhook', 'ErrorTrigger'].includes(backendType);
-}
-
-/**
- * Checks if workflow has at least one trigger node
- */
-export function hasTriggerNode(nodes: Node<WorkflowNodeData>[]): boolean {
-  return nodes.some((n) => {
-    if (n.type !== 'workflowNode') return false;
-    const backendType = toBackendNodeType(n.data.type);
-    return isTriggerNode(backendType);
-  });
-}

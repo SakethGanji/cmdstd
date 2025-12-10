@@ -118,7 +118,7 @@ const darkTheme = EditorView.theme({
   },
 });
 
-export function CodeEditor({
+export default function CodeEditor({
   value,
   onChange,
   language = 'json',
@@ -240,5 +240,3 @@ export function CodeEditor({
     />
   );
 }
-
-export default CodeEditor;

@@ -4,7 +4,7 @@
 
 export type NodeGroup = 'trigger' | 'transform' | 'flow' | 'ai' | 'action';
 
-export interface NodeStyleConfig {
+interface NodeStyleConfig {
   group: NodeGroup;
   bgColor: string;
   borderColor: string;

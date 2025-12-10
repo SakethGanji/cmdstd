@@ -6,7 +6,7 @@
  */
 
 import { useQuery } from '@tanstack/react-query';
-import { nodesApi, type NodeTypeInfo } from '@/lib/api';
+import { nodesApi } from '@/lib/api';
 
 /**
  * Fetch all available node types with their schemas
@@ -18,40 +18,6 @@ export function useNodeTypes() {
     staleTime: 1000 * 60 * 5, // Cache for 5 minutes
     refetchOnWindowFocus: false,
   });
-}
-
-/**
- * Fetch a specific node type's schema
- */
-export function useNodeType(type: string) {
-  return useQuery({
-    queryKey: ['nodes', type],
-    queryFn: () => nodesApi.get(type),
-    enabled: !!type,
-    staleTime: 1000 * 60 * 5,
-    refetchOnWindowFocus: false,
-  });
-}
-
-/**
- * Get nodes grouped by category (group field)
- */
-export function useNodesByCategory() {
-  const { data: nodes, ...rest } = useNodeTypes();
-
-  const grouped = nodes?.reduce(
-    (acc, node) => {
-      const category = node.group?.[0] || 'other';
-      if (!acc[category]) {
-        acc[category] = [];
-      }
-      acc[category].push(node);
-      return acc;
-    },
-    {} as Record<string, NodeTypeInfo[]>
-  );
-
-  return { grouped, nodes, ...rest };
 }
 
 /**

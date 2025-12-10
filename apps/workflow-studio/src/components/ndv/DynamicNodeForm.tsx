@@ -67,7 +67,7 @@ interface OutputSchema {
 }
 
 // Export for consumers
-export type { NodeProperty, NodePropertyOption, NodePropertyType, OutputSchema };
+export type { NodeProperty, OutputSchema };
 
 interface DynamicNodeFormProps {
   properties: NodeProperty[];

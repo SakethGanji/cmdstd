@@ -8,10 +8,10 @@
 import type { BackendWorkflow } from './workflowTransform';
 
 // ============================================================================
-// Types (matching backend responses)
+// Types (internal - used by API functions)
 // ============================================================================
 
-export interface WorkflowSummary {
+interface WorkflowSummary {
   id: string;
   name: string;
   active: boolean;
@@ -21,7 +21,7 @@ export interface WorkflowSummary {
   updatedAt: string;
 }
 
-export interface WorkflowDetail {
+interface WorkflowDetail {
   id: string;
   name: string;
   active: boolean;
@@ -31,7 +31,7 @@ export interface WorkflowDetail {
   updatedAt: string;
 }
 
-export interface CreateWorkflowResponse {
+interface CreateWorkflowResponse {
   id: string;
   name: string;
   active: boolean;
@@ -39,55 +39,26 @@ export interface CreateWorkflowResponse {
   createdAt: string;
 }
 
-export interface UpdateWorkflowResponse {
+interface UpdateWorkflowResponse {
   id: string;
   name: string;
   active: boolean;
   updatedAt: string;
 }
 
-export interface SetActiveResponse {
+interface SetActiveResponse {
   id: string;
   active: boolean;
 }
 
-export interface ExecutionResult {
+interface ExecutionResult {
   status: 'success' | 'failed';
   executionId: string;
   data: Record<string, unknown>;
-  errors: ExecutionError[];
+  errors: { nodeName: string; error: string }[];
 }
 
-export interface ExecutionError {
-  nodeName: string;
-  error: string;
-  timestamp?: string;
-}
-
-export interface ExecutionSummary {
-  id: string;
-  workflowId: string;
-  workflowName: string;
-  status: 'running' | 'success' | 'failed';
-  mode: 'manual' | 'webhook' | 'cron';
-  startTime: string;
-  endTime?: string;
-  errorCount: number;
-}
-
-export interface ExecutionDetail {
-  id: string;
-  workflowId: string;
-  workflowName: string;
-  status: 'running' | 'success' | 'failed';
-  mode: 'manual' | 'webhook' | 'cron';
-  startTime: string;
-  endTime?: string;
-  errors: ExecutionError[];
-  nodeData: Record<string, unknown>;
-}
-
-export interface NodeTypeInfo {
+interface NodeTypeInfo {
   type: string;
   displayName: string;
   description: string;
@@ -95,37 +66,21 @@ export interface NodeTypeInfo {
   group: string[];
   inputCount: number;
   outputCount: number;
-  properties: NodeProperty[];
-  inputs: NodeInput[];
-  outputs: NodeOutput[];
-}
-
-export interface NodeProperty {
-  name: string;
-  displayName: string;
-  type: string;
-  default?: unknown;
-  required?: boolean;
-  description?: string;
-  options?: { name: string; value: unknown }[];
-  displayOptions?: {
-    show?: Record<string, unknown[]>;
-    hide?: Record<string, unknown[]>;
-  };
-}
-
-export interface NodeInput {
-  name: string;
-  displayName: string;
-  type: string;
-  required?: boolean;
-}
-
-export interface NodeOutput {
-  name: string;
-  displayName: string;
-  type: string;
-  schema?: unknown;
+  properties: {
+    name: string;
+    displayName: string;
+    type: string;
+    default?: unknown;
+    required?: boolean;
+    description?: string;
+    options?: { name: string; value: unknown }[];
+    displayOptions?: {
+      show?: Record<string, unknown[]>;
+      hide?: Record<string, unknown[]>;
+    };
+  }[];
+  inputs: { name: string; displayName: string; type: string; required?: boolean }[];
+  outputs: { name: string; displayName: string; type: string; schema?: unknown }[];
 }
 
 // ============================================================================
@@ -217,33 +172,6 @@ export const workflowsApi = {
     return apiFetch('/workflows/run-adhoc', {
       method: 'POST',
       body: JSON.stringify(workflow),
-    });
-  },
-};
-
-// ============================================================================
-// Executions API
-// ============================================================================
-
-export const executionsApi = {
-  list: (workflowId?: string): Promise<ExecutionSummary[]> => {
-    const query = workflowId ? `?workflowId=${workflowId}` : '';
-    return apiFetch(`/executions${query}`);
-  },
-
-  get: (id: string): Promise<ExecutionDetail> => {
-    return apiFetch(`/executions/${id}`);
-  },
-
-  delete: (id: string): Promise<{ success: boolean }> => {
-    return apiFetch(`/executions/${id}`, {
-      method: 'DELETE',
-    });
-  },
-
-  clear: (): Promise<{ success: boolean }> => {
-    return apiFetch('/executions', {
-      method: 'DELETE',
     });
   },
 };

@@ -10,7 +10,6 @@ import { workflowsApi } from '@/lib/api';
 import { useWorkflowStore } from '@/stores/workflowStore';
 import {
   toBackendWorkflow,
-  fromBackendWorkflow,
   type BackendWorkflow,
 } from '@/lib/workflowTransform';
 import { toast } from 'sonner';
@@ -87,48 +86,6 @@ export function useSaveWorkflow() {
     saveWorkflow,
     isSaving: createMutation.isPending || updateMutation.isPending,
   };
-}
-
-/**
- * Hook for loading a workflow by ID
- */
-export function useLoadWorkflow() {
-  const {
-    setNodes,
-    setEdges,
-    setWorkflowName,
-    setWorkflowId,
-    setIsActive,
-  } = useWorkflowStore();
-
-  const loadWorkflow = async (id: string) => {
-    try {
-      const result = await workflowsApi.get(id);
-
-      if (result) {
-        const { nodes, edges } = fromBackendWorkflow(result.definition);
-        setNodes(nodes);
-        setEdges(edges);
-        setWorkflowName(result.name);
-        setWorkflowId(result.id);
-        setIsActive(result.active);
-
-        toast.success('Workflow loaded', {
-          description: `"${result.name}" is ready to edit.`,
-        });
-      }
-
-      return result;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error('Failed to load workflow', {
-        description: message,
-      });
-      throw error;
-    }
-  };
-
-  return { loadWorkflow };
 }
 
 /**
@@ -300,39 +257,6 @@ export function useToggleWorkflowActive() {
   return {
     toggleActive,
     isToggling: setActiveMutation.isPending,
-  };
-}
-
-/**
- * Hook for deleting a workflow
- */
-export function useDeleteWorkflow() {
-  const queryClient = useQueryClient();
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => workflowsApi.delete(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['workflows'] });
-    },
-  });
-
-  const deleteWorkflow = async (id: string) => {
-    try {
-      await deleteMutation.mutateAsync(id);
-      toast.success('Workflow deleted');
-      return true;
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error('Failed to delete workflow', {
-        description: message,
-      });
-      throw error;
-    }
-  };
-
-  return {
-    deleteWorkflow,
-    isDeleting: deleteMutation.isPending,
   };
 }
 
