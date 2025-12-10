@@ -1,5 +1,7 @@
 """Main entry point for the workflow engine server."""
 
+from __future__ import annotations
+
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
@@ -7,78 +9,81 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .routes.api import router as api_router
-from .routes.webhooks import router as webhook_router
-from .routes.execution_stream import router as stream_router
+from .core.config import settings
 from .engine.node_registry import register_all_nodes
+from .routes import api_router, webhook_router, stream_router
+from .schemas.common import RootResponse, HealthResponse
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
-    # Startup
     register_all_nodes()
-    print("Workflow Engine started")
-    print("Available endpoints:")
-    print("  - GET  /api/workflows       - List workflows")
-    print("  - POST /api/workflows       - Create workflow")
-    print("  - GET  /api/workflows/:id   - Get workflow")
-    print("  - POST /api/workflows/:id/run - Run workflow")
-    print("  - POST /webhook/:id         - Webhook trigger")
-    print("  - GET  /api/nodes           - List node types")
-    print("  - GET  /execution-stream/:id - SSE stream")
+    print(f"{settings.app_name} v{settings.app_version} started")
+    print(f"Running on http://{settings.host}:{settings.port}")
+    print("API documentation available at /docs")
 
     yield
 
-    # Shutdown
-    print("Workflow Engine stopped")
+    print(f"{settings.app_name} stopped")
 
 
-app = FastAPI(
-    title="Workflow Engine",
-    description="Python workflow engine with Prefect 3.0 - DAG-based workflow execution",
-    version="0.1.0",
-    lifespan=lifespan,
-)
+def create_app() -> FastAPI:
+    """Create and configure the FastAPI application."""
+    app = FastAPI(
+        title=settings.app_name,
+        description="Python workflow engine - DAG-based workflow execution",
+        version=settings.app_version,
+        lifespan=lifespan,
+        debug=settings.debug,
+    )
 
-# CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # CORS middleware
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=settings.cors_allow_credentials,
+        allow_methods=settings.cors_allow_methods,
+        allow_headers=settings.cors_allow_headers,
+    )
 
-# Include routers
-app.include_router(api_router)
-app.include_router(webhook_router)
-app.include_router(stream_router)
+    # Include routers
+    app.include_router(api_router)
+    app.include_router(webhook_router, tags=["Webhooks"])
+    app.include_router(stream_router, tags=["Streaming"])
+
+    # Root endpoints
+    @app.get("/", response_model=RootResponse)
+    async def root() -> RootResponse:
+        """Root endpoint."""
+        return RootResponse(
+            name=settings.app_name,
+            version=settings.app_version,
+            status="running",
+        )
+
+    @app.get("/health", response_model=HealthResponse)
+    async def health() -> HealthResponse:
+        """Health check endpoint."""
+        return HealthResponse(
+            status="healthy",
+            version=settings.app_version,
+        )
+
+    return app
 
 
-@app.get("/")
-async def root() -> dict[str, str]:
-    """Root endpoint."""
-    return {
-        "name": "Workflow Engine",
-        "version": "0.1.0",
-        "status": "running",
-    }
-
-
-@app.get("/health")
-async def health() -> dict[str, str]:
-    """Health check endpoint."""
-    return {"status": "healthy"}
+# Create app instance
+app = create_app()
 
 
 def main() -> None:
     """Run the server."""
     uvicorn.run(
         "src.main:app",
-        host="0.0.0.0",
-        port=3001,
-        reload=True,
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
     )
 
 

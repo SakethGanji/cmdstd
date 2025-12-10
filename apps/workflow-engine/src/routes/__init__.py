@@ -1,8 +1,22 @@
-"""FastAPI routes for the workflow engine."""
+"""Route aggregation for workflow engine API."""
 
-from .api import router as api_router
-from .webhooks import router as webhook_router
-from .execution_stream import router as stream_router
+from fastapi import APIRouter
+
+from .workflows import router as workflows_router
+from .executions import router as executions_router
+from .nodes import router as nodes_router
+from .webhooks import router as webhooks_router
+from .streaming import router as streaming_router
+
+# Main API router
+api_router = APIRouter(prefix="/api")
+api_router.include_router(workflows_router, tags=["Workflows"])
+api_router.include_router(executions_router, tags=["Executions"])
+api_router.include_router(nodes_router, tags=["Nodes"])
+
+# Non-prefixed routers (for webhooks and streaming)
+webhook_router = webhooks_router
+stream_router = streaming_router
 
 __all__ = [
     "api_router",

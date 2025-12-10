@@ -1,0 +1,57 @@
+"""Application configuration using pydantic-settings."""
+
+from functools import lru_cache
+from typing import Literal
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Application settings loaded from environment variables."""
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        env_prefix="WORKFLOW_",
+    )
+
+    # Server settings
+    host: str = "0.0.0.0"
+    port: int = 3001
+    reload: bool = True
+    log_level: Literal["debug", "info", "warning", "error"] = "info"
+
+    # Application settings
+    app_name: str = "Workflow Engine"
+    app_version: str = "0.1.0"
+    debug: bool = False
+
+    # CORS settings
+    cors_origins: list[str] = ["*"]
+    cors_allow_credentials: bool = True
+    cors_allow_methods: list[str] = ["*"]
+    cors_allow_headers: list[str] = ["*"]
+
+    # Execution settings
+    max_execution_records: int = 100
+    default_retry_delay: int = 1000
+    max_workflow_iterations: int = 1000
+
+    # External services (for future use)
+    redis_url: str | None = None
+    database_url: str | None = None
+
+    # AI/LLM settings
+    openai_api_key: str | None = None
+    anthropic_api_key: str | None = None
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """Get cached settings instance."""
+    return Settings()
+
+
+# Global settings instance
+settings = get_settings()

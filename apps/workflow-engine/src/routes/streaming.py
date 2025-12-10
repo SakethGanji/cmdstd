@@ -5,12 +5,14 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import datetime
-from typing import Any, AsyncGenerator
+from typing import Annotated, Any, AsyncGenerator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
+from ..core.exceptions import WorkflowNotFoundError, WorkflowExecutionError
+from ..core.dependencies import get_workflow_store, get_execution_store
 from ..engine.workflow_runner import WorkflowRunner
 from ..engine.types import (
     ExecutionEvent,
@@ -19,14 +21,14 @@ from ..engine.types import (
     Connection,
     Workflow,
 )
-from ..storage.workflow_store import workflow_store
-from ..storage.execution_store import execution_store
+from ..storage.workflow_store import WorkflowStore
+from ..storage.execution_store import ExecutionStore
 
 router = APIRouter()
 
 
-class AdhocWorkflowModel(BaseModel):
-    """Workflow model for ad-hoc SSE execution."""
+class AdhocWorkflowRequest(BaseModel):
+    """Request schema for ad-hoc SSE execution."""
 
     name: str
     nodes: list[dict[str, Any]]
@@ -63,6 +65,7 @@ async def _run_workflow_with_events(
     start_node_name: str,
     initial_data: list[NodeData],
     mode: str,
+    execution_store: ExecutionStore,
 ) -> AsyncGenerator[str, None]:
     """Run workflow and yield SSE events."""
     event_queue: asyncio.Queue[ExecutionEvent | None] = asyncio.Queue()
@@ -70,7 +73,6 @@ async def _run_workflow_with_events(
     def on_event(event: ExecutionEvent) -> None:
         event_queue.put_nowait(event)
 
-    # Start workflow execution in background
     runner = WorkflowRunner()
 
     async def run_workflow() -> None:
@@ -84,7 +86,6 @@ async def _run_workflow_with_events(
             )
             execution_store.complete(context, workflow.id or "adhoc", workflow.name)
         except Exception as e:
-            # Send error event
             on_event(
                 ExecutionEvent(
                     type=ExecutionEvent.__class__,  # type: ignore
@@ -94,9 +95,8 @@ async def _run_workflow_with_events(
                 )
             )
         finally:
-            event_queue.put_nowait(None)  # Signal completion
+            event_queue.put_nowait(None)
 
-    # Start execution task
     task = asyncio.create_task(run_workflow())
 
     try:
@@ -111,12 +111,15 @@ async def _run_workflow_with_events(
 
 
 @router.get("/execution-stream/{workflow_id}")
-async def stream_workflow_execution(workflow_id: str) -> EventSourceResponse:
+async def stream_workflow_execution(
+    workflow_id: str,
+    workflow_store: Annotated[WorkflowStore, Depends(get_workflow_store)],
+    execution_store: Annotated[ExecutionStore, Depends(get_execution_store)],
+) -> EventSourceResponse:
     """Stream workflow execution via SSE for a saved workflow."""
     stored = workflow_store.get(workflow_id)
-
     if not stored:
-        raise HTTPException(status_code=404, detail="Workflow not found")
+        raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}")
 
     runner = WorkflowRunner()
     start_node = runner.find_start_node(stored.workflow)
@@ -125,10 +128,12 @@ async def stream_workflow_execution(workflow_id: str) -> EventSourceResponse:
         raise HTTPException(status_code=400, detail="No start node found in workflow")
 
     initial_data = [
-        NodeData(json={
-            "triggeredAt": datetime.now().isoformat(),
-            "mode": "manual",
-        })
+        NodeData(
+            json={
+                "triggeredAt": datetime.now().isoformat(),
+                "mode": "manual",
+            }
+        )
     ]
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -137,6 +142,7 @@ async def stream_workflow_execution(workflow_id: str) -> EventSourceResponse:
             start_node.name,
             initial_data,
             "manual",
+            execution_store,
         ):
             yield event
 
@@ -144,9 +150,11 @@ async def stream_workflow_execution(workflow_id: str) -> EventSourceResponse:
 
 
 @router.post("/execution-stream/adhoc")
-async def stream_adhoc_execution(workflow: AdhocWorkflowModel) -> EventSourceResponse:
+async def stream_adhoc_execution(
+    workflow: AdhocWorkflowRequest,
+    execution_store: Annotated[ExecutionStore, Depends(get_execution_store)],
+) -> EventSourceResponse:
     """Stream ad-hoc workflow execution via SSE."""
-    # Convert to internal workflow
     internal_workflow = Workflow(
         name=workflow.name,
         id=workflow.id,
@@ -182,10 +190,12 @@ async def stream_adhoc_execution(workflow: AdhocWorkflowModel) -> EventSourceRes
         raise HTTPException(status_code=400, detail="No start node found in workflow")
 
     initial_data = [
-        NodeData(json={
-            "triggeredAt": datetime.now().isoformat(),
-            "mode": "manual",
-        })
+        NodeData(
+            json={
+                "triggeredAt": datetime.now().isoformat(),
+                "mode": "manual",
+            }
+        )
     ]
 
     async def event_generator() -> AsyncGenerator[str, None]:
@@ -194,6 +204,7 @@ async def stream_adhoc_execution(workflow: AdhocWorkflowModel) -> EventSourceRes
             start_node.name,
             initial_data,
             "manual",
+            execution_store,
         ):
             yield event
 

@@ -1,3 +1,9 @@
-"""AI-related utilities for workflow nodes."""
+"""AI/LLM nodes - large language model integrations."""
 
-# Placeholder for future AI tools implementation
+from ..llm_chat import LLMChatNode
+from ..ai_agent import AIAgentNode
+
+__all__ = [
+    "LLMChatNode",
+    "AIAgentNode",
+]
