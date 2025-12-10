@@ -17,7 +17,7 @@ from .ai_agent import AIAgentNode
 from .read_file import ReadFileNode
 from .pandas_explore import PandasExploreNode
 from .html_display import HTMLDisplayNode
-from .error_trigger import ErrorTriggerNode, error_workflow_manager
+from .error_trigger import ErrorTriggerNode
 
 __all__ = [
     "BaseNode",
@@ -38,5 +38,4 @@ __all__ = [
     "PandasExploreNode",
     "HTMLDisplayNode",
     "ErrorTriggerNode",
-    "error_workflow_manager",
 ]

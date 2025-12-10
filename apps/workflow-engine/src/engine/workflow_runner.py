@@ -29,7 +29,6 @@ from .types import (
     NodeExecutionResult,
     Workflow,
     NO_OUTPUT_SIGNAL,
-    NoOutputSignal,
 )
 
 if TYPE_CHECKING:

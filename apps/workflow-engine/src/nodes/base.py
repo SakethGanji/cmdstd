@@ -141,10 +141,6 @@ class BaseNode(ABC):
                 return prop.required
         return False
 
-    def has_parameter(self, node_definition: NodeDefinition, key: str) -> bool:
-        """Check if a parameter exists."""
-        return key in node_definition.parameters
-
     def output(self, data: list[NodeData]) -> NodeExecutionResult:
         """Helper to create single-output result."""
         from ..engine.types import NodeExecutionResult
@@ -156,9 +152,3 @@ class BaseNode(ABC):
         from ..engine.types import NodeExecutionResult
 
         return NodeExecutionResult(outputs=outputs)
-
-    def to_node_data(self, data: list[dict[str, Any]]) -> list[NodeData]:
-        """Helper to create NodeData array from plain objects."""
-        from ..engine.types import NodeData
-
-        return [NodeData(json=d) for d in data]

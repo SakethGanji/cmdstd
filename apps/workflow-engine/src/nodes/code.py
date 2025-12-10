@@ -77,7 +77,6 @@ External imports and file system access are limited.""",
         node_definition: NodeDefinition,
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
-        from ..engine.types import NodeData
 
         code = self.get_parameter(node_definition, "code", "return items")
 

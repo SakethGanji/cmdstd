@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from .base import (
     BaseNode,
     NodeTypeDescription,
-    NodeInputDefinition,
     NodeOutputDefinition,
 )
 
@@ -56,7 +55,7 @@ class StartNode(BaseNode):
         node_definition: NodeDefinition,
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
-        from ..engine.types import NodeData, NodeExecutionResult
+        from ..engine.types import NodeData
 
         # Pass through input data or create trigger data
         if input_data and input_data[0].json:

@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
-    from ..engine.types import ExecutionContext, ExecutionRecord, NodeData
+    from ..engine.types import ExecutionContext, ExecutionRecord
 
 
 class ExecutionStore:
@@ -67,26 +67,6 @@ class ExecutionStore:
         record.errors = list(context.errors)
 
         self._executions[context.execution_id] = record
-        return record
-
-    def fail(self, execution_id: str, error: str) -> ExecutionRecord | None:
-        """Mark execution as failed."""
-        from ..engine.types import ExecutionError
-
-        record = self._executions.get(execution_id)
-        if not record:
-            return None
-
-        record.status = "failed"
-        record.end_time = datetime.now()
-        record.errors.append(
-            ExecutionError(
-                node_name="_system",
-                error=error,
-                timestamp=datetime.now(),
-            )
-        )
-
         return record
 
     def get(self, execution_id: str) -> ExecutionRecord | None:

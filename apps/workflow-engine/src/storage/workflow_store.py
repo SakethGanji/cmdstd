@@ -49,15 +49,6 @@ class WorkflowStore:
         """Get a workflow by ID."""
         return self._workflows.get(workflow_id)
 
-    def get_by_webhook_path(self, path: str) -> StoredWorkflow | None:
-        """Get a workflow by webhook path."""
-        # Webhook path format: /webhook/:workflowId
-        workflow_id = path.replace("/webhook/", "")
-        stored = self._workflows.get(workflow_id)
-        if stored and stored.active:
-            return stored
-        return None
-
     def list(self) -> list[StoredWorkflow]:
         """List all workflows."""
         return list(self._workflows.values())

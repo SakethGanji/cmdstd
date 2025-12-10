@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from typing import Any, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from ..nodes.base import BaseNode, NodeTypeDescription
+    from ..nodes.base import BaseNode
 
 
 @dataclass
@@ -34,22 +34,6 @@ class NodeRegistryClass:
         self._nodes: dict[str, type[BaseNode]] = {}
         self._instances: dict[str, BaseNode] = {}
 
-    def register(self, node_class: type[BaseNode]) -> None:
-        """
-        Register a node class.
-
-        Raises:
-            ValueError: If node type is already registered
-        """
-        instance = node_class()
-        node_type = instance.type
-
-        if node_type in self._nodes:
-            raise ValueError(f"Duplicate node type: {node_type}")
-
-        self._nodes[node_type] = node_class
-        self._instances[node_type] = instance
-
     def get(self, node_type: str) -> BaseNode:
         """
         Get a cached node instance by type.
@@ -71,24 +55,6 @@ class NodeRegistryClass:
     def list(self) -> list[str]:
         """List all registered node types."""
         return list(self._nodes.keys())
-
-    def get_definition(self, node_type: str) -> NodeTypeDescription | None:
-        """Get node description for a specific type."""
-        instance = self._instances.get(node_type)
-        if instance:
-            return instance.node_description
-        return None
-
-    def get_node_info(self) -> list[dict[str, Any]]:
-        """Get basic node info (legacy compatibility)."""
-        return [
-            {
-                "type": instance.type,
-                "description": instance.description,
-                "input_count": instance.input_count,
-            }
-            for instance in self._instances.values()
-        ]
 
     def get_node_info_full(self) -> list[NodeTypeInfo]:
         """
