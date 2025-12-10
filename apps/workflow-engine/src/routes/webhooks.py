@@ -11,20 +11,19 @@ from ..core.exceptions import (
     WorkflowInactiveError,
     WebhookError,
 )
-from ..core.dependencies import get_workflow_store, get_execution_store
+from ..core.dependencies import get_workflow_repository, get_execution_repository
 from ..services.webhook_service import WebhookService
-from ..storage.workflow_store import WorkflowStore
-from ..storage.execution_store import ExecutionStore
+from ..repositories import WorkflowRepository, ExecutionRepository
 
 router = APIRouter()
 
 
 def get_webhook_service(
-    workflow_store: Annotated[WorkflowStore, Depends(get_workflow_store)],
-    execution_store: Annotated[ExecutionStore, Depends(get_execution_store)],
+    workflow_repo: Annotated[WorkflowRepository, Depends(get_workflow_repository)],
+    execution_repo: Annotated[ExecutionRepository, Depends(get_execution_repository)],
 ) -> WebhookService:
     """Get webhook service instance."""
-    return WebhookService(workflow_store, execution_store)
+    return WebhookService(workflow_repo, execution_repo)
 
 
 WebhookServiceDep = Annotated[WebhookService, Depends(get_webhook_service)]

@@ -25,7 +25,7 @@ async def list_executions(
     workflow_id: str | None = Query(None, description="Filter by workflow ID"),
 ) -> list[ExecutionListItem]:
     """List execution history."""
-    return service.list_executions(workflow_id)
+    return await service.list_executions(workflow_id)
 
 
 @router.get("/{execution_id}", response_model=ExecutionDetailResponse)
@@ -35,7 +35,7 @@ async def get_execution(
 ) -> ExecutionDetailResponse:
     """Get execution details."""
     try:
-        return service.get_execution(execution_id)
+        return await service.get_execution(execution_id)
     except ExecutionNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
 
@@ -47,7 +47,7 @@ async def delete_execution(
 ) -> SuccessResponse:
     """Delete an execution record."""
     try:
-        service.delete_execution(execution_id)
+        await service.delete_execution(execution_id)
         return SuccessResponse(message="Execution deleted")
     except ExecutionNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
@@ -56,5 +56,5 @@ async def delete_execution(
 @router.delete("", response_model=SuccessResponse)
 async def clear_executions(service: ExecutionServiceDep) -> SuccessResponse:
     """Clear all execution records."""
-    count = service.clear_executions()
+    count = await service.clear_executions()
     return SuccessResponse(message=f"Cleared {count} execution records")

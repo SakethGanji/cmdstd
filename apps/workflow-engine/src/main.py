@@ -13,11 +13,16 @@ from .core.config import settings
 from .engine.node_registry import register_all_nodes
 from .routes import api_router, webhook_router, stream_router
 from .schemas.common import RootResponse, HealthResponse
+from .db import init_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan handler."""
+    # Initialize database tables
+    await init_db()
+    print("Database initialized")
+
     register_all_nodes()
     print(f"{settings.app_name} v{settings.app_version} started")
     print(f"Running on http://{settings.host}:{settings.port}")

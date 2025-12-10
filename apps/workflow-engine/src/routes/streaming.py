@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from sse_starlette.sse import EventSourceResponse
 
 from ..core.exceptions import WorkflowNotFoundError, WorkflowExecutionError
-from ..core.dependencies import get_workflow_store, get_execution_store
+from ..core.dependencies import get_workflow_repository, get_execution_repository
 from ..engine.workflow_runner import WorkflowRunner
 from ..engine.types import (
     ExecutionEvent,
@@ -21,8 +21,7 @@ from ..engine.types import (
     Connection,
     Workflow,
 )
-from ..storage.workflow_store import WorkflowStore
-from ..storage.execution_store import ExecutionStore
+from ..repositories import WorkflowRepository, ExecutionRepository
 
 router = APIRouter()
 
@@ -65,7 +64,7 @@ async def _run_workflow_with_events(
     start_node_name: str,
     initial_data: list[NodeData],
     mode: str,
-    execution_store: ExecutionStore,
+    execution_repo: ExecutionRepository,
 ) -> AsyncGenerator[str, None]:
     """Run workflow and yield SSE events."""
     event_queue: asyncio.Queue[ExecutionEvent | None] = asyncio.Queue()
@@ -84,7 +83,7 @@ async def _run_workflow_with_events(
                 mode,
                 on_event,
             )
-            execution_store.complete(context, workflow.id or "adhoc", workflow.name)
+            await execution_repo.complete(context, workflow.id or "adhoc", workflow.name)
         except Exception as e:
             on_event(
                 ExecutionEvent(
@@ -113,11 +112,11 @@ async def _run_workflow_with_events(
 @router.get("/execution-stream/{workflow_id}")
 async def stream_workflow_execution(
     workflow_id: str,
-    workflow_store: Annotated[WorkflowStore, Depends(get_workflow_store)],
-    execution_store: Annotated[ExecutionStore, Depends(get_execution_store)],
+    workflow_repo: Annotated[WorkflowRepository, Depends(get_workflow_repository)],
+    execution_repo: Annotated[ExecutionRepository, Depends(get_execution_repository)],
 ) -> EventSourceResponse:
     """Stream workflow execution via SSE for a saved workflow."""
-    stored = workflow_store.get(workflow_id)
+    stored = await workflow_repo.get(workflow_id)
     if not stored:
         raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}")
 
@@ -142,7 +141,7 @@ async def stream_workflow_execution(
             start_node.name,
             initial_data,
             "manual",
-            execution_store,
+            execution_repo,
         ):
             yield event
 
@@ -152,7 +151,7 @@ async def stream_workflow_execution(
 @router.post("/execution-stream/adhoc")
 async def stream_adhoc_execution(
     workflow: AdhocWorkflowRequest,
-    execution_store: Annotated[ExecutionStore, Depends(get_execution_store)],
+    execution_repo: Annotated[ExecutionRepository, Depends(get_execution_repository)],
 ) -> EventSourceResponse:
     """Stream ad-hoc workflow execution via SSE."""
     internal_workflow = Workflow(
@@ -204,7 +203,7 @@ async def stream_adhoc_execution(
             start_node.name,
             initial_data,
             "manual",
-            execution_store,
+            execution_repo,
         ):
             yield event
 

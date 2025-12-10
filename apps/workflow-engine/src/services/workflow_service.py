@@ -29,8 +29,8 @@ from ..schemas.workflow import (
 from ..schemas.execution import ExecutionResponse, ExecutionErrorSchema
 
 if TYPE_CHECKING:
-    from ..storage.workflow_store import WorkflowStore, StoredWorkflow
-    from ..storage.execution_store import ExecutionStore
+    from ..repositories import WorkflowRepository, ExecutionRepository
+    from ..engine.types import StoredWorkflow
 
 
 class WorkflowService:
@@ -38,15 +38,15 @@ class WorkflowService:
 
     def __init__(
         self,
-        workflow_store: WorkflowStore,
-        execution_store: ExecutionStore,
+        workflow_repo: WorkflowRepository,
+        execution_repo: ExecutionRepository,
     ) -> None:
-        self._workflow_store = workflow_store
-        self._execution_store = execution_store
+        self._workflow_repo = workflow_repo
+        self._execution_repo = execution_repo
 
-    def list_workflows(self) -> list[WorkflowListItem]:
+    async def list_workflows(self) -> list[WorkflowListItem]:
         """List all workflows."""
-        workflows = self._workflow_store.list()
+        workflows = await self._workflow_repo.list()
         return [
             WorkflowListItem(
                 id=w.id,
@@ -60,9 +60,9 @@ class WorkflowService:
             for w in workflows
         ]
 
-    def get_workflow(self, workflow_id: str) -> WorkflowDetailResponse:
+    async def get_workflow(self, workflow_id: str) -> WorkflowDetailResponse:
         """Get a workflow by ID."""
-        stored = self._workflow_store.get(workflow_id)
+        stored = await self._workflow_repo.get(workflow_id)
         if not stored:
             raise WorkflowNotFoundError(workflow_id)
 
@@ -76,12 +76,12 @@ class WorkflowService:
             updated_at=stored.updated_at.isoformat(),
         )
 
-    def create_workflow(self, request: WorkflowCreateRequest) -> WorkflowResponse:
+    async def create_workflow(self, request: WorkflowCreateRequest) -> WorkflowResponse:
         """Create a new workflow."""
         self._validate_workflow(request)
 
         internal_workflow = self._request_to_workflow(request)
-        stored = self._workflow_store.create(internal_workflow)
+        stored = await self._workflow_repo.create(internal_workflow)
 
         return WorkflowResponse(
             id=stored.id,
@@ -91,11 +91,11 @@ class WorkflowService:
             created_at=stored.created_at.isoformat(),
         )
 
-    def update_workflow(
+    async def update_workflow(
         self, workflow_id: str, request: WorkflowUpdateRequest
     ) -> WorkflowDetailResponse:
         """Update an existing workflow."""
-        existing = self._workflow_store.get(workflow_id)
+        existing = await self._workflow_repo.get(workflow_id)
         if not existing:
             raise WorkflowNotFoundError(workflow_id)
 
@@ -132,7 +132,7 @@ class WorkflowService:
             settings=request.settings or existing.workflow.settings,
         )
 
-        updated = self._workflow_store.update(workflow_id, internal_workflow)
+        updated = await self._workflow_repo.update(workflow_id, internal_workflow)
         if not updated:
             raise WorkflowNotFoundError(workflow_id)
 
@@ -146,16 +146,16 @@ class WorkflowService:
             updated_at=updated.updated_at.isoformat(),
         )
 
-    def delete_workflow(self, workflow_id: str) -> bool:
+    async def delete_workflow(self, workflow_id: str) -> bool:
         """Delete a workflow."""
-        deleted = self._workflow_store.delete(workflow_id)
+        deleted = await self._workflow_repo.delete(workflow_id)
         if not deleted:
             raise WorkflowNotFoundError(workflow_id)
         return True
 
-    def set_active(self, workflow_id: str, active: bool) -> WorkflowActiveResponse:
+    async def set_active(self, workflow_id: str, active: bool) -> WorkflowActiveResponse:
         """Set workflow active state."""
-        updated = self._workflow_store.set_active(workflow_id, active)
+        updated = await self._workflow_repo.set_active(workflow_id, active)
         if not updated:
             raise WorkflowNotFoundError(workflow_id)
 
@@ -163,7 +163,7 @@ class WorkflowService:
 
     async def run_workflow(self, workflow_id: str) -> ExecutionResponse:
         """Run a saved workflow."""
-        stored = self._workflow_store.get(workflow_id)
+        stored = await self._workflow_repo.get(workflow_id)
         if not stored:
             raise WorkflowNotFoundError(workflow_id)
 
@@ -185,7 +185,7 @@ class WorkflowService:
         ]
 
         context = await runner.run(stored.workflow, start_node.name, initial_data, "manual")
-        self._execution_store.complete(context, stored.id, stored.name)
+        await self._execution_repo.complete(context, stored.id, stored.name)
 
         return self._build_execution_response(context)
 
@@ -212,15 +212,15 @@ class WorkflowService:
         context = await runner.run(
             internal_workflow, start_node.name, initial_data, "manual"
         )
-        self._execution_store.complete(
+        await self._execution_repo.complete(
             context, internal_workflow.id or "adhoc", internal_workflow.name
         )
 
         return self._build_execution_response(context)
 
-    def get_stored_workflow(self, workflow_id: str) -> "StoredWorkflow":
+    async def get_stored_workflow(self, workflow_id: str) -> "StoredWorkflow":
         """Get raw stored workflow (for internal use)."""
-        stored = self._workflow_store.get(workflow_id)
+        stored = await self._workflow_repo.get(workflow_id)
         if not stored:
             raise WorkflowNotFoundError(workflow_id)
         return stored

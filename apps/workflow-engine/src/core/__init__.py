@@ -10,8 +10,8 @@ from .exceptions import (
     WorkflowExecutionError,
 )
 from .dependencies import (
-    get_workflow_store,
-    get_execution_store,
+    get_workflow_repository,
+    get_execution_repository,
     get_node_registry,
     get_workflow_service,
     get_execution_service,
@@ -30,8 +30,8 @@ __all__ = [
     "ValidationError",
     "WorkflowExecutionError",
     # Dependencies
-    "get_workflow_store",
-    "get_execution_store",
+    "get_workflow_repository",
+    "get_execution_repository",
     "get_node_registry",
     "get_workflow_service",
     "get_execution_service",

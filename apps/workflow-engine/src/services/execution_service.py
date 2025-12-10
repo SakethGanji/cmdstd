@@ -12,8 +12,7 @@ from ..schemas.execution import (
 )
 
 if TYPE_CHECKING:
-    from ..storage.execution_store import ExecutionStore
-    from ..storage.workflow_store import WorkflowStore
+    from ..repositories import ExecutionRepository, WorkflowRepository
 
 
 class ExecutionService:
@@ -21,15 +20,15 @@ class ExecutionService:
 
     def __init__(
         self,
-        execution_store: ExecutionStore,
-        workflow_store: WorkflowStore,
+        execution_repo: ExecutionRepository,
+        workflow_repo: WorkflowRepository,
     ) -> None:
-        self._execution_store = execution_store
-        self._workflow_store = workflow_store
+        self._execution_repo = execution_repo
+        self._workflow_repo = workflow_repo
 
-    def list_executions(self, workflow_id: str | None = None) -> list[ExecutionListItem]:
+    async def list_executions(self, workflow_id: str | None = None) -> list[ExecutionListItem]:
         """List execution history."""
-        executions = self._execution_store.list(workflow_id)
+        executions = await self._execution_repo.list(workflow_id)
 
         return [
             ExecutionListItem(
@@ -45,9 +44,9 @@ class ExecutionService:
             for e in executions
         ]
 
-    def get_execution(self, execution_id: str) -> ExecutionDetailResponse:
+    async def get_execution(self, execution_id: str) -> ExecutionDetailResponse:
         """Get execution details."""
-        execution = self._execution_store.get(execution_id)
+        execution = await self._execution_repo.get(execution_id)
         if not execution:
             raise ExecutionNotFoundError(execution_id)
 
@@ -73,15 +72,16 @@ class ExecutionService:
             },
         )
 
-    def delete_execution(self, execution_id: str) -> bool:
+    async def delete_execution(self, execution_id: str) -> bool:
         """Delete an execution record."""
-        deleted = self._execution_store.delete(execution_id)
+        deleted = await self._execution_repo.delete(execution_id)
         if not deleted:
             raise ExecutionNotFoundError(execution_id)
         return True
 
-    def clear_executions(self) -> int:
+    async def clear_executions(self) -> int:
         """Clear all execution records and return count."""
-        count = len(self._execution_store.list())
-        self._execution_store.clear()
+        executions = await self._execution_repo.list()
+        count = len(executions)
+        await self._execution_repo.clear()
         return count

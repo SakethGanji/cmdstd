@@ -15,8 +15,7 @@ from ..engine.workflow_runner import WorkflowRunner
 from ..schemas.execution import ExecutionResponse, ExecutionErrorSchema
 
 if TYPE_CHECKING:
-    from ..storage.workflow_store import WorkflowStore
-    from ..storage.execution_store import ExecutionStore
+    from ..repositories import WorkflowRepository, ExecutionRepository
 
 
 class WebhookService:
@@ -24,11 +23,11 @@ class WebhookService:
 
     def __init__(
         self,
-        workflow_store: WorkflowStore,
-        execution_store: ExecutionStore,
+        workflow_repo: WorkflowRepository,
+        execution_repo: ExecutionRepository,
     ) -> None:
-        self._workflow_store = workflow_store
-        self._execution_store = execution_store
+        self._workflow_repo = workflow_repo
+        self._execution_repo = execution_repo
 
     async def handle_webhook(
         self,
@@ -39,7 +38,7 @@ class WebhookService:
         query_params: dict[str, str],
     ) -> dict[str, Any]:
         """Handle incoming webhook request."""
-        stored = self._workflow_store.get(workflow_id)
+        stored = await self._workflow_repo.get(workflow_id)
         if not stored:
             raise WorkflowNotFoundError(workflow_id)
 
@@ -81,7 +80,7 @@ class WebhookService:
             "webhook",
         )
 
-        self._execution_store.complete(context, stored.id, stored.name)
+        await self._execution_repo.complete(context, stored.id, stored.name)
 
         # Check response mode
         response_mode = webhook_node.parameters.get("responseMode", "onReceived")

@@ -35,7 +35,7 @@ WorkflowServiceDep = Annotated[WorkflowService, Depends(get_workflow_service)]
 @router.get("", response_model=list[WorkflowListItem])
 async def list_workflows(service: WorkflowServiceDep) -> list[WorkflowListItem]:
     """List all workflows."""
-    return service.list_workflows()
+    return await service.list_workflows()
 
 
 @router.get("/{workflow_id}", response_model=WorkflowDetailResponse)
@@ -45,7 +45,7 @@ async def get_workflow(
 ) -> WorkflowDetailResponse:
     """Get a single workflow by ID."""
     try:
-        return service.get_workflow(workflow_id)
+        return await service.get_workflow(workflow_id)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
 
@@ -57,7 +57,7 @@ async def create_workflow(
 ) -> WorkflowResponse:
     """Create a new workflow."""
     try:
-        return service.create_workflow(workflow)
+        return await service.create_workflow(workflow)
     except ValidationError as e:
         raise HTTPException(status_code=400, detail=e.message)
 
@@ -70,7 +70,7 @@ async def update_workflow(
 ) -> WorkflowDetailResponse:
     """Update an existing workflow."""
     try:
-        return service.update_workflow(workflow_id, workflow)
+        return await service.update_workflow(workflow_id, workflow)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
     except ValidationError as e:
@@ -84,7 +84,7 @@ async def delete_workflow(
 ) -> SuccessResponse:
     """Delete a workflow."""
     try:
-        service.delete_workflow(workflow_id)
+        await service.delete_workflow(workflow_id)
         return SuccessResponse(message="Workflow deleted")
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
@@ -98,7 +98,7 @@ async def toggle_workflow_active(
 ) -> WorkflowActiveResponse:
     """Toggle workflow active state."""
     try:
-        return service.set_active(workflow_id, body.active)
+        return await service.set_active(workflow_id, body.active)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
 
