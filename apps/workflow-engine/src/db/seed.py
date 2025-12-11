@@ -24,8 +24,8 @@ def generate_workflow_id(name: str) -> str:
 
 EXAMPLE_WORKFLOWS = [
     {
-        "name": "Fetch Random User",
-        "description": "Fetches a random user from an API and extracts their info",
+        "name": "Weather Alert Monitor",
+        "description": "Checks for active weather alerts and categorizes by severity",
         "definition": {
             "nodes": [
                 {
@@ -35,87 +35,59 @@ EXAMPLE_WORKFLOWS = [
                     "position": {"x": 100, "y": 200},
                 },
                 {
-                    "name": "Fetch User",
+                    "name": "Fetch DC Alerts",
                     "type": "HttpRequest",
                     "parameters": {
-                        "url": "https://randomuser.me/api/",
+                        "url": "https://api.weather.gov/alerts/active?area=DC",
                         "method": "GET",
                     },
                     "position": {"x": 350, "y": 200},
                 },
                 {
-                    "name": "Extract Data",
+                    "name": "Check Alerts Exist",
                     "type": "Code",
                     "parameters": {
-                        "code": 'response = items[0]["json"]\nuser = response["body"]["results"][0]\nfirst_name = user["name"]["first"]\nlast_name = user["name"]["last"]\nreturn {\n    "name": first_name + " " + last_name,\n    "email": user["email"],\n    "country": user["location"]["country"]\n}'
+                        "code": 'response = items[0]["json"]\nfeatures = response["body"].get("features", [])\nreturn {"has_alerts": len(features) > 0, "alert_count": len(features), "features": features}'
                     },
                     "position": {"x": 600, "y": 200},
                 },
-            ],
-            "connections": [
-                {"source_node": "Start", "target_node": "Fetch User"},
-                {"source_node": "Fetch User", "target_node": "Extract Data"},
-            ],
-            "settings": {},
-        },
-    },
-    {
-        "name": "Conditional Greeting",
-        "description": "Demonstrates branching logic with If node based on time of day",
-        "definition": {
-            "nodes": [
                 {
-                    "name": "Start",
-                    "type": "Start",
-                    "parameters": {},
-                    "position": {"x": 100, "y": 200},
-                },
-                {
-                    "name": "Get Hour",
-                    "type": "Code",
-                    "parameters": {
-                        "code": 'hour = datetime.now().hour\nreturn {"hour": hour, "is_morning": hour < 12}'
-                    },
-                    "position": {"x": 350, "y": 200},
-                },
-                {
-                    "name": "Check Time",
+                    "name": "Has Alerts?",
                     "type": "If",
-                    "parameters": {"condition": "{{ $json.is_morning }}"},
-                    "position": {"x": 600, "y": 200},
+                    "parameters": {"condition": "{{ $json.has_alerts }}"},
+                    "position": {"x": 850, "y": 200},
                 },
                 {
-                    "name": "Morning Message",
+                    "name": "Process Alerts",
+                    "type": "Code",
+                    "parameters": {
+                        "code": 'features = items[0]["json"]["features"]\nalerts = []\nfor f in features[:5]:\n    props = f.get("properties", {})\n    alerts.append({\n        "event": props.get("event", "Unknown"),\n        "severity": props.get("severity", "Unknown"),\n        "headline": props.get("headline", ""),\n        "areas": props.get("areaDesc", "")\n    })\nreturn {"alerts": alerts, "total": len(features)}'
+                    },
+                    "position": {"x": 1100, "y": 100},
+                },
+                {
+                    "name": "No Alerts",
                     "type": "Set",
                     "parameters": {
                         "mode": "json",
-                        "jsonData": '{"greeting": "Good morning!", "emoji": "sunrise", "period": "AM"}',
+                        "jsonData": '{"message": "No active weather alerts for DC", "status": "all_clear"}',
                         "keepOnlySet": True,
                     },
-                    "position": {"x": 850, "y": 100},
-                },
-                {
-                    "name": "Evening Message",
-                    "type": "Set",
-                    "parameters": {
-                        "mode": "json",
-                        "jsonData": '{"greeting": "Good evening!", "emoji": "moon", "period": "PM"}',
-                        "keepOnlySet": True,
-                    },
-                    "position": {"x": 850, "y": 300},
+                    "position": {"x": 1100, "y": 300},
                 },
             ],
             "connections": [
-                {"source_node": "Start", "target_node": "Get Hour"},
-                {"source_node": "Get Hour", "target_node": "Check Time"},
+                {"source_node": "Start", "target_node": "Fetch DC Alerts"},
+                {"source_node": "Fetch DC Alerts", "target_node": "Check Alerts Exist"},
+                {"source_node": "Check Alerts Exist", "target_node": "Has Alerts?"},
                 {
-                    "source_node": "Check Time",
-                    "target_node": "Morning Message",
+                    "source_node": "Has Alerts?",
+                    "target_node": "Process Alerts",
                     "source_output": "true",
                 },
                 {
-                    "source_node": "Check Time",
-                    "target_node": "Evening Message",
+                    "source_node": "Has Alerts?",
+                    "target_node": "No Alerts",
                     "source_output": "false",
                 },
             ],
@@ -123,8 +95,8 @@ EXAMPLE_WORKFLOWS = [
         },
     },
     {
-        "name": "Data Transform Pipeline",
-        "description": "Shows data transformation: generate data, filter, and aggregate",
+        "name": "Near-Earth Asteroid Tracker",
+        "description": "Fetches asteroid data from NASA and identifies potentially hazardous objects",
         "definition": {
             "nodes": [
                 {
@@ -134,41 +106,42 @@ EXAMPLE_WORKFLOWS = [
                     "position": {"x": 100, "y": 200},
                 },
                 {
-                    "name": "Generate Sales Data",
-                    "type": "Code",
+                    "name": "Fetch Asteroids",
+                    "type": "HttpRequest",
                     "parameters": {
-                        "code": '# Sample sales data\nsales = [\n    {"id": 1, "product": "Widget", "region": "North", "amount": 250, "quantity": 2},\n    {"id": 2, "product": "Gadget", "region": "South", "amount": 750, "quantity": 5},\n    {"id": 3, "product": "Gizmo", "region": "East", "amount": 320, "quantity": 3},\n    {"id": 4, "product": "Widget", "region": "West", "amount": 890, "quantity": 8},\n    {"id": 5, "product": "Doohickey", "region": "North", "amount": 150, "quantity": 1},\n    {"id": 6, "product": "Gadget", "region": "East", "amount": 620, "quantity": 4},\n    {"id": 7, "product": "Gizmo", "region": "South", "amount": 980, "quantity": 9},\n    {"id": 8, "product": "Widget", "region": "West", "amount": 410, "quantity": 3}\n]\nreturn {"sales": sales, "total_records": len(sales)}'
+                        "url": "https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=DEMO_KEY",
+                        "method": "GET",
                     },
                     "position": {"x": 350, "y": 200},
                 },
                 {
-                    "name": "Filter High Value",
+                    "name": "Parse Asteroid Data",
                     "type": "Code",
                     "parameters": {
-                        "code": 'sales = items[0]["json"]["sales"]\nhigh_value = [s for s in sales if s["amount"] > 500]\nreturn {"high_value_sales": high_value, "count": len(high_value)}'
+                        "code": 'response = items[0]["json"]\nasteroids = response["body"].get("near_earth_objects", [])\nparsed = []\nfor a in asteroids[:10]:\n    diameter = a.get("estimated_diameter", {}).get("kilometers", {})\n    parsed.append({\n        "name": a.get("name", "Unknown"),\n        "id": a.get("id", ""),\n        "is_hazardous": a.get("is_potentially_hazardous_asteroid", False),\n        "diameter_km_min": round(diameter.get("estimated_diameter_min", 0), 3),\n        "diameter_km_max": round(diameter.get("estimated_diameter_max", 0), 3),\n        "first_observed": a.get("orbital_data", {}).get("first_observation_date", "Unknown")\n    })\nreturn {"asteroids": parsed, "total_fetched": len(parsed)}'
                     },
                     "position": {"x": 600, "y": 200},
                 },
                 {
-                    "name": "Aggregate Stats",
+                    "name": "Filter Hazardous",
                     "type": "Code",
                     "parameters": {
-                        "code": 'sales = items[0]["json"]["high_value_sales"]\nif not sales:\n    return {"message": "No high value sales found"}\ntotal = sum(s["amount"] for s in sales)\navg = total / len(sales)\nby_region = {}\nfor s in sales:\n    region = s["region"]\n    by_region[region] = by_region.get(region, 0) + s["amount"]\nreturn {\n    "total_high_value": total,\n    "average_amount": round(avg, 2),\n    "count": len(sales),\n    "by_region": by_region\n}'
+                        "code": 'asteroids = items[0]["json"]["asteroids"]\nhazardous = [a for a in asteroids if a["is_hazardous"]]\nsafe = [a for a in asteroids if not a["is_hazardous"]]\nreturn {\n    "hazardous_count": len(hazardous),\n    "safe_count": len(safe),\n    "hazardous_asteroids": hazardous,\n    "largest_hazardous": max(hazardous, key=lambda x: x["diameter_km_max"]) if hazardous else None\n}'
                     },
                     "position": {"x": 850, "y": 200},
                 },
             ],
             "connections": [
-                {"source_node": "Start", "target_node": "Generate Sales Data"},
-                {"source_node": "Generate Sales Data", "target_node": "Filter High Value"},
-                {"source_node": "Filter High Value", "target_node": "Aggregate Stats"},
+                {"source_node": "Start", "target_node": "Fetch Asteroids"},
+                {"source_node": "Fetch Asteroids", "target_node": "Parse Asteroid Data"},
+                {"source_node": "Parse Asteroid Data", "target_node": "Filter Hazardous"},
             ],
             "settings": {},
         },
     },
     {
-        "name": "Multi-API Aggregator",
-        "description": "Fetches data from multiple APIs in parallel and combines results",
+        "name": "Space and Weather Dashboard",
+        "description": "Combines NASA space data with weather alerts for a comprehensive dashboard",
         "definition": {
             "nodes": [
                 {
@@ -178,44 +151,55 @@ EXAMPLE_WORKFLOWS = [
                     "position": {"x": 100, "y": 250},
                 },
                 {
-                    "name": "Fetch Cat Fact",
+                    "name": "Fetch Space Picture",
                     "type": "HttpRequest",
                     "parameters": {
-                        "url": "https://catfact.ninja/fact",
+                        "url": "https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY",
                         "method": "GET",
                     },
-                    "position": {"x": 350, "y": 150},
+                    "position": {"x": 350, "y": 100},
                 },
                 {
-                    "name": "Fetch Joke",
+                    "name": "Fetch Weather Alerts",
                     "type": "HttpRequest",
                     "parameters": {
-                        "url": "https://official-joke-api.appspot.com/random_joke",
+                        "url": "https://api.weather.gov/alerts/active?area=DC",
                         "method": "GET",
                     },
-                    "position": {"x": 350, "y": 350},
+                    "position": {"x": 350, "y": 250},
                 },
                 {
-                    "name": "Wait For Both",
+                    "name": "Fetch Asteroids",
+                    "type": "HttpRequest",
+                    "parameters": {
+                        "url": "https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=DEMO_KEY",
+                        "method": "GET",
+                    },
+                    "position": {"x": 350, "y": 400},
+                },
+                {
+                    "name": "Wait For All",
                     "type": "Merge",
-                    "parameters": {"mode": "wait_all", "expected_inputs": 2},
+                    "parameters": {"mode": "wait_all", "expected_inputs": 3},
                     "position": {"x": 600, "y": 250},
                 },
                 {
-                    "name": "Combine Results",
+                    "name": "Build Dashboard",
                     "type": "Code",
                     "parameters": {
-                        "code": '# Get data from both API calls via node_data\ncat_data = node_data.get("Fetch Cat Fact", {}).get("json", {})\njoke_data = node_data.get("Fetch Joke", {}).get("json", {})\n\ncat_body = cat_data.get("body", {})\njoke_body = joke_data.get("body", {})\n\nreturn {\n    "cat_fact": cat_body.get("fact", "No fact available"),\n    "joke": {\n        "setup": joke_body.get("setup", "No joke available"),\n        "punchline": joke_body.get("punchline", "")\n    }\n}'
+                        "code": '# Get data from all API calls\napod = node_data.get("Fetch Space Picture", {}).get("json", {}).get("body", {})\nalerts = node_data.get("Fetch Weather Alerts", {}).get("json", {}).get("body", {}).get("features", [])\nasteroids = node_data.get("Fetch Asteroids", {}).get("json", {}).get("body", {}).get("near_earth_objects", [])\n\n# Process alerts\nactive_alerts = [{\n    "event": a.get("properties", {}).get("event", "Unknown"),\n    "severity": a.get("properties", {}).get("severity", "Unknown")\n} for a in alerts[:3]]\n\n# Count hazardous asteroids\nhazardous = sum(1 for a in asteroids if a.get("is_potentially_hazardous_asteroid", False))\n\nreturn {\n    "space_picture": {\n        "title": apod.get("title", "No image today"),\n        "date": apod.get("date", "Unknown")\n    },\n    "weather": {\n        "alert_count": len(alerts),\n        "alerts": active_alerts,\n        "status": "warnings" if alerts else "clear"\n    },\n    "asteroids": {\n        "tracked": len(asteroids),\n        "hazardous": hazardous\n    },\n    "dashboard_generated": "success"\n}'
                     },
                     "position": {"x": 850, "y": 250},
                 },
             ],
             "connections": [
-                {"source_node": "Start", "target_node": "Fetch Cat Fact"},
-                {"source_node": "Start", "target_node": "Fetch Joke"},
-                {"source_node": "Fetch Cat Fact", "target_node": "Wait For Both"},
-                {"source_node": "Fetch Joke", "target_node": "Wait For Both"},
-                {"source_node": "Wait For Both", "target_node": "Combine Results"},
+                {"source_node": "Start", "target_node": "Fetch Space Picture"},
+                {"source_node": "Start", "target_node": "Fetch Weather Alerts"},
+                {"source_node": "Start", "target_node": "Fetch Asteroids"},
+                {"source_node": "Fetch Space Picture", "target_node": "Wait For All"},
+                {"source_node": "Fetch Weather Alerts", "target_node": "Wait For All"},
+                {"source_node": "Fetch Asteroids", "target_node": "Wait For All"},
+                {"source_node": "Wait For All", "target_node": "Build Dashboard"},
             ],
             "settings": {},
         },
