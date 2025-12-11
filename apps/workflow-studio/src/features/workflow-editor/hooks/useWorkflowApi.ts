@@ -6,6 +6,7 @@
  */
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
 import { workflowsApi } from '@/shared/lib/api';
 import { useWorkflowStore } from '../stores/workflowStore';
 import {
@@ -28,6 +29,7 @@ export function useSaveWorkflow() {
     setWorkflowId,
   } = useWorkflowStore();
 
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
 
   const createMutation = useMutation({
@@ -68,6 +70,12 @@ export function useSaveWorkflow() {
         // Create new workflow
         const result = await createMutation.mutateAsync(backendWorkflow);
         setWorkflowId(result.id);
+        // Update URL to include the new workflow ID
+        navigate({
+          to: '/editor',
+          search: { workflowId: result.id },
+          replace: true,
+        });
         toast.success('Workflow created', {
           description: `"${result.name}" has been saved.`,
         });

@@ -29,10 +29,10 @@ interface BackendNodeDefinition {
 }
 
 interface BackendConnection {
-  sourceNode: string;
-  sourceOutput: string;
-  targetNode: string;
-  targetInput: string;
+  source_node: string;
+  source_output: string;
+  target_node: string;
+  target_input: string;
 }
 
 export interface BackendWorkflow {
@@ -219,10 +219,10 @@ export function toBackendWorkflow(
       return sourceName && targetName;
     })
     .map((edge) => ({
-      sourceNode: idToName.get(edge.source)!,
-      sourceOutput: edge.sourceHandle || 'main',
-      targetNode: idToName.get(edge.target)!,
-      targetInput: edge.targetHandle || 'main',
+      source_node: idToName.get(edge.source)!,
+      source_output: edge.sourceHandle || 'main',
+      target_node: idToName.get(edge.target)!,
+      target_input: edge.targetHandle || 'main',
     }));
 
   return {
@@ -244,5 +244,124 @@ export function getExistingNodeNames(nodes: Node<WorkflowNodeData>[]): string[] 
   return nodes
     .filter((n) => n.type === 'workflowNode')
     .map((n) => n.data.name);
+}
+
+// ============================================================================
+// Backend → ReactFlow Transformation
+// ============================================================================
+
+/**
+ * Maps backend node types (PascalCase) to UI node types (camelCase)
+ */
+const BACKEND_TO_UI_NODE_TYPE: Record<string, string> = {
+  Start: 'manualTrigger',
+  Cron: 'scheduleTrigger',
+  Webhook: 'webhook',
+  ErrorTrigger: 'errorTrigger',
+  Set: 'set',
+  Code: 'code',
+  If: 'if',
+  Switch: 'switch',
+  Merge: 'merge',
+  SplitInBatches: 'splitInBatches',
+  HttpRequest: 'httpRequest',
+  Wait: 'wait',
+  LLMChat: 'llmChat',
+  AIAgent: 'aiAgent',
+  ReadFile: 'readFile',
+  PandasExplore: 'pandasExplore',
+  HTMLDisplay: 'htmlDisplay',
+};
+
+function toUINodeType(backendType: string): string {
+  return BACKEND_TO_UI_NODE_TYPE[backendType] || backendType;
+}
+
+/**
+ * Get icon for a node type
+ */
+function getIconForType(backendType: string): string {
+  const iconMap: Record<string, string> = {
+    Start: 'mouse-pointer',
+    Webhook: 'webhook',
+    Cron: 'clock',
+    ErrorTrigger: 'alert-triangle',
+    HttpRequest: 'globe',
+    Set: 'pen',
+    Code: 'code',
+    If: 'git-branch',
+    Switch: 'route',
+    Merge: 'git-merge',
+    Wait: 'clock',
+    SplitInBatches: 'layers',
+    LLMChat: 'message-square',
+    AIAgent: 'bot',
+  };
+  return iconMap[backendType] || 'code';
+}
+
+/**
+ * API response types (snake_case from backend)
+ */
+interface ApiWorkflowDetail {
+  id: string;
+  name: string;
+  active: boolean;
+  definition: {
+    nodes: Array<{
+      name: string;
+      type: string;
+      parameters: Record<string, unknown>;
+      position?: { x: number; y: number };
+    }>;
+    connections: Array<{
+      source_node: string;
+      target_node: string;
+      source_output: string;
+      target_input: string;
+    }>;
+  };
+}
+
+/**
+ * Transforms backend workflow to ReactFlow nodes and edges.
+ */
+export function fromBackendWorkflow(api: ApiWorkflowDetail): {
+  nodes: Node<WorkflowNodeData>[];
+  edges: Edge[];
+  workflowName: string;
+  workflowId: string;
+  isActive: boolean;
+} {
+  // Build name to ID map (we use the name as the ID for simplicity)
+  const nodes: Node<WorkflowNodeData>[] = api.definition.nodes.map((node) => ({
+    id: node.name,
+    type: 'workflowNode',
+    position: node.position || { x: 0, y: 0 },
+    data: {
+      name: node.name,
+      type: toUINodeType(node.type),
+      label: node.name,
+      icon: getIconForType(node.type),
+      parameters: node.parameters,
+    },
+  }));
+
+  const edges: Edge[] = api.definition.connections.map((conn, index) => ({
+    id: `edge-${index}`,
+    source: conn.source_node,
+    target: conn.target_node,
+    sourceHandle: conn.source_output,
+    targetHandle: conn.target_input,
+    type: 'workflowEdge',
+  }));
+
+  return {
+    nodes,
+    edges,
+    workflowName: api.name,
+    workflowId: api.id,
+    isActive: api.active,
+  };
 }
 

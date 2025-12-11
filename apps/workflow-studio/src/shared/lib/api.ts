@@ -22,10 +22,10 @@ interface BackendNodeDefinition {
 }
 
 interface BackendConnection {
-  sourceNode: string;
-  sourceOutput: string;
-  targetNode: string;
-  targetInput: string;
+  source_node: string;
+  source_output: string;
+  target_node: string;
+  target_input: string;
 }
 
 export interface BackendWorkflow {

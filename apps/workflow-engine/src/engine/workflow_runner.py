@@ -67,13 +67,9 @@ class WorkflowRunner:
             initial_data = [NodeData(json={})]
 
         context = self._create_context(workflow, mode)
-        
-        # Shared HTTP client
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
-            context.http_client = http_client
-            
-            total_nodes = len(workflow.nodes)
-            completed_nodes = 0
+
+        total_nodes = len(workflow.nodes)
+        completed_nodes = 0
 
         # Build node lookup dict for O(1) access
         node_map: dict[str, NodeDefinition] = {n.name: n for n in workflow.nodes}
@@ -123,83 +119,86 @@ class WorkflowRunner:
         iteration = 0
         max_iterations = workflow.settings.get("max_iterations", 1000)
 
-        while queue and iteration < max_iterations:
-            iteration += 1
-            
-            # Process all currently available jobs in parallel (BFS layer)
-            current_batch = queue[:]
-            queue.clear()
-            
-            tasks = []
-            for job in current_batch:
-                # Emit node start event (only first time for each node)
-                node_def = node_map.get(job.node_name)
-                if node_def and job.node_name not in executed_nodes:
-                    self._emit_event(
-                        on_event,
-                        ExecutionEvent(
-                            type=ExecutionEventType.NODE_START,
-                            execution_id=context.execution_id,
-                            timestamp=datetime.now(),
-                            node_name=job.node_name,
-                            node_type=node_def.type,
-                            progress={"completed": completed_nodes, "total": total_nodes},
-                        ),
-                    )
-                
-                tasks.append(self._process_job(context, job, queue, node_map, on_event))
+        # Shared HTTP client for all nodes
+        async with httpx.AsyncClient(timeout=30.0) as http_client:
+            context.http_client = http_client
 
-            # Run batch
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            while queue and iteration < max_iterations:
+                iteration += 1
 
-            # Process results
-            for job, result in zip(current_batch, results):
-                had_error = False
-                if isinstance(result, Exception):
-                    logger.error(f"Error processing job {job.node_name}: {result}")
-                    had_error = True
-                else:
-                    had_error = result
+                # Process all currently available jobs in parallel (BFS layer)
+                current_batch = queue[:]
+                queue.clear()
 
-                # Track completion and emit node complete event
-                node_def = node_map.get(job.node_name)
-                if job.node_name not in executed_nodes:
-                    executed_nodes.add(job.node_name)
-                    completed_nodes += 1
-
-                    if not had_error and node_def:
+                tasks = []
+                for job in current_batch:
+                    # Emit node start event (only first time for each node)
+                    node_def = node_map.get(job.node_name)
+                    if node_def and job.node_name not in executed_nodes:
                         self._emit_event(
                             on_event,
                             ExecutionEvent(
-                                type=ExecutionEventType.NODE_COMPLETE,
+                                type=ExecutionEventType.NODE_START,
                                 execution_id=context.execution_id,
                                 timestamp=datetime.now(),
                                 node_name=job.node_name,
                                 node_type=node_def.type,
-                                data=context.node_states.get(job.node_name),
                                 progress={"completed": completed_nodes, "total": total_nodes},
                             ),
                         )
 
-        if iteration >= max_iterations:
-            error = "Execution exceeded maximum iterations (possible infinite loop)"
-            context.errors.append(
-                ExecutionError(
-                    node_name="WorkflowRunner",
-                    error=error,
-                    timestamp=datetime.now(),
-                )
-            )
-            self._emit_event(
-                on_event,
-                ExecutionEvent(
-                    type=ExecutionEventType.EXECUTION_ERROR,
-                    execution_id=context.execution_id,
-                    timestamp=datetime.now(),
-                    error=error,
-                ),
-            )
+                    tasks.append(self._process_job(context, job, queue, node_map, on_event))
 
+                # Run batch
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+
+                # Process results
+                for job, result in zip(current_batch, results):
+                    had_error = False
+                    if isinstance(result, Exception):
+                        logger.error(f"Error processing job {job.node_name}: {result}")
+                        had_error = True
+                    else:
+                        had_error = result
+
+                    # Track completion and emit node complete event
+                    node_def = node_map.get(job.node_name)
+                    if job.node_name not in executed_nodes:
+                        executed_nodes.add(job.node_name)
+                        completed_nodes += 1
+
+                        if not had_error and node_def:
+                            self._emit_event(
+                                on_event,
+                                ExecutionEvent(
+                                    type=ExecutionEventType.NODE_COMPLETE,
+                                    execution_id=context.execution_id,
+                                    timestamp=datetime.now(),
+                                    node_name=job.node_name,
+                                    node_type=node_def.type,
+                                    data=context.node_states.get(job.node_name),
+                                    progress={"completed": completed_nodes, "total": total_nodes},
+                                ),
+                            )
+
+            if iteration >= max_iterations:
+                error = "Execution exceeded maximum iterations (possible infinite loop)"
+                context.errors.append(
+                    ExecutionError(
+                        node_name="WorkflowRunner",
+                        error=error,
+                        timestamp=datetime.now(),
+                    )
+                )
+                self._emit_event(
+                    on_event,
+                    ExecutionEvent(
+                        type=ExecutionEventType.EXECUTION_ERROR,
+                        execution_id=context.execution_id,
+                        timestamp=datetime.now(),
+                        error=error,
+                    ),
+                )
 
         # Emit execution complete event
         self._emit_event(

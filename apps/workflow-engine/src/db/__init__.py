@@ -2,6 +2,7 @@
 
 from .session import engine, async_session_factory, init_db, get_session
 from .models import WorkflowModel, ExecutionModel
+from .seed import seed_workflows
 
 __all__ = [
     "engine",
@@ -10,4 +11,5 @@ __all__ = [
     "get_session",
     "WorkflowModel",
     "ExecutionModel",
+    "seed_workflows",
 ]

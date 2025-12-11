@@ -68,6 +68,18 @@ interface WorkflowState {
 
   // Workflow ID management
   setWorkflowId: (id: string) => void;
+
+  // Load workflow from API data
+  loadWorkflow: (data: {
+    nodes: Node[];
+    edges: Edge[];
+    workflowName: string;
+    workflowId: string;
+    isActive: boolean;
+  }) => void;
+
+  // Reset to empty state
+  resetWorkflow: () => void;
 }
 
 // Initial "Add first step" node for empty canvas
@@ -311,4 +323,31 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
   // Workflow ID management
   setWorkflowId: (id) => set({ workflowId: id }),
+
+  // Load workflow from API data
+  loadWorkflow: (data) =>
+    set({
+      nodes: data.nodes,
+      edges: data.edges,
+      workflowName: data.workflowName,
+      workflowId: data.workflowId,
+      isActive: data.isActive,
+      selectedNodeId: null,
+      executionData: {},
+      pinnedData: {},
+    }),
+
+  // Reset to empty state
+  resetWorkflow: () =>
+    set({
+      nodes: initialNodes,
+      edges: [],
+      workflowName: 'My workflow',
+      workflowId: undefined,
+      isActive: false,
+      selectedNodeId: null,
+      executionData: {},
+      pinnedData: {},
+      workflowTags: [],
+    }),
 }));

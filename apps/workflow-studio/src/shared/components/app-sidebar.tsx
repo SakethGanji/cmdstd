@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Link, useMatchRoute } from "@tanstack/react-router"
-import { Moon, Sun, Sparkles, Workflow } from "lucide-react"
+import { Moon, Sun, Sparkles, Workflow, FolderOpen } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/shared/components/ui/avatar"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -21,6 +21,7 @@ import {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const matchRoute = useMatchRoute()
+  const isWorkflowsActive = matchRoute({ to: '/workflows' })
   const isEditorActive = matchRoute({ to: '/editor' })
   const { theme, setTheme } = useTheme()
 
@@ -52,6 +53,14 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild isActive={!!isWorkflowsActive} tooltip="Workflows">
+                  <Link to="/workflows">
+                    <FolderOpen />
+                    <span>Workflows</span>
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild isActive={!!isEditorActive} tooltip="Editor">
                   <Link to="/editor">
