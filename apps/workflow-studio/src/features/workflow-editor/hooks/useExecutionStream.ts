@@ -295,6 +295,7 @@ export function useExecutionStream(): UseExecutionStreamResult {
 
         case 'execution:complete':
           setProgress(event.progress || null);
+          setIsExecuting(false);
           // Close EventSource if using it
           if (eventSourceRef.current) {
             eventSourceRef.current.close();
