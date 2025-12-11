@@ -51,14 +51,3 @@ class ExecutionDetailResponse(BaseModel):
     node_data: dict[str, Any]
 
 
-class ExecutionStreamEvent(BaseModel):
-    """Schema for SSE execution event."""
-
-    type: str
-    execution_id: str
-    timestamp: str
-    node_name: str | None = None
-    node_type: str | None = None
-    data: list[dict[str, Any]] | None = None
-    error: str | None = None
-    progress: dict[str, int] | None = None

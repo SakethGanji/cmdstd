@@ -95,44 +95,15 @@ function toBackendNodeType(uiType: string): string {
 
 /**
  * Returns default parameters for a node type.
- * These are used when a new node is created to ensure required fields have values.
+ *
+ * NOTE: Most defaults are now defined in the backend node schemas and applied
+ * by DynamicNodeForm when rendering. Only add frontend defaults here for
+ * parameters that need immediate values at node creation time.
  */
-export function getDefaultParameters(backendType: string): Record<string, unknown> {
-  const defaults: Record<string, Record<string, unknown>> = {
-    LLMChat: {
-      model: 'gemini-2.5-flash',
-      systemPrompt: '',
-      userPrompt: '',
-      temperature: 0.7,
-      maxTokens: 1024,
-    },
-    AIAgent: {
-      model: 'gemini-2.5-flash',
-      systemPrompt: 'You are a helpful assistant. Use the available tools when needed to complete tasks.',
-      userPrompt: '',
-      tools: '["http_request", "calculate", "get_current_time"]',
-      maxIterations: 10,
-      temperature: 0.7,
-      maxTokens: 2048,
-    },
-    HttpRequest: {
-      method: 'GET',
-      url: '',
-      responseType: 'json',
-    },
-    ReadFile: {
-      filePath: '',
-    },
-    PandasExplore: {
-      filePath: '={{ $json.filePath }}',
-      analysisType: 'profile',
-    },
-    HTMLDisplay: {
-      htmlField: 'html',
-    },
-  };
-
-  return defaults[backendType] || {};
+export function getDefaultParameters(_backendType: string): Record<string, unknown> {
+  // All defaults are now managed by the backend schema.
+  // The DynamicNodeForm uses property.default from the API response.
+  return {};
 }
 
 // ============================================================================

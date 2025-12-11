@@ -5,6 +5,8 @@ from __future__ import annotations
 import os
 from typing import Any, TYPE_CHECKING
 
+import httpx
+
 from .base import (
     BaseNode,
     NodeTypeDescription,
@@ -44,22 +46,17 @@ class LLMChatNode(BaseNode):
         ],
         properties=[
             NodeProperty(
-                display_name="Provider",
-                name="provider",
-                type="options",
-                default="anthropic",
-                options=[
-                    NodePropertyOption(name="Anthropic (Claude)", value="anthropic"),
-                    NodePropertyOption(name="OpenAI (GPT)", value="openai"),
-                ],
-            ),
-            NodeProperty(
                 display_name="Model",
                 name="model",
-                type="string",
-                default="claude-sonnet-4-20250514",
-                placeholder="claude-sonnet-4-20250514",
-                description="Model identifier",
+                type="options",
+                default="gemini-2.5-flash",
+                options=[
+                    NodePropertyOption(name="Gemini 2.5 Flash", value="gemini-2.5-flash"),
+                    NodePropertyOption(name="Gemini 2.5 Pro", value="gemini-2.5-pro"),
+                    NodePropertyOption(name="Gemini 2.0 Flash", value="gemini-2.0-flash"),
+                    NodePropertyOption(name="Gemini 1.5 Pro", value="gemini-1.5-pro"),
+                    NodePropertyOption(name="Gemini 1.5 Flash", value="gemini-1.5-flash"),
+                ],
             ),
             NodeProperty(
                 display_name="System Prompt",
@@ -111,8 +108,7 @@ class LLMChatNode(BaseNode):
     ) -> NodeExecutionResult:
         from ..engine.types import NodeData
 
-        provider = self.get_parameter(node_definition, "provider", "anthropic")
-        model = self.get_parameter(node_definition, "model", "claude-sonnet-4-20250514")
+        model = self.get_parameter(node_definition, "model", "gemini-2.5-flash")
         system_prompt = self.get_parameter(node_definition, "systemPrompt", "You are a helpful assistant.")
         user_message = self.get_parameter(node_definition, "userMessage", "")
         temperature = self.get_parameter(node_definition, "temperature", 0.7)
@@ -124,28 +120,18 @@ class LLMChatNode(BaseNode):
         results: list[NodeData] = []
 
         for _item in input_data if input_data else [NodeData(json={})]:
-            if provider == "anthropic":
-                result = await self._call_anthropic(
-                    model=model,
-                    system_prompt=system_prompt,
-                    user_message=user_message,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-            else:
-                result = await self._call_openai(
-                    model=model,
-                    system_prompt=system_prompt,
-                    user_message=user_message,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                )
-
+            result = await self._call_gemini(
+                model=model,
+                system_prompt=system_prompt,
+                user_message=user_message,
+                temperature=temperature,
+                max_tokens=max_tokens,
+            )
             results.append(NodeData(json=result))
 
         return self.output(results)
 
-    async def _call_anthropic(
+    async def _call_gemini(
         self,
         model: str,
         system_prompt: str,
@@ -153,70 +139,70 @@ class LLMChatNode(BaseNode):
         temperature: float,
         max_tokens: int,
     ) -> dict[str, Any]:
-        """Call Anthropic API."""
-        try:
-            from anthropic import AsyncAnthropic
+        """Call Google Gemini API."""
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable not set")
 
-            client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        base_url = "https://generativelanguage.googleapis.com/v1beta"
 
-            response = await client.messages.create(
-                model=model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system=system_prompt,
-                messages=[{"role": "user", "content": user_message}],
-            )
+        # Build request body
+        request_body: dict[str, Any] = {
+            "contents": [
+                {"role": "user", "parts": [{"text": user_message}]}
+            ],
+            "generationConfig": {
+                "temperature": temperature,
+                "maxOutputTokens": max_tokens,
+            },
+        }
 
-            return {
-                "response": response.content[0].text if response.content else "",
-                "model": response.model,
-                "usage": {
-                    "input_tokens": response.usage.input_tokens,
-                    "output_tokens": response.usage.output_tokens,
-                },
+        if system_prompt:
+            request_body["systemInstruction"] = {
+                "parts": [{"text": system_prompt}]
             }
 
-        except ImportError:
-            raise RuntimeError("anthropic package not installed")
-        except Exception as e:
-            raise RuntimeError(f"Anthropic API error: {e}")
-
-    async def _call_openai(
-        self,
-        model: str,
-        system_prompt: str,
-        user_message: str,
-        temperature: float,
-        max_tokens: int,
-    ) -> dict[str, Any]:
-        """Call OpenAI API."""
-        try:
-            from openai import AsyncOpenAI
-
-            client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-            response = await client.chat.completions.create(
-                model=model or "gpt-4o",
-                max_tokens=max_tokens,
-                temperature=temperature,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message},
-                ],
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                f"{base_url}/models/{model}:generateContent",
+                params={"key": api_key},
+                json=request_body,
+                timeout=120.0,
             )
 
-            choice = response.choices[0] if response.choices else None
+            if response.status_code != 200:
+                error_detail = response.text
+                raise RuntimeError(f"Gemini API error ({response.status_code}): {error_detail}")
+
+            result = response.json()
+
+            # Check for errors in response
+            if "error" in result:
+                raise RuntimeError(f"Gemini API error: {result['error']}")
+
+            # Extract response text
+            candidates = result.get("candidates", [])
+            if not candidates:
+                return {
+                    "response": "",
+                    "model": model,
+                    "usage": {"input_tokens": 0, "output_tokens": 0},
+                }
+
+            candidate = candidates[0]
+            content = candidate.get("content", {})
+            parts = content.get("parts", [])
+            text_parts = [p.get("text", "") for p in parts if "text" in p]
+            response_text = "".join(text_parts)
+
+            # Extract usage metadata
+            usage_metadata = result.get("usageMetadata", {})
 
             return {
-                "response": choice.message.content if choice else "",
-                "model": response.model,
+                "response": response_text,
+                "model": model,
                 "usage": {
-                    "input_tokens": response.usage.prompt_tokens if response.usage else 0,
-                    "output_tokens": response.usage.completion_tokens if response.usage else 0,
+                    "input_tokens": usage_metadata.get("promptTokenCount", 0),
+                    "output_tokens": usage_metadata.get("candidatesTokenCount", 0),
                 },
             }
-
-        except ImportError:
-            raise RuntimeError("openai package not installed")
-        except Exception as e:
-            raise RuntimeError(f"OpenAI API error: {e}")

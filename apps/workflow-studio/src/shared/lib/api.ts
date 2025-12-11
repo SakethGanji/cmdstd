@@ -28,7 +28,7 @@ interface BackendConnection {
   target_input: string;
 }
 
-export interface BackendWorkflow {
+interface BackendWorkflow {
   id?: string;
   name: string;
   nodes: BackendNodeDefinition[];

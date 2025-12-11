@@ -32,29 +32,6 @@ class NodePropertySchema(BaseModel):
         populate_by_name = True
 
 
-class NodeInputSchema(BaseModel):
-    """Schema for node input definition."""
-
-    name: str
-    display_name: str = Field(..., alias="displayName")
-    type: str = "main"
-
-    class Config:
-        populate_by_name = True
-
-
-class NodeOutputSchema(BaseModel):
-    """Schema for node output definition."""
-
-    name: str
-    display_name: str = Field(..., alias="displayName")
-    type: str = "main"
-    schema_def: dict[str, Any] | None = Field(None, alias="schema")
-
-    class Config:
-        populate_by_name = True
-
-
 class NodeTypeInfo(BaseModel):
     """Full information about a node type."""
 

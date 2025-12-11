@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { backends } from '@/shared/lib/config';
 
 // Types matching our UI needs (camelCase)
-export interface WorkflowSummary {
+interface WorkflowSummary {
   id: string;
   name: string;
   active: boolean;

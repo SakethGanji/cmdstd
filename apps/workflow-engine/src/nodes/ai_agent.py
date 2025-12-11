@@ -6,6 +6,8 @@ import json
 import os
 from typing import Any, TYPE_CHECKING
 
+import httpx
+
 from .base import (
     BaseNode,
     NodeTypeDescription,
@@ -45,21 +47,17 @@ class AIAgentNode(BaseNode):
         ],
         properties=[
             NodeProperty(
-                display_name="Provider",
-                name="provider",
-                type="options",
-                default="anthropic",
-                options=[
-                    NodePropertyOption(name="Anthropic (Claude)", value="anthropic"),
-                    NodePropertyOption(name="OpenAI (GPT)", value="openai"),
-                ],
-            ),
-            NodeProperty(
                 display_name="Model",
                 name="model",
-                type="string",
-                default="claude-sonnet-4-20250514",
-                placeholder="claude-sonnet-4-20250514",
+                type="options",
+                default="gemini-2.5-flash",
+                options=[
+                    NodePropertyOption(name="Gemini 2.5 Flash", value="gemini-2.5-flash"),
+                    NodePropertyOption(name="Gemini 2.5 Pro", value="gemini-2.5-pro"),
+                    NodePropertyOption(name="Gemini 2.0 Flash", value="gemini-2.0-flash"),
+                    NodePropertyOption(name="Gemini 1.5 Pro", value="gemini-1.5-pro"),
+                    NodePropertyOption(name="Gemini 1.5 Flash", value="gemini-1.5-flash"),
+                ],
             ),
             NodeProperty(
                 display_name="System Prompt",
@@ -136,8 +134,7 @@ class AIAgentNode(BaseNode):
     ) -> NodeExecutionResult:
         from ..engine.types import NodeData
 
-        provider = self.get_parameter(node_definition, "provider", "anthropic")
-        model = self.get_parameter(node_definition, "model", "claude-sonnet-4-20250514")
+        model = self.get_parameter(node_definition, "model", "gemini-2.5-flash")
         system_prompt = self.get_parameter(node_definition, "systemPrompt", "")
         task = self.get_parameter(node_definition, "task", "")
         tools_config = self.get_parameter(node_definition, "tools", [])
@@ -157,24 +154,14 @@ class AIAgentNode(BaseNode):
             context_str = json.dumps(item.json, indent=2) if item.json else ""
             full_task = f"{task}\n\nInput data:\n{context_str}" if context_str else task
 
-            if provider == "anthropic":
-                result = await self._run_anthropic_agent(
-                    model=model,
-                    system_prompt=system_prompt,
-                    task=full_task,
-                    tools=tools,
-                    max_iterations=max_iterations,
-                    temperature=temperature,
-                )
-            else:
-                result = await self._run_openai_agent(
-                    model=model,
-                    system_prompt=system_prompt,
-                    task=full_task,
-                    tools=tools,
-                    max_iterations=max_iterations,
-                    temperature=temperature,
-                )
+            result = await self._run_gemini_agent(
+                model=model,
+                system_prompt=system_prompt,
+                task=full_task,
+                tools=tools,
+                max_iterations=max_iterations,
+                temperature=temperature,
+            )
 
             results.append(NodeData(json=result))
 
@@ -230,7 +217,7 @@ class AIAgentNode(BaseNode):
 
         return tools
 
-    async def _run_anthropic_agent(
+    async def _run_gemini_agent(
         self,
         model: str,
         system_prompt: str,
@@ -239,177 +226,145 @@ class AIAgentNode(BaseNode):
         max_iterations: int,
         temperature: float,
     ) -> dict[str, Any]:
-        """Run an agentic loop with Anthropic."""
-        try:
-            from anthropic import AsyncAnthropic
+        """Run an agentic loop with Google Gemini."""
+        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not api_key:
+            raise RuntimeError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable not set")
 
-            client = AsyncAnthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        base_url = "https://generativelanguage.googleapis.com/v1beta"
 
-            messages: list[dict[str, Any]] = [{"role": "user", "content": task}]
-            tool_calls: list[dict[str, Any]] = []
-            iterations = 0
+        # Build contents array for conversation
+        contents: list[dict[str, Any]] = []
+        if task:
+            contents.append({"role": "user", "parts": [{"text": task}]})
 
-            # Convert tools to Anthropic format
-            anthropic_tools = [
-                {
+        tool_calls_list: list[dict[str, Any]] = []
+        iterations = 0
+
+        # Convert tools to Gemini format
+        gemini_tools = None
+        if tools:
+            function_declarations = []
+            for t in tools:
+                func_decl: dict[str, Any] = {
                     "name": t["name"],
                     "description": t["description"],
-                    "input_schema": t["input_schema"],
                 }
-                for t in tools
-            ]
+                # Only add parameters if they have properties
+                if t.get("input_schema") and t["input_schema"].get("properties"):
+                    func_decl["parameters"] = t["input_schema"]
+                function_declarations.append(func_decl)
+            gemini_tools = [{"functionDeclarations": function_declarations}]
 
+        async with httpx.AsyncClient() as client:
             while iterations < max_iterations:
                 iterations += 1
 
-                response = await client.messages.create(
-                    model=model,
-                    max_tokens=4096,
-                    temperature=temperature,
-                    system=system_prompt,
-                    tools=anthropic_tools,
-                    messages=messages,
-                )
-
-                # Check if we're done
-                if response.stop_reason == "end_turn":
-                    final_text = ""
-                    for block in response.content:
-                        if hasattr(block, "text"):
-                            final_text += block.text
-                    return {
-                        "response": final_text,
-                        "toolCalls": tool_calls,
-                        "iterations": iterations,
-                    }
-
-                # Process tool use
-                if response.stop_reason == "tool_use":
-                    assistant_content = response.content
-                    messages.append({"role": "assistant", "content": assistant_content})
-
-                    tool_results = []
-                    for block in assistant_content:
-                        if block.type == "tool_use":
-                            tool_call = {
-                                "tool": block.name,
-                                "input": block.input,
-                                "id": block.id,
-                            }
-                            tool_calls.append(tool_call)
-
-                            # Execute tool (mock for now)
-                            result = await self._execute_tool(block.name, block.input)
-                            tool_results.append({
-                                "type": "tool_result",
-                                "tool_use_id": block.id,
-                                "content": json.dumps(result),
-                            })
-
-                    messages.append({"role": "user", "content": tool_results})
-                else:
-                    # Unknown stop reason, return what we have
-                    break
-
-            return {
-                "response": "Agent reached maximum iterations",
-                "toolCalls": tool_calls,
-                "iterations": iterations,
-            }
-
-        except ImportError:
-            raise RuntimeError("anthropic package not installed")
-        except Exception as e:
-            raise RuntimeError(f"Anthropic agent error: {e}")
-
-    async def _run_openai_agent(
-        self,
-        model: str,
-        system_prompt: str,
-        task: str,
-        tools: list[dict[str, Any]],
-        max_iterations: int,
-        temperature: float,
-    ) -> dict[str, Any]:
-        """Run an agentic loop with OpenAI."""
-        try:
-            from openai import AsyncOpenAI
-
-            client = AsyncOpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-            messages: list[dict[str, Any]] = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": task},
-            ]
-            tool_calls_list: list[dict[str, Any]] = []
-            iterations = 0
-
-            # Convert tools to OpenAI format
-            openai_tools = [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": t["name"],
-                        "description": t["description"],
-                        "parameters": t["input_schema"],
+                # Build request body
+                request_body: dict[str, Any] = {
+                    "contents": contents,
+                    "generationConfig": {
+                        "temperature": temperature,
+                        "maxOutputTokens": 4096,
                     },
                 }
-                for t in tools
-            ]
 
-            while iterations < max_iterations:
-                iterations += 1
+                if system_prompt:
+                    request_body["systemInstruction"] = {
+                        "parts": [{"text": system_prompt}]
+                    }
 
-                response = await client.chat.completions.create(
-                    model=model or "gpt-4o",
-                    max_tokens=4096,
-                    temperature=temperature,
-                    messages=messages,
-                    tools=openai_tools if openai_tools else None,
+                if gemini_tools:
+                    request_body["tools"] = gemini_tools
+
+                # Make API request
+                response = await client.post(
+                    f"{base_url}/models/{model}:generateContent",
+                    params={"key": api_key},
+                    json=request_body,
+                    timeout=120.0,
                 )
 
-                choice = response.choices[0]
+                if response.status_code != 200:
+                    error_detail = response.text
+                    raise RuntimeError(f"Gemini API error ({response.status_code}): {error_detail}")
 
-                # Check if we're done
-                if choice.finish_reason == "stop":
+                result = response.json()
+
+                # Check for errors in response
+                if "error" in result:
+                    raise RuntimeError(f"Gemini API error: {result['error']}")
+
+                # Get the candidate response
+                candidates = result.get("candidates", [])
+                if not candidates:
                     return {
-                        "response": choice.message.content or "",
+                        "response": "No response from model",
                         "toolCalls": tool_calls_list,
                         "iterations": iterations,
                     }
 
-                # Process tool calls
-                if choice.finish_reason == "tool_calls" and choice.message.tool_calls:
-                    messages.append(choice.message.model_dump())
+                candidate = candidates[0]
+                content = candidate.get("content", {})
+                parts = content.get("parts", [])
+                finish_reason = candidate.get("finishReason", "")
 
-                    for tool_call in choice.message.tool_calls:
-                        tool_input = json.loads(tool_call.function.arguments)
+                # Check for function calls
+                function_calls = [p for p in parts if "functionCall" in p]
+
+                if function_calls:
+                    # Add assistant response to conversation
+                    contents.append({"role": "model", "parts": parts})
+
+                    # Process each function call
+                    function_responses = []
+                    for part in function_calls:
+                        fc = part["functionCall"]
+                        tool_name = fc["name"]
+                        tool_args = fc.get("args", {})
+
                         tool_calls_list.append({
-                            "tool": tool_call.function.name,
-                            "input": tool_input,
-                            "id": tool_call.id,
+                            "tool": tool_name,
+                            "input": tool_args,
+                            "id": f"{tool_name}_{iterations}",
                         })
 
-                        # Execute tool (mock for now)
-                        result = await self._execute_tool(tool_call.function.name, tool_input)
-                        messages.append({
-                            "role": "tool",
-                            "tool_call_id": tool_call.id,
-                            "content": json.dumps(result),
+                        # Execute tool
+                        tool_result = await self._execute_tool(tool_name, tool_args)
+                        function_responses.append({
+                            "functionResponse": {
+                                "name": tool_name,
+                                "response": {"result": tool_result},
+                            }
                         })
+
+                    # Add function responses to conversation
+                    contents.append({"role": "user", "parts": function_responses})
                 else:
-                    break
+                    # No function calls - extract text response
+                    text_parts = [p.get("text", "") for p in parts if "text" in p]
+                    final_text = "".join(text_parts)
 
-            return {
-                "response": "Agent reached maximum iterations",
-                "toolCalls": tool_calls_list,
-                "iterations": iterations,
-            }
+                    return {
+                        "response": final_text,
+                        "toolCalls": tool_calls_list,
+                        "iterations": iterations,
+                    }
 
-        except ImportError:
-            raise RuntimeError("openai package not installed")
-        except Exception as e:
-            raise RuntimeError(f"OpenAI agent error: {e}")
+                # Check if we should stop
+                if finish_reason == "STOP":
+                    text_parts = [p.get("text", "") for p in parts if "text" in p]
+                    return {
+                        "response": "".join(text_parts),
+                        "toolCalls": tool_calls_list,
+                        "iterations": iterations,
+                    }
+
+        return {
+            "response": "Agent reached maximum iterations",
+            "toolCalls": tool_calls_list,
+            "iterations": iterations,
+        }
 
     async def _execute_tool(self, name: str, input_data: dict[str, Any]) -> Any:
         """Execute a tool (mock implementation)."""

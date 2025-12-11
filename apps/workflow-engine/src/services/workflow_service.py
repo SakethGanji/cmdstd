@@ -30,7 +30,6 @@ from ..schemas.execution import ExecutionResponse, ExecutionErrorSchema
 
 if TYPE_CHECKING:
     from ..repositories import WorkflowRepository, ExecutionRepository
-    from ..engine.types import StoredWorkflow
 
 
 class WorkflowService:
@@ -217,13 +216,6 @@ class WorkflowService:
         )
 
         return self._build_execution_response(context)
-
-    async def get_stored_workflow(self, workflow_id: str) -> "StoredWorkflow":
-        """Get raw stored workflow (for internal use)."""
-        stored = await self._workflow_repo.get(workflow_id)
-        if not stored:
-            raise WorkflowNotFoundError(workflow_id)
-        return stored
 
     def _validate_workflow(self, request: WorkflowCreateRequest) -> None:
         """Validate workflow request."""

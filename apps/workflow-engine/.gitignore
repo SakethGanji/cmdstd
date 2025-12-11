@@ -76,6 +76,7 @@ dmypy.json
 
 # Database
 *.db
+apps/workflow-engine/workflows.db
 
 # OS
 .DS_Store
