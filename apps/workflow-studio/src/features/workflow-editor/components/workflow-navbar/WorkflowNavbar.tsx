@@ -13,8 +13,11 @@ import {
   Upload,
   Trash2,
   Loader2,
+  Workflow,
+  Play,
 } from 'lucide-react';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import { useUIModeStore } from '../../stores/uiModeStore';
 import { useSidebar } from '@/shared/components/ui/sidebar';
 import { Switch } from '@/shared/components/ui/switch';
 import { Button } from '@/shared/components/ui/button';
@@ -182,8 +185,12 @@ export default function WorkflowNavbar() {
           </div>
         </div>
 
-        {/* Center section - Navigation tabs */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center">
+        {/* Center section - Mode toggle and Navigation tabs */}
+        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
+          {/* Builder / UI Mode Toggle */}
+          <ModeToggle />
+
+          {/* Navigation tabs */}
           <div className="flex items-center rounded-lg bg-muted p-1">
             <Link
               to="/editor"
@@ -288,6 +295,38 @@ export default function WorkflowNavbar() {
           </DropdownMenu>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ModeToggle() {
+  const mode = useUIModeStore((s) => s.mode);
+  const setMode = useUIModeStore((s) => s.setMode);
+
+  return (
+    <div className="flex items-center rounded-lg bg-muted p-1">
+      <button
+        onClick={() => setMode('builder')}
+        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+          mode === 'builder'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        <Workflow size={14} />
+        Builder
+      </button>
+      <button
+        onClick={() => setMode('ui')}
+        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${
+          mode === 'ui'
+            ? 'bg-background text-foreground shadow-sm'
+            : 'text-muted-foreground hover:text-foreground'
+        }`}
+      >
+        <Play size={14} />
+        UI
+      </button>
     </div>
   );
 }

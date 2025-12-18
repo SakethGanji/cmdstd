@@ -49,8 +49,9 @@ class LLMChatNode(BaseNode):
                 display_name="Model",
                 name="model",
                 type="options",
-                default="gemini-2.5-flash",
+                default="mock",
                 options=[
+                    NodePropertyOption(name="Mock (Testing)", value="mock"),
                     NodePropertyOption(name="Gemini 2.5 Flash", value="gemini-2.5-flash"),
                     NodePropertyOption(name="Gemini 2.5 Pro", value="gemini-2.5-pro"),
                     NodePropertyOption(name="Gemini 2.0 Flash", value="gemini-2.0-flash"),
@@ -70,7 +71,7 @@ class LLMChatNode(BaseNode):
                 display_name="User Message",
                 name="userMessage",
                 type="string",
-                default="",
+                default="{{ $json.message }}",
                 required=True,
                 description="Message to send. Supports expressions: {{ $json.message }}",
                 type_options={"rows": 5},
@@ -107,29 +108,98 @@ class LLMChatNode(BaseNode):
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
         from ..engine.types import NodeData
+        from ..engine.expression_engine import ExpressionEngine, expression_engine
 
-        model = self.get_parameter(node_definition, "model", "gemini-2.5-flash")
+        model = self.get_parameter(node_definition, "model", "mock")
         system_prompt = self.get_parameter(node_definition, "systemPrompt", "You are a helpful assistant.")
-        user_message = self.get_parameter(node_definition, "userMessage", "")
+        user_message_template = self.get_parameter(node_definition, "userMessage", "{{ $json.message }}")
         temperature = self.get_parameter(node_definition, "temperature", 0.7)
         max_tokens = self.get_parameter(node_definition, "maxTokens", 1024)
 
-        if not user_message:
-            raise ValueError("User message is required")
-
         results: list[NodeData] = []
 
-        for _item in input_data if input_data else [NodeData(json={})]:
-            result = await self._call_gemini(
-                model=model,
-                system_prompt=system_prompt,
-                user_message=user_message,
-                temperature=temperature,
-                max_tokens=max_tokens,
+        for idx, item in enumerate(input_data if input_data else [NodeData(json={})]):
+            # Resolve expression against current item's data
+            expr_context = ExpressionEngine.create_context(
+                input_data,
+                context.node_states,
+                context.execution_id,
+                idx,
             )
+            user_message = expression_engine.resolve(user_message_template, expr_context)
+
+            if not user_message:
+                raise ValueError("User message is required")
+
+            # Use mock response for testing
+            if model == "mock":
+                result = self._mock_response(user_message)
+            else:
+                result = await self._call_gemini(
+                    model=model,
+                    system_prompt=system_prompt,
+                    user_message=user_message,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                )
             results.append(NodeData(json=result))
 
         return self.output(results)
+
+    def _mock_response(self, user_message: str) -> dict[str, Any]:
+        """Generate a mock response for testing."""
+        lower_msg = user_message.lower().strip()
+
+        # Number-based responses for testing dynamic behavior
+        number_responses = {
+            "1": "You entered 1! This is response ONE. 🥇",
+            "2": "You entered 2! This is response TWO. 🥈",
+            "3": "You entered 3! This is response THREE. 🥉",
+            "4": "You entered 4! This is response FOUR. 🍀",
+            "5": "You entered 5! This is response FIVE. ✋",
+        }
+
+        # Check for number input first
+        if lower_msg in number_responses:
+            response = number_responses[lower_msg]
+            return {
+                "response": response,
+                "message": response,
+                "model": "mock",
+                "input": user_message,
+                "usage": {"input_tokens": len(user_message.split()), "output_tokens": len(response.split())},
+            }
+
+        # Keyword-based responses
+        keyword_responses = {
+            "hello": "Hello! I'm a mock LLM assistant. Try entering numbers 1-5 for different responses!",
+            "hi": "Hi there! I'm running in mock mode. Try: 1, 2, 3, 4, or 5 for dynamic responses!",
+            "help": "Mock assistant here! Try these:\n• Enter 1-5 for numbered responses\n• 'hello' or 'hi' for greetings\n• 'joke' for a joke\n• 'weather' for weather\n• Anything else to see echo",
+            "weather": "Mock weather report: Sunny with 72°F (22°C). Perfect coding weather! ☀️",
+            "joke": "Why do programmers prefer dark mode? Because light attracts bugs! 🐛",
+            "test": "Test successful! The workflow is working correctly. 🎉",
+        }
+
+        # Check for keyword matches
+        for keyword, response in keyword_responses.items():
+            if keyword in lower_msg:
+                return {
+                    "response": response,
+                    "message": response,
+                    "model": "mock",
+                    "input": user_message,
+                    "usage": {"input_tokens": len(user_message.split()), "output_tokens": len(response.split())},
+                }
+
+        # Echo response for anything else
+        response = f"Echo: \"{user_message}\"\n\n(Mock mode - enter 1-5 or 'help' for more options)"
+        return {
+            "response": response,
+            "message": response,
+            "model": "mock",
+            "input": user_message,
+            "usage": {"input_tokens": len(user_message.split()), "output_tokens": len(response.split())},
+        }
 
     async def _call_gemini(
         self,

@@ -4,6 +4,7 @@ import { ReactFlowProvider } from 'reactflow'
 import { Loader2 } from 'lucide-react'
 import { rootRoute } from './__root'
 import { useWorkflowStore } from '@/features/workflow-editor/stores/workflowStore'
+import { useUIModeStore } from '@/features/workflow-editor/stores/uiModeStore'
 import { fromBackendWorkflow } from '@/features/workflow-editor/lib/workflowTransform'
 import { backends } from '@/shared/lib/config'
 
@@ -13,6 +14,7 @@ const NodeCreatorPanel = lazy(() => import('@/features/workflow-editor/component
 const NodeDetailsModal = lazy(() => import('@/features/workflow-editor/components/ndv/NodeDetailsModal'))
 const WorkflowNavbar = lazy(() => import('@/features/workflow-editor/components/workflow-navbar/WorkflowNavbar'))
 const ExecutionLogsPanel = lazy(() => import('@/features/workflow-editor/components/execution-logs/ExecutionLogsPanel'))
+const UIPreviewPanel = lazy(() => import('@/features/workflow-editor/components/ui-preview/UIPreviewPanel'))
 
 function EditorLoadingFallback() {
   return (
@@ -70,15 +72,23 @@ function EditorPage() {
     fetchWorkflow()
   }, [workflowId, currentWorkflowId, loadWorkflow, resetWorkflow])
 
+  const mode = useUIModeStore((s) => s.mode)
+
   return (
     <ReactFlowProvider>
       <Suspense fallback={<EditorLoadingFallback />}>
         <div className="h-full w-full absolute inset-0">
           <WorkflowNavbar />
-          <WorkflowCanvas />
-          <NodeCreatorPanel />
-          <NodeDetailsModal />
-          <ExecutionLogsPanel />
+          {mode === 'builder' ? (
+            <>
+              <WorkflowCanvas />
+              <NodeCreatorPanel />
+              <NodeDetailsModal />
+              <ExecutionLogsPanel />
+            </>
+          ) : (
+            <UIPreviewPanel />
+          )}
         </div>
       </Suspense>
     </ReactFlowProvider>

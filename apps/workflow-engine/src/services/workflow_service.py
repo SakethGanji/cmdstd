@@ -160,8 +160,10 @@ class WorkflowService:
 
         return WorkflowActiveResponse(id=updated.id, active=updated.active)
 
-    async def run_workflow(self, workflow_id: str) -> ExecutionResponse:
-        """Run a saved workflow."""
+    async def run_workflow(
+        self, workflow_id: str, input_data: dict[str, Any] | None = None
+    ) -> ExecutionResponse:
+        """Run a saved workflow with optional input data."""
         stored = await self._workflow_repo.get(workflow_id)
         if not stored:
             raise WorkflowNotFoundError(workflow_id)
@@ -174,14 +176,15 @@ class WorkflowService:
                 "No start node found in workflow", workflow_id=workflow_id
             )
 
-        initial_data = [
-            NodeData(
-                json={
-                    "triggeredAt": datetime.now().isoformat(),
-                    "mode": "manual",
-                }
-            )
-        ]
+        # Build initial data - merge user input with trigger metadata
+        base_data = {
+            "triggeredAt": datetime.now().isoformat(),
+            "mode": "manual",
+        }
+        if input_data:
+            base_data.update(input_data)
+
+        initial_data = [NodeData(json=base_data)]
 
         context = await runner.run(stored.workflow, start_node.name, initial_data, "manual")
         await self._execution_repo.complete(context, stored.id, stored.name)
@@ -199,14 +202,15 @@ class WorkflowService:
         if not start_node:
             raise WorkflowExecutionError("No start node found in workflow")
 
-        initial_data = [
-            NodeData(
-                json={
-                    "triggeredAt": datetime.now().isoformat(),
-                    "mode": "manual",
-                }
-            )
-        ]
+        # Build initial data - merge user input with trigger metadata
+        base_data: dict[str, Any] = {
+            "triggeredAt": datetime.now().isoformat(),
+            "mode": "manual",
+        }
+        if request.input_data:
+            base_data.update(request.input_data)
+
+        initial_data = [NodeData(json=base_data)]
 
         context = await runner.run(
             internal_workflow, start_node.name, initial_data, "manual"

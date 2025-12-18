@@ -22,7 +22,7 @@ from ..schemas.workflow import (
     ActiveToggleRequest,
     WorkflowActiveResponse,
 )
-from ..schemas.execution import ExecutionResponse
+from ..schemas.execution import ExecutionResponse, RunWorkflowRequest
 from ..schemas.common import SuccessResponse
 
 router = APIRouter(prefix="/workflows")
@@ -107,10 +107,12 @@ async def toggle_workflow_active(
 async def run_workflow(
     workflow_id: str,
     service: WorkflowServiceDep,
+    body: RunWorkflowRequest | None = None,
 ) -> ExecutionResponse:
-    """Run a saved workflow."""
+    """Run a saved workflow with optional input data."""
     try:
-        return await service.run_workflow(workflow_id)
+        input_data = body.input_data if body else None
+        return await service.run_workflow(workflow_id, input_data)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
     except WorkflowExecutionError as e:

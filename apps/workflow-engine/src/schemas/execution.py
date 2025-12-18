@@ -5,6 +5,15 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 
+class RunWorkflowRequest(BaseModel):
+    """Request schema for running a workflow with input data."""
+
+    input_data: dict[str, Any] | None = Field(
+        default=None,
+        description="Initial input data to pass to the workflow",
+    )
+
+
 class ExecutionErrorSchema(BaseModel):
     """Schema for execution error."""
 

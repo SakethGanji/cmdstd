@@ -80,6 +80,10 @@ const UI_TO_BACKEND_NODE_TYPE: Record<string, string> = {
   readFile: 'ReadFile',
   pandasExplore: 'PandasExplore',
   htmlDisplay: 'HTMLDisplay',
+
+  // UI nodes
+  chatInput: 'ChatInput',
+  chatOutput: 'ChatOutput',
 };
 
 /**
@@ -242,6 +246,8 @@ const BACKEND_TO_UI_NODE_TYPE: Record<string, string> = {
   ReadFile: 'readFile',
   PandasExplore: 'pandasExplore',
   HTMLDisplay: 'htmlDisplay',
+  ChatInput: 'chatInput',
+  ChatOutput: 'chatOutput',
 };
 
 function toUINodeType(backendType: string): string {

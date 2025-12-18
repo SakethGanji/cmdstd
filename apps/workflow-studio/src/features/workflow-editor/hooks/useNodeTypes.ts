@@ -72,6 +72,8 @@ export function backendTypeToUIType(backendType: string): string {
     ReadFile: 'readFile',
     PandasExplore: 'pandasExplore',
     HTMLDisplay: 'htmlDisplay',
+    ChatInput: 'chatInput',
+    ChatOutput: 'chatOutput',
   };
   return map[backendType] || backendType.charAt(0).toLowerCase() + backendType.slice(1);
 }

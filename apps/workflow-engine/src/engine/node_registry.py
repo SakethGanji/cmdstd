@@ -311,6 +311,8 @@ def register_all_nodes() -> None:
         PandasExploreNode,
         HTMLDisplayNode,
         ErrorTriggerNode,
+        ChatInputNode,
+        ChatOutputNode,
     )
 
     node_classes: list[type[BaseNode]] = [
@@ -331,6 +333,8 @@ def register_all_nodes() -> None:
         PandasExploreNode,
         HTMLDisplayNode,
         ErrorTriggerNode,
+        ChatInputNode,
+        ChatOutputNode,
     ]
 
     for node_class in node_classes:

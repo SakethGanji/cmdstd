@@ -34,6 +34,10 @@ from .html_display import HTMLDisplayNode
 from .llm_chat import LLMChatNode
 from .ai_agent import AIAgentNode
 
+# UI nodes
+from .chat_input import ChatInputNode
+from .chat_output import ChatOutputNode
+
 # Category exports for convenience
 from . import triggers
 from . import flow
@@ -64,6 +68,9 @@ __all__ = [
     # AI
     "LLMChatNode",
     "AIAgentNode",
+    # UI
+    "ChatInputNode",
+    "ChatOutputNode",
     # Category modules
     "triggers",
     "flow",
