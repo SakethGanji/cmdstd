@@ -21,6 +21,8 @@ import {
   Bot,
   File,
   BarChart3,
+  Check,
+  X,
 } from 'lucide-react';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
 import { useNDVStore } from '../../../stores/ndvStore';
@@ -29,9 +31,60 @@ import type { WorkflowNodeData } from '../../../types/workflow';
 import {
   getNodeGroupFromType,
   getNodeStyles,
+  getNodeShapeConfig,
   calculateHandlePositions,
-  calculateNodeMinHeight,
+  calculateNodeDimensions,
+  type NodeGroup,
 } from '../../../lib/nodeStyles';
+
+// Status badge component for success/error states
+const StatusBadge = ({ status }: { status: 'success' | 'error' }) => {
+  const isSuccess = status === 'success';
+  return (
+    <div
+      className={`
+        absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full
+        flex items-center justify-center text-white
+        shadow-sm animate-badge-pop z-10
+        ${isSuccess ? 'bg-emerald-500' : 'bg-red-500'}
+      `}
+    >
+      {isSuccess ? <Check size={10} strokeWidth={3} /> : <X size={10} strokeWidth={3} />}
+    </div>
+  );
+};
+
+// Group accent components for visual differentiation
+const GroupAccent = ({ group, accentColor }: { group: NodeGroup; accentColor: string }) => {
+  switch (group) {
+    case 'trigger':
+      // Left accent bar
+      return (
+        <div
+          className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
+          style={{ backgroundColor: accentColor }}
+        />
+      );
+    case 'action':
+      // Bottom accent bar
+      return (
+        <div
+          className="absolute bottom-0 left-3 right-3 h-[2px] rounded-t-full"
+          style={{ backgroundColor: accentColor }}
+        />
+      );
+    case 'flow':
+      // Top accent bar for flow nodes
+      return (
+        <div
+          className="absolute top-0 left-3 right-3 h-[2px] rounded-b-full"
+          style={{ backgroundColor: accentColor }}
+        />
+      );
+    default:
+      return null;
+  }
+};
 
 // Icon mapping - using LucideIcon type for proper typing
 type LucideIconComponent = React.ComponentType<{ size?: string | number; className?: string }>;
@@ -78,20 +131,21 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     data.type === 'Webhook' || data.type === 'webhook' ||
     data.type === 'Cron' || data.type === 'scheduleTrigger';
 
-  // Get group-based styling
+  // Get group-based styling and shape
   const nodeGroup = useMemo(
     () => getNodeGroupFromType(data.type, data.group ? [data.group] : undefined),
     [data.type, data.group]
   );
   const styles = useMemo(() => getNodeStyles(nodeGroup), [nodeGroup]);
+  const shapeConfig = useMemo(() => getNodeShapeConfig(nodeGroup), [nodeGroup]);
 
   // Calculate input/output counts (ensure at least 1 input for non-triggers, at least 1 output)
   const inputCount = isTrigger ? 0 : Math.max(1, data.inputCount ?? data.inputs?.length ?? 1);
   const outputCount = Math.max(1, data.outputCount ?? data.outputs?.length ?? 1);
 
-  // Calculate dimensions and handle positions
-  const minHeight = useMemo(
-    () => calculateNodeMinHeight(inputCount, outputCount),
+  // Calculate dimensions and handle positions (proportional sizing)
+  const dimensions = useMemo(
+    () => calculateNodeDimensions(inputCount, outputCount),
     [inputCount, outputCount]
   );
   const inputPositions = useMemo(
@@ -115,70 +169,10 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     openNDV(id);
   };
 
-  // Execution status - only affects border, not background
-  const getExecutionBorderColor = () => {
-    if (!executionData) return null;
-    switch (executionData.status) {
-      case 'running':
-        return '#f59e0b'; // amber-500
-      case 'success':
-        return '#10b981'; // emerald-500
-      case 'error':
-        return '#ef4444'; // red-500
-      default:
-        return null;
-    }
-  };
-
-  // Execution status - icon background color
-  const getExecutionIconBgColor = () => {
-    if (!executionData) return null;
-    switch (executionData.status) {
-      case 'running':
-        return '#fef3c7'; // amber-100
-      case 'success':
-        return '#d1fae5'; // emerald-100
-      case 'error':
-        return '#fee2e2'; // red-100
-      default:
-        return null;
-    }
-  };
-
-  // Execution status - icon color
-  const getExecutionIconColor = () => {
-    if (!executionData) return null;
-    switch (executionData.status) {
-      case 'running':
-        return '#f59e0b'; // amber-500
-      case 'success':
-        return '#10b981'; // emerald-500
-      case 'error':
-        return '#ef4444'; // red-500
-      default:
-        return null;
-    }
-  };
-
-  const executionBorderColor = getExecutionBorderColor();
-  const executionIconBgColor = getExecutionIconBgColor();
-  const executionIconColor = getExecutionIconColor();
-  const hasExecutionStatus = executionData?.status && executionData.status !== 'idle';
-
-  // Get box shadow for glow effect based on execution status
-  const getExecutionGlow = () => {
-    if (!executionData) return undefined;
-    switch (executionData.status) {
-      case 'running':
-        return '0 0 8px rgba(245, 158, 11, 0.25)';
-      case 'success':
-        return '0 0 8px rgba(16, 185, 129, 0.25)';
-      case 'error':
-        return '0 0 8px rgba(239, 68, 68, 0.25)';
-      default:
-        return undefined;
-    }
-  };
+  // Execution status flags
+  const isRunning = executionData?.status === 'running';
+  const isSuccess = executionData?.status === 'success';
+  const isError = executionData?.status === 'error';
 
   // Render input handles (labels shown on edges if needed)
   const renderInputHandles = () => {
@@ -253,47 +247,47 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     >
       <div
         className={`
-          relative cursor-grab rounded-xl border-2 transition-all duration-300
+          relative cursor-grab border transition-all duration-300 flex items-center justify-center
+          ${shapeConfig.borderRadiusClass}
           ${selected ? 'ring-2 ring-offset-1' : ''}
           ${data.disabled ? 'opacity-50' : ''}
+          ${isRunning ? 'animate-pulse-border' : ''}
         `}
         style={{
-          minHeight,
+          height: dimensions.height,
+          width: dimensions.width,
           backgroundColor: styles.bgColor,
-          borderColor: executionBorderColor || (selected ? styles.accentColor : styles.borderColor),
-          borderWidth: hasExecutionStatus ? 2 : 1,
-          boxShadow: getExecutionGlow() || (selected ? `0 4px 12px ${styles.accentColor}40` : '0 1px 3px rgba(0,0,0,0.1)'),
+          borderColor: isRunning ? styles.accentColor : (selected ? styles.accentColor : styles.borderColor),
+          borderWidth: 2,
+          boxShadow: selected ? `0 4px 12px ${styles.accentColor}40` : '0 1px 3px rgba(0,0,0,0.1)',
           // @ts-expect-error CSS custom property
-          '--tw-ring-color': executionBorderColor || styles.accentColor,
+          '--tw-ring-color': styles.accentColor,
         }}
         onDoubleClick={handleDoubleClick}
       >
+        {/* Group accent (left bar for triggers, top bar for flow, bottom bar for actions) */}
+        <GroupAccent group={nodeGroup} accentColor={styles.accentColor} />
+
         {/* Input Handles */}
         {renderInputHandles()}
 
-        {/* Node Content - Icon only */}
-        <div className="flex items-center justify-center p-3">
-          <div
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-300"
-            style={{
-              backgroundColor: executionIconBgColor || styles.iconBgColor,
-              color: executionIconColor || styles.accentColor,
-            }}
-          >
-            <IconComponent size={20} />
-          </div>
+        {/* Node Content - Icon only, centered */}
+        <div
+          className={`
+            flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-colors duration-300
+            ${nodeGroup === 'ai' ? 'node-ai-shimmer' : ''}
+          `}
+          style={{
+            backgroundColor: nodeGroup !== 'ai' ? styles.iconBgColor : undefined,
+            color: styles.accentColor,
+          }}
+        >
+          <IconComponent size={20} />
         </div>
 
-        {/* Execution status indicator dot */}
-        {executionData?.status === 'running' && (
-          <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-amber-500 shadow-[0_0_4px_rgba(245,158,11,0.4)]" />
-        )}
-        {executionData?.status === 'success' && (
-          <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.4)]" />
-        )}
-        {executionData?.status === 'error' && (
-          <div className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.4)]" />
-        )}
+        {/* Status badges for success/error */}
+        {isSuccess && <StatusBadge status="success" />}
+        {isError && <StatusBadge status="error" />}
 
         {/* Output Handles */}
         {renderOutputHandles()}

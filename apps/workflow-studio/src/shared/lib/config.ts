@@ -15,10 +15,10 @@ interface Backends {
 // Add your environments here
 const ENVIRONMENTS: Record<string, Backends> = {
   'localhost': {
-    workflow: 'http://localhost:3001',
+    workflow: 'http://localhost:8000',
   },
   '127.0.0.1': {
-    workflow: 'http://localhost:3001',
+    workflow: 'http://localhost:8000',
   },
 
   // Development

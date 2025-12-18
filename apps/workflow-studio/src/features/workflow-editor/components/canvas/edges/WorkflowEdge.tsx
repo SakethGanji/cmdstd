@@ -147,15 +147,6 @@ function WorkflowEdge({
           <stop offset="100%" stopColor={edgeColors.end} />
         </linearGradient>
 
-        {/* Glow filter for active/running edges */}
-        <filter id={`glow-${id}`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-          <feMerge>
-            <feMergeNode in="coloredBlur" />
-            <feMergeNode in="SourceGraphic" />
-          </feMerge>
-        </filter>
-
         {/* Arrow marker with gradient color */}
         <marker
           id={`arrow-${id}`}
@@ -173,16 +164,15 @@ function WorkflowEdge({
         </marker>
       </defs>
 
-      {/* Glow layer for running/success/error states */}
+      {/* Subtle highlight layer for active edges (no blur, just thicker stroke) */}
       {edgeStatus !== 'default' && (
         <path
           d={edgePath}
           fill="none"
           stroke={`url(#${gradientId})`}
-          strokeWidth={6}
-          strokeOpacity={0.35}
-          filter={`url(#glow-${id})`}
-          className={isAnimated ? 'animate-pulse' : ''}
+          strokeWidth={4}
+          strokeOpacity={0.2}
+          strokeLinecap="round"
         />
       )}
 
