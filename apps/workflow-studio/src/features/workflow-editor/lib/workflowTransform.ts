@@ -33,6 +33,8 @@ interface BackendConnection {
   source_output: string;
   target_node: string;
   target_input: string;
+  connection_type?: 'normal' | 'subnode';
+  slot_name?: string;
 }
 
 export interface BackendWorkflow {
@@ -159,9 +161,13 @@ export function toBackendWorkflow(
   workflowName: string,
   workflowId?: string
 ): BackendWorkflow {
-  // Filter to only workflow nodes (exclude addNodes placeholder and sticky notes)
+  // Filter to workflow nodes AND subnode nodes (exclude addNodes placeholder and sticky notes)
   const workflowNodes = nodes.filter(
     (n) => n.type === 'workflowNode'
+  ) as Node<WorkflowNodeData>[];
+
+  const subnodeNodes = nodes.filter(
+    (n) => n.type === 'subnodeNode'
   ) as Node<WorkflowNodeData>[];
 
   // Build a map from React Flow node ID to node name (for connection mapping)
@@ -169,8 +175,14 @@ export function toBackendWorkflow(
   workflowNodes.forEach((node) => {
     idToName.set(node.id, node.data.name);
   });
+  subnodeNodes.forEach((node) => {
+    idToName.set(node.id, node.data.name);
+  });
 
-  // Transform nodes
+  // Track which nodes are subnodes for connection type
+  const subnodeIds = new Set(subnodeNodes.map((n) => n.id));
+
+  // Transform workflow nodes
   const backendNodes: BackendNodeDefinition[] = workflowNodes.map((node) => ({
     name: node.data.name,
     type: toBackendNodeType(node.data.type),
@@ -185,25 +197,57 @@ export function toBackendWorkflow(
     pinnedData: node.data.pinnedData,
   }));
 
+  // Transform subnode nodes
+  const backendSubnodes: BackendNodeDefinition[] = subnodeNodes.map((node) => ({
+    name: node.data.name,
+    type: toBackendNodeType(node.data.type),
+    parameters: node.data.parameters || {},
+    position: {
+      x: Math.round(node.position.x),
+      y: Math.round(node.position.y),
+    },
+    continueOnFail: false,
+    retryOnFail: 0,
+    retryDelay: 1000,
+  }));
+
   // Transform edges to connections
   const connections: BackendConnection[] = edges
     .filter((edge) => {
-      // Only include edges between workflow nodes
+      // Include edges where both source and target are valid nodes
       const sourceName = idToName.get(edge.source);
       const targetName = idToName.get(edge.target);
       return sourceName && targetName;
     })
-    .map((edge) => ({
-      source_node: idToName.get(edge.source)!,
-      source_output: edge.sourceHandle || 'main',
-      target_node: idToName.get(edge.target)!,
-      target_input: edge.targetHandle || 'main',
-    }));
+    .map((edge) => {
+      const isSubnodeConnection = subnodeIds.has(edge.source);
+      const edgeData = edge.data as { slotName?: string } | undefined;
+
+      if (isSubnodeConnection) {
+        // Subnode connection - source is a subnode, target is a parent node
+        return {
+          source_node: idToName.get(edge.source)!,
+          source_output: edge.sourceHandle || 'config',
+          target_node: idToName.get(edge.target)!,
+          target_input: edgeData?.slotName || edge.targetHandle || 'main',
+          connection_type: 'subnode' as const,
+          slot_name: edgeData?.slotName || edge.targetHandle,
+        };
+      } else {
+        // Normal connection between workflow nodes
+        return {
+          source_node: idToName.get(edge.source)!,
+          source_output: edge.sourceHandle || 'main',
+          target_node: idToName.get(edge.target)!,
+          target_input: edge.targetHandle || 'main',
+        };
+      }
+    });
 
   return {
     id: workflowId,
     name: workflowName,
-    nodes: backendNodes,
+    nodes: [...backendNodes, ...backendSubnodes],
     connections,
   };
 }

@@ -26,6 +26,8 @@ interface BackendConnection {
   source_output: string;
   target_node: string;
   target_input: string;
+  connection_type?: 'normal' | 'subnode';
+  slot_name?: string;
 }
 
 interface BackendWorkflow {
