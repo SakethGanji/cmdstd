@@ -29,6 +29,8 @@ from .code import CodeNode
 from .read_file import ReadFileNode
 from .pandas_explore import PandasExploreNode
 from .html_display import HTMLDisplayNode
+from .object_read import ObjectReadNode
+from .object_write import ObjectWriteNode
 
 # AI nodes
 from .llm_chat import LLMChatNode
@@ -65,6 +67,8 @@ __all__ = [
     "ReadFileNode",
     "PandasExploreNode",
     "HTMLDisplayNode",
+    "ObjectReadNode",
+    "ObjectWriteNode",
     # AI
     "LLMChatNode",
     "AIAgentNode",

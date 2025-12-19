@@ -26,6 +26,8 @@ interface ExpressionEditorProps {
   outputSchema?: OutputSchema;
   /** Sample data from upstream node execution for preview */
   sampleData?: Record<string, unknown>[];
+  /** All node execution data keyed by node name - for resolving $node["NodeName"].json expressions */
+  allNodeData?: Record<string, Record<string, unknown>[]>;
 }
 
 // Simple expression syntax highlighting
@@ -66,26 +68,49 @@ function highlightExpression(text: string): React.ReactNode[] {
 }
 
 // Resolve expression paths against sample data
-function resolveExpression(text: string, sampleData: Record<string, unknown>[] | undefined): string {
-  if (!sampleData || sampleData.length === 0) return text;
-
-  const firstItem = sampleData[0];
-
+function resolveExpression(
+  text: string,
+  sampleData: Record<string, unknown>[] | undefined,
+  allNodeData?: Record<string, Record<string, unknown>[]>
+): string {
   return text.replace(/\{\{\s*([^}]+)\s*\}\}/g, (match, expr) => {
     const trimmedExpr = expr.trim();
 
-    // Handle $json.path expressions
-    if (trimmedExpr.startsWith('$json.')) {
+    // Handle $node["NodeName"].json.path expressions
+    const nodeMatch = trimmedExpr.match(/^\$node\["([^"]+)"\]\.json(?:\.(.+))?$/);
+    if (nodeMatch) {
+      const nodeName = nodeMatch[1];
+      const path = nodeMatch[2]; // may be undefined if just $node["Name"].json
+
+      // Look up the node's data
+      const nodeData = allNodeData?.[nodeName];
+      if (nodeData && nodeData.length > 0) {
+        const firstItem = nodeData[0];
+        if (path) {
+          const value = getNestedValue(firstItem, path);
+          if (value !== undefined) {
+            return typeof value === 'object' ? JSON.stringify(value) : String(value);
+          }
+        } else {
+          // Just $node["Name"].json - return the whole object
+          return JSON.stringify(firstItem);
+        }
+      }
+      return match; // Return original if can't resolve
+    }
+
+    // Handle $json.path expressions (immediate upstream node)
+    if (trimmedExpr.startsWith('$json.') && sampleData && sampleData.length > 0) {
       const path = trimmedExpr.slice(6); // Remove '$json.'
-      const value = getNestedValue(firstItem, path);
+      const value = getNestedValue(sampleData[0], path);
       if (value !== undefined) {
         return typeof value === 'object' ? JSON.stringify(value) : String(value);
       }
     }
 
     // Handle $json directly
-    if (trimmedExpr === '$json') {
-      return JSON.stringify(firstItem);
+    if (trimmedExpr === '$json' && sampleData && sampleData.length > 0) {
+      return JSON.stringify(sampleData[0]);
     }
 
     return match; // Return original if can't resolve
@@ -159,6 +184,7 @@ export default function ExpressionEditor({
   label,
   outputSchema,
   sampleData,
+  allNodeData,
 }: ExpressionEditorProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -168,13 +194,14 @@ export default function ExpressionEditor({
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const hasExpression = value.includes('{{');
-  const canPreview = hasExpression && sampleData && sampleData.length > 0;
+  // Can preview if we have expressions AND either sample data or allNodeData
+  const canPreview = hasExpression && ((sampleData && sampleData.length > 0) || (allNodeData && Object.keys(allNodeData).length > 0));
 
   // Resolved/preview value
   const previewValue = useMemo(() => {
     if (!showPreview || !canPreview) return null;
-    return resolveExpression(value, sampleData);
-  }, [showPreview, canPreview, value, sampleData]);
+    return resolveExpression(value, sampleData, allNodeData);
+  }, [showPreview, canPreview, value, sampleData, allNodeData]);
 
   // Handle drag events - use refs to avoid re-renders during drag
   const dragCountRef = useRef(0);
@@ -218,7 +245,8 @@ export default function ExpressionEditor({
       fieldPath = e.dataTransfer.getData('text/plain');
     }
 
-    if (fieldPath && fieldPath.startsWith('$json')) {
+    // Accept paths starting with $json, $node, or other valid expression prefixes
+    if (fieldPath && (fieldPath.startsWith('$json') || fieldPath.startsWith('$node') || fieldPath.startsWith('$'))) {
       // Insert the expression at the end of current value (or replace if empty)
       const expression = `{{ ${fieldPath} }}`;
       if (value.trim()) {

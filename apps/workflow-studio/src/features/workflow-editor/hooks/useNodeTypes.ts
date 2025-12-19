@@ -74,6 +74,8 @@ export function backendTypeToUIType(backendType: string): string {
     HTMLDisplay: 'htmlDisplay',
     ChatInput: 'chatInput',
     ChatOutput: 'chatOutput',
+    ObjectRead: 'objectRead',
+    ObjectWrite: 'objectWrite',
   };
   return map[backendType] || backendType.charAt(0).toLowerCase() + backendType.slice(1);
 }
@@ -100,6 +102,10 @@ export function uiTypeToBackendType(uiType: string): string {
     readFile: 'ReadFile',
     pandasExplore: 'PandasExplore',
     htmlDisplay: 'HTMLDisplay',
+    chatInput: 'ChatInput',
+    chatOutput: 'ChatOutput',
+    objectRead: 'ObjectRead',
+    objectWrite: 'ObjectWrite',
   };
   return map[uiType] || uiType.charAt(0).toUpperCase() + uiType.slice(1);
 }

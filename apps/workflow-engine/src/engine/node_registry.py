@@ -230,6 +230,8 @@ def register_all_nodes() -> None:
         ErrorTriggerNode,
         ChatInputNode,
         ChatOutputNode,
+        ObjectReadNode,
+        ObjectWriteNode,
     )
 
     # Import subnode types
@@ -264,6 +266,8 @@ def register_all_nodes() -> None:
         ErrorTriggerNode,
         ChatInputNode,
         ChatOutputNode,
+        ObjectReadNode,
+        ObjectWriteNode,
         # Subnodes
         GeminiModelNode,
         SimpleMemoryNode,

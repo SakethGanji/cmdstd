@@ -83,6 +83,18 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
     return upstreamExecution.output.items as Record<string, unknown>[];
   }, [upstreamNodeId, executionData]);
 
+  // Build a map of node name -> execution data for all nodes (for $node["Name"].json expressions)
+  const allNodeData = useMemo(() => {
+    const result: Record<string, Record<string, unknown>[]> = {};
+    for (const n of nodes) {
+      const nodeName = n.data?.name || n.data?.label;
+      if (nodeName && executionData[n.id]?.output?.items) {
+        result[nodeName] = executionData[n.id].output.items as Record<string, unknown>[];
+      }
+    }
+    return result;
+  }, [nodes, executionData]);
+
   // Get connected subnodes for each slot
   const connectedSubnodes = useMemo(() => {
     const slots = node.data.subnodeSlots as SubnodeSlotDefinition[] | undefined;
@@ -182,6 +194,7 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
                       allValues={(node.data.parameters as Record<string, unknown>) || {}}
                       upstreamSchema={upstreamOutputSchema}
                       sampleData={upstreamSampleData}
+                      allNodeData={allNodeData}
                     />
                   ) : nodeSchema && nodeSchema.properties.length === 0 ? (
                     <div className="flex items-center gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">

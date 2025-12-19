@@ -5,6 +5,8 @@ import JsonViewer from '@/shared/components/ui/json-viewer';
 interface RunDataDisplayProps {
   data: Record<string, unknown>[];
   mode: 'json' | 'schema';
+  /** Base path for expression generation. Default: '$json' */
+  basePath?: string;
 }
 
 // Type for nested schema structure
@@ -14,17 +16,17 @@ interface SchemaNode {
   path: string;
 }
 
-export default function RunDataDisplay({ data, mode }: RunDataDisplayProps) {
+export default function RunDataDisplay({ data, mode, basePath = '$json' }: RunDataDisplayProps) {
   // Generate nested schema from data for tree view
   const schema = useMemo(() => {
     const buildSchema = (
       obj: Record<string, unknown>,
-      basePath: string = '$json'
+      currentPath: string = basePath
     ): Record<string, SchemaNode> => {
       const result: Record<string, SchemaNode> = {};
 
       Object.entries(obj).forEach(([key, value]) => {
-        const path = `${basePath}.${key}`;
+        const path = `${currentPath}.${key}`;
         const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value;
 
         if (type === 'object' && value !== null) {
@@ -63,7 +65,7 @@ export default function RunDataDisplay({ data, mode }: RunDataDisplayProps) {
     });
 
     return buildSchema(merged);
-  }, [data]);
+  }, [data, basePath]);
 
   // Handle drag start for field - use native drag image for better performance
   const handleDragStart = useCallback((e: React.DragEvent, fieldPath: string) => {
@@ -98,7 +100,7 @@ export default function RunDataDisplay({ data, mode }: RunDataDisplayProps) {
       <div className="rounded-md border border-border bg-card">
         {Object.entries(schema).map(([key, node]) => (
           <SchemaFieldRow
-            key={key}
+            key={`${basePath}-${key}`}
             name={key}
             node={node}
             depth={0}

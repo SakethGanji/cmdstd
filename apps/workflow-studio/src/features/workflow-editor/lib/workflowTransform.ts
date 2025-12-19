@@ -86,6 +86,10 @@ const UI_TO_BACKEND_NODE_TYPE: Record<string, string> = {
   // UI nodes
   chatInput: 'ChatInput',
   chatOutput: 'ChatOutput',
+
+  // Storage nodes
+  objectRead: 'ObjectRead',
+  objectWrite: 'ObjectWrite',
 };
 
 /**
@@ -292,6 +296,8 @@ const BACKEND_TO_UI_NODE_TYPE: Record<string, string> = {
   HTMLDisplay: 'htmlDisplay',
   ChatInput: 'chatInput',
   ChatOutput: 'chatOutput',
+  ObjectRead: 'objectRead',
+  ObjectWrite: 'objectWrite',
 };
 
 function toUINodeType(backendType: string): string {

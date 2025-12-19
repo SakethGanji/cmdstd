@@ -109,7 +109,7 @@ class LLMChatNode(BaseNode):
         from ..engine.expression_engine import ExpressionEngine, expression_engine
 
         model = self.get_parameter(node_definition, "model", "mock")
-        system_prompt = self.get_parameter(node_definition, "systemPrompt", "You are a helpful assistant.")
+        system_prompt_template = self.get_parameter(node_definition, "systemPrompt", "You are a helpful assistant.")
         user_message_template = self.get_parameter(node_definition, "userMessage", "{{ $json.message }}")
         temperature = self.get_parameter(node_definition, "temperature", 0.7)
         max_tokens = self.get_parameter(node_definition, "maxTokens", 1024)
@@ -124,6 +124,8 @@ class LLMChatNode(BaseNode):
                 context.execution_id,
                 idx,
             )
+            # Resolve expressions in both system prompt and user message
+            system_prompt = expression_engine.resolve(system_prompt_template, expr_context)
             user_message = expression_engine.resolve(user_message_template, expr_context)
 
             if not user_message:
@@ -209,7 +211,7 @@ class LLMChatNode(BaseNode):
     ) -> dict[str, Any]:
         """Call Google Gemini API."""
         # Hardcoded for POC - move to config/env in production
-        api_key = os.environ.get("GEMINI_API_KEY") or "AIzaSyD5KPJ77iwkDr-y_-fv97rADxFR0XJzzVE"
+        api_key = os.environ.get("GEMINI_API_KEY") or "AIzaSyCrI3ot-M-7GfKRNIhUFhD_R5VjQqieJaE"
 
         base_url = "https://generativelanguage.googleapis.com/v1beta"
 

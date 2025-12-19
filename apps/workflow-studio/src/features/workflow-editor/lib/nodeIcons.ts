@@ -50,6 +50,8 @@ import {
   Boxes,
   LayoutGrid,
   Wrench,
+  Download,
+  Upload,
 } from 'lucide-react';
 
 // Lucide icon component type
@@ -170,6 +172,14 @@ export const iconMap: Record<string, LucideIconComponent> = {
   database: Database,
   simplememory: Database,
   memory: Database,
+
+  // Storage nodes
+  download: Download,
+  'fa:download': Download,
+  objectread: Download,
+  upload: Upload,
+  'fa:upload': Upload,
+  objectwrite: Upload,
 
   // Generic/fallback
   network: Network,
