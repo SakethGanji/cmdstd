@@ -5,10 +5,17 @@ import {
   ChevronDown,
   ChevronUp,
   Loader2,
+  Plus,
+  Bot,
+  Database,
+  Wrench,
+  X,
 } from 'lucide-react';
 import type { Node } from 'reactflow';
-import type { WorkflowNodeData } from '../../types/workflow';
+import type { WorkflowNodeData, SubnodeSlotDefinition, SubnodeType } from '../../types/workflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
+import { useNDVStore } from '../../stores/ndvStore';
+import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import DynamicNodeForm, { type NodeProperty, type OutputSchema } from './DynamicNodeForm';
 import { useNodeTypes, uiTypeToBackendType } from '../../hooks/useNodeTypes';
 
@@ -17,18 +24,36 @@ interface NodeSettingsProps {
   onExecute: () => void;
 }
 
+// Icon mapping for subnode types
+const subnodeTypeIcons: Record<SubnodeType, typeof Bot> = {
+  model: Bot,
+  memory: Database,
+  tool: Wrench,
+};
+
+// Accent colors for subnode types
+const subnodeTypeColors: Record<SubnodeType, string> = {
+  model: '#a855f7',   // purple
+  memory: '#3b82f6',  // blue
+  tool: '#f59e0b',    // amber
+};
+
 export default function NodeSettings({ node }: NodeSettingsProps) {
   const [activeTab, setActiveTab] = useState<'parameters' | 'settings'>('parameters');
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     main: true,
+    subnodes: true,
     options: false,
   });
-  const { updateNodeData, edges, nodes, executionData } = useWorkflowStore((s) => ({
+  const { updateNodeData, edges, nodes, executionData, deleteNode } = useWorkflowStore((s) => ({
     updateNodeData: s.updateNodeData,
     edges: s.edges,
     nodes: s.nodes,
     executionData: s.executionData,
+    deleteNode: s.deleteNode,
   }));
+  const { openNDV } = useNDVStore();
+  const { openForSubnode } = useNodeCreatorStore();
 
   // Fetch node type schema from API
   const { data: nodeTypes, isLoading: isLoadingSchema } = useNodeTypes();
@@ -57,6 +82,33 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
     if (!upstreamExecution?.output?.items) return undefined;
     return upstreamExecution.output.items as Record<string, unknown>[];
   }, [upstreamNodeId, executionData]);
+
+  // Get connected subnodes for each slot
+  const connectedSubnodes = useMemo(() => {
+    const slots = node.data.subnodeSlots as SubnodeSlotDefinition[] | undefined;
+    if (!slots || slots.length === 0) return null;
+
+    // Find subnode edges targeting this node
+    const subnodeEdges = edges.filter(
+      (e) => e.target === node.id && e.data?.isSubnodeEdge
+    );
+
+    // Map each slot to its connected subnodes
+    const slotMap: Record<string, Node<WorkflowNodeData>[]> = {};
+    for (const slot of slots) {
+      slotMap[slot.name] = [];
+    }
+
+    for (const edge of subnodeEdges) {
+      const slotName = edge.data?.slotName || edge.targetHandle;
+      const subnodeNode = nodes.find((n) => n.id === edge.source);
+      if (subnodeNode && slotName && slotMap[slotName]) {
+        slotMap[slotName].push(subnodeNode as Node<WorkflowNodeData>);
+      }
+    }
+
+    return { slots, slotMap };
+  }, [node.id, node.data.subnodeSlots, edges, nodes]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => ({
@@ -145,6 +197,95 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
                 </div>
               )}
             </div>
+
+            {/* Connected Subnodes Section - only show if node has subnode slots */}
+            {connectedSubnodes && (
+              <div className="rounded-md border border-border">
+                <button
+                  onClick={() => toggleSection('subnodes')}
+                  className="flex w-full items-center justify-between px-3 py-2 text-left hover:bg-accent transition-colors"
+                >
+                  <span className="text-sm font-medium text-foreground">
+                    Connected Subnodes
+                  </span>
+                  {expandedSections.subnodes ? (
+                    <ChevronUp size={14} className="text-muted-foreground" />
+                  ) : (
+                    <ChevronDown size={14} className="text-muted-foreground" />
+                  )}
+                </button>
+                {expandedSections.subnodes && (
+                  <div className="border-t border-border px-3 py-3 space-y-3">
+                    {connectedSubnodes.slots.map((slot) => {
+                      const slotSubnodes = connectedSubnodes.slotMap[slot.name] || [];
+                      const SlotIcon = subnodeTypeIcons[slot.slotType as SubnodeType] || Wrench;
+                      const slotColor = subnodeTypeColors[slot.slotType as SubnodeType] || '#888';
+                      const canAddMore = slot.multiple || slotSubnodes.length === 0;
+
+                      return (
+                        <div key={slot.name} className="space-y-2">
+                          {/* Slot header */}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <SlotIcon size={14} style={{ color: slotColor }} />
+                              <span className="text-xs font-medium text-foreground">
+                                {slot.displayName}
+                                {slot.required && <span className="text-destructive ml-0.5">*</span>}
+                              </span>
+                            </div>
+                            {canAddMore && (
+                              <button
+                                onClick={() => openForSubnode(node.id, slot.name, slot.slotType as SubnodeType)}
+                                className="flex items-center gap-1 px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
+                              >
+                                <Plus size={12} />
+                                Add
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Connected subnodes list */}
+                          {slotSubnodes.length > 0 ? (
+                            <div className="space-y-1.5 ml-5">
+                              {slotSubnodes.map((subnode) => (
+                                <div
+                                  key={subnode.id}
+                                  className="flex items-center justify-between rounded-md border border-border/50 bg-secondary/30 px-2.5 py-1.5 group"
+                                >
+                                  <button
+                                    onClick={() => openNDV(subnode.id)}
+                                    className="flex items-center gap-2 text-xs text-foreground hover:text-primary transition-colors"
+                                  >
+                                    <div
+                                      className="w-5 h-5 rounded-full flex items-center justify-center"
+                                      style={{ backgroundColor: `${slotColor}20`, color: slotColor }}
+                                    >
+                                      <SlotIcon size={10} />
+                                    </div>
+                                    <span>{subnode.data.label}</span>
+                                  </button>
+                                  <button
+                                    onClick={() => deleteNode(subnode.id)}
+                                    className="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                                    title="Remove subnode"
+                                  >
+                                    <X size={12} />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="ml-5 text-xs text-muted-foreground/60 italic">
+                              No {slot.displayName.toLowerCase()} connected
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Options Section - Error Handling */}
             <div className="rounded-md border border-border">

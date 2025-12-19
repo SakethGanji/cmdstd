@@ -2,11 +2,20 @@ import { useCallback, useMemo } from 'react';
 import { X, Search, ArrowLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
-import { generateNodeName, getExistingNodeNames, getDefaultParameters } from '../../lib/workflowTransform';
+import { generateNodeName, getExistingNodeNames } from '../../lib/workflowTransform';
 import { useNodeTypes, getNodeIcon, backendTypeToUIType } from '../../hooks/useNodeTypes';
 import NodeItem from './NodeItem';
-import type { NodeDefinition, WorkflowNodeData } from '../../types/workflow';
+import type { NodeDefinition, WorkflowNodeData, SubnodeType, SubnodeSlotDefinition, OutputStrategy } from '../../types/workflow';
 import type { NodeGroup, NodeIO } from '../../lib/nodeStyles';
+
+// Property definition from API
+interface ApiProperty {
+  name: string;
+  displayName: string;
+  type: string;
+  default?: unknown;
+  [key: string]: unknown;
+}
 
 // Extended node definition with API metadata for dynamic UI
 interface ExtendedNodeDefinition extends NodeDefinition {
@@ -15,6 +24,16 @@ interface ExtendedNodeDefinition extends NodeDefinition {
   outputCount?: number;
   inputs?: NodeIO[];
   outputs?: NodeIO[];
+  // Subnode metadata (for subnodes themselves)
+  isSubnode?: boolean;
+  subnodeType?: SubnodeType;
+  providesToSlot?: string;
+  // Subnode slots (for parent nodes like AI Agent)
+  subnodeSlots?: SubnodeSlotDefinition[];
+  // Output strategy for dynamic output nodes
+  outputStrategy?: OutputStrategy;
+  // Properties with defaults
+  properties?: ApiProperty[];
 }
 
 export default function NodeCreatorPanel() {
@@ -24,26 +43,30 @@ export default function NodeCreatorPanel() {
     search,
     sourceNodeId,
     sourceHandleId,
+    subnodeSlotContext,
     closePanel,
     setView,
     setSearch,
     clearConnectionContext,
+    clearSubnodeContext,
   } = useNodeCreatorStore();
 
-  const { addNode, nodes, onConnect } = useWorkflowStore();
+  const { addNode, addSubnode, nodes, onConnect } = useWorkflowStore();
 
   // Fetch node types from API
   const { data: apiNodes, isLoading, isError } = useNodeTypes();
 
   // Transform API nodes to ExtendedNodeDefinition format with dynamic UI metadata
-  const { triggerNodes, regularNodes } = useMemo(() => {
-    if (!apiNodes) return { triggerNodes: [], regularNodes: [] };
+  const { triggerNodes, regularNodes, subnodeNodes } = useMemo(() => {
+    if (!apiNodes) return { triggerNodes: [], regularNodes: [], subnodeNodes: [] };
 
     const triggers: ExtendedNodeDefinition[] = [];
     const regular: ExtendedNodeDefinition[] = [];
+    const subnodes: ExtendedNodeDefinition[] = [];
 
     apiNodes.forEach((node) => {
       const isTrigger = node.group?.includes('trigger');
+      const isSubnode = node.isSubnode === true;
       const category = node.group?.[0] || 'other';
 
       // Map API category to UI category
@@ -87,22 +110,41 @@ export default function NodeCreatorPanel() {
         outputCount,
         inputs,
         outputs,
+        // Subnode metadata (for subnodes)
+        isSubnode,
+        subnodeType: node.subnodeType as SubnodeType | undefined,
+        providesToSlot: node.providesToSlot,
+        // Subnode slots (for parent nodes like AI Agent)
+        subnodeSlots: node.subnodeSlots as SubnodeSlotDefinition[] | undefined,
+        // Output strategy for dynamic output nodes (like Switch)
+        outputStrategy: node.outputStrategy as OutputStrategy | undefined,
+        // Properties with defaults
+        properties: node.properties as ApiProperty[] | undefined,
       };
 
-      if (isTrigger) {
+      if (isSubnode) {
+        subnodes.push(nodeDef);
+      } else if (isTrigger) {
         triggers.push(nodeDef);
       } else {
         regular.push(nodeDef);
       }
     });
 
-    return { triggerNodes: triggers, regularNodes: regular };
+    return { triggerNodes: triggers, regularNodes: regular, subnodeNodes: subnodes };
   }, [apiNodes]);
 
   // Get the right nodes based on view
   const availableNodes = useMemo(() => {
-    return view === 'trigger' ? triggerNodes : regularNodes;
-  }, [view, triggerNodes, regularNodes]);
+    if (view === 'trigger') {
+      return triggerNodes;
+    }
+    if (view === 'subnode' && subnodeSlotContext) {
+      // Filter subnodes by the slot type they can connect to
+      return subnodeNodes.filter((node) => node.subnodeType === subnodeSlotContext.slotType);
+    }
+    return regularNodes;
+  }, [view, triggerNodes, regularNodes, subnodeNodes, subnodeSlotContext]);
 
   // Filter nodes by search
   const filteredNodes = useMemo(() => {
@@ -167,22 +209,71 @@ export default function NodeCreatorPanel() {
       const existingNames = getExistingNodeNames(nodes as any);
       const nodeName = generateNodeName(nodeDef.name, existingNames);
 
+      // Extract defaults from properties
+      const defaultParams: Record<string, unknown> = {};
+      if (nodeDef.properties) {
+        for (const prop of nodeDef.properties) {
+          if (prop.default !== undefined) {
+            defaultParams[prop.name] = prop.default;
+          }
+        }
+      }
+
+      // For dynamic output nodes, calculate initial outputs based on default parameters
+      let initialOutputCount = nodeDef.outputCount;
+      let initialOutputs = nodeDef.outputs;
+
+      // If node has outputStrategy, calculate initial outputs
+      if (nodeDef.outputStrategy?.type === 'dynamicFromParameter') {
+        // Get number of outputs from parameter value (e.g., numberOfOutputs)
+        const paramName = nodeDef.outputStrategy.parameter;
+        const numOutputs = paramName ? (defaultParams[paramName] as number) || 2 : 2;
+        initialOutputCount = numOutputs + (nodeDef.outputStrategy.addFallback ? 1 : 0);
+
+        // Generate output definitions: output0, output1, ... + fallback
+        initialOutputs = [];
+        for (let i = 0; i < numOutputs; i++) {
+          initialOutputs.push({ name: `output${i}`, displayName: `Output ${i}` });
+        }
+        if (nodeDef.outputStrategy.addFallback) {
+          initialOutputs.push({ name: 'fallback', displayName: 'Fallback' });
+        }
+      } else if (nodeDef.outputStrategy?.type === 'dynamicFromCollection') {
+        const collectionName = nodeDef.outputStrategy.collectionName;
+        const collection = collectionName ? (defaultParams[collectionName] as unknown[]) || [] : [];
+        const numOutputs = collection.length + (nodeDef.outputStrategy.addFallback ? 1 : 0);
+        // Minimum of 1 output (fallback) for Switch node
+        initialOutputCount = Math.max(1, numOutputs);
+        initialOutputs = Array.from({ length: initialOutputCount }, (_, i) => ({
+          name: i === initialOutputCount - 1 && nodeDef.outputStrategy?.addFallback
+            ? 'fallback'
+            : `output${i}`,
+          displayName: i === initialOutputCount - 1 && nodeDef.outputStrategy?.addFallback
+            ? 'Fallback'
+            : `Output ${i}`,
+        }));
+      }
+
       const nodeData: WorkflowNodeData = {
         name: nodeName,           // Unique name for backend connections
         label: nodeDef.displayName,  // Display label in UI
         type: nodeDef.type,       // UI type (camelCase)
         icon: nodeDef.icon,
         description: nodeDef.description,
-        parameters: getDefaultParameters(nodeDef.name),
+        parameters: defaultParams,
         continueOnFail: false,
         retryOnFail: 0,
         retryDelay: 1000,
         // Dynamic UI metadata from API
         group: nodeDef.group,
         inputCount: nodeDef.inputCount,
-        outputCount: nodeDef.outputCount,
+        outputCount: initialOutputCount,
         inputs: nodeDef.inputs,
-        outputs: nodeDef.outputs,
+        outputs: initialOutputs,
+        // Output strategy for dynamic recalculation
+        outputStrategy: nodeDef.outputStrategy,
+        // Subnode slots for parent nodes (like AI Agent)
+        subnodeSlots: nodeDef.subnodeSlots,
       };
 
       const newNode = {
@@ -226,16 +317,72 @@ export default function NodeCreatorPanel() {
     ]
   );
 
+  // Handle subnode selection (from slot + button)
+  const handleSubnodeSelect = useCallback(
+    (nodeDef: ExtendedNodeDefinition) => {
+      if (!subnodeSlotContext || !nodeDef.subnodeType) return;
+
+      // Extract defaults from properties
+      const defaultParams: Record<string, unknown> = {};
+      if (nodeDef.properties) {
+        for (const prop of nodeDef.properties) {
+          if (prop.default !== undefined) {
+            defaultParams[prop.name] = prop.default;
+          }
+        }
+      }
+
+      addSubnode(
+        subnodeSlotContext.parentNodeId,
+        subnodeSlotContext.slotName,
+        {
+          type: nodeDef.name,
+          label: nodeDef.displayName,
+          icon: nodeDef.icon,
+          subnodeType: nodeDef.subnodeType,
+          properties: defaultParams,
+        }
+      );
+
+      clearSubnodeContext();
+      closePanel();
+    },
+    [addSubnode, closePanel, clearSubnodeContext, subnodeSlotContext]
+  );
+
+  // Choose the right handler based on view
+  const handleNodeClick = useCallback(
+    (nodeDef: ExtendedNodeDefinition) => {
+      if (view === 'subnode') {
+        handleSubnodeSelect(nodeDef);
+      } else {
+        handleNodeSelect(nodeDef);
+      }
+    },
+    [view, handleNodeSelect, handleSubnodeSelect]
+  );
+
   if (!isOpen) return null;
+
+  // Get slot type display name for subnode view
+  const slotTypeLabels: Record<string, string> = {
+    model: 'Chat Model',
+    memory: 'Memory',
+    tool: 'Tool',
+  };
 
   const title =
     view === 'trigger'
       ? 'What triggers this workflow?'
+      : view === 'subnode' && subnodeSlotContext
+      ? `Select ${slotTypeLabels[subnodeSlotContext.slotType] || 'Subnode'}`
       : 'What happens next?';
 
   const subtitle =
     view === 'trigger'
       ? 'Select a trigger to start your workflow'
+      : view === 'subnode' && subnodeSlotContext
+      ? `Choose a ${subnodeSlotContext.slotType} to attach`
       : 'Add a node to continue your workflow';
 
   return (
@@ -251,9 +398,17 @@ export default function NodeCreatorPanel() {
         {/* Header */}
         <div className="border-b border-border px-4 py-4">
           <div className="flex items-center justify-between">
-            {view !== 'trigger' && (
+            {view !== 'trigger' && view !== 'subnode' && (
               <button
                 onClick={() => setView('trigger')}
+                className="mr-2 rounded-md p-1 hover:bg-accent"
+              >
+                <ArrowLeft size={20} className="text-muted-foreground" />
+              </button>
+            )}
+            {view === 'subnode' && (
+              <button
+                onClick={closePanel}
                 className="mr-2 rounded-md p-1 hover:bg-accent"
               >
                 <ArrowLeft size={20} className="text-muted-foreground" />
@@ -311,7 +466,7 @@ export default function NodeCreatorPanel() {
                 <NodeItem
                   key={node.type}
                   node={node}
-                  onClick={() => handleNodeSelect(node)}
+                  onClick={() => handleNodeClick(node)}
                 />
               ))}
               {filteredNodes.length === 0 && (
@@ -334,7 +489,7 @@ export default function NodeCreatorPanel() {
                       <NodeItem
                         key={node.type}
                         node={node}
-                        onClick={() => handleNodeSelect(node)}
+                        onClick={() => handleNodeClick(node)}
                       />
                     ))}
                   </div>
@@ -347,7 +502,7 @@ export default function NodeCreatorPanel() {
                         <NodeItem
                           key={node.type}
                           node={node}
-                          onClick={() => handleNodeSelect(node)}
+                          onClick={() => handleNodeClick(node)}
                         />
                       ))}
                     </div>
@@ -365,7 +520,7 @@ export default function NodeCreatorPanel() {
                       <NodeItem
                         key={node.type}
                         node={node}
-                        onClick={() => handleNodeSelect(node)}
+                        onClick={() => handleNodeClick(node)}
                       />
                     ))}
                   </div>

@@ -17,7 +17,9 @@ import { useSaveWorkflow } from '../../hooks/useWorkflowApi';
 import { useExecutionStream } from '../../hooks/useExecutionStream';
 import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
+import SubnodeNode from './nodes/SubnodeNode';
 import WorkflowEdge from './edges/WorkflowEdge';
+import SubnodeEdge from './edges/SubnodeEdge';
 import StickyNote from './nodes/StickyNote';
 import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
 import { getNodeGroupFromType, getMiniMapColor } from '../../lib/nodeStyles';
@@ -28,6 +30,7 @@ import { cn } from '@/shared/lib/utils';
 const nodeTypes: any = {
   addNodes: AddNodesButton,
   workflowNode: WorkflowNode,
+  subnodeNode: SubnodeNode,
   stickyNote: StickyNote,
 };
 
@@ -35,6 +38,7 @@ const nodeTypes: any = {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const edgeTypes: any = {
   workflowEdge: WorkflowEdge,
+  subnodeEdge: SubnodeEdge,
 };
 
 export default function WorkflowCanvas() {

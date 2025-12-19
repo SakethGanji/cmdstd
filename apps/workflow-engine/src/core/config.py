@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # Server settings
     host: str = "0.0.0.0"
-    port: int = 3001
+    port: int = 8000
     reload: bool = True
     log_level: Literal["debug", "info", "warning", "error"] = "info"
 

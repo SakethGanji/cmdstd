@@ -1,6 +1,6 @@
 """Workflow-related Pydantic schemas."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -34,6 +34,10 @@ class ConnectionSchema(BaseModel):
     target_node: str = Field(..., description="Target node name")
     source_output: str = Field("main", description="Source output name")
     target_input: str = Field("main", description="Target input name")
+    connection_type: Literal["normal", "subnode"] = Field(
+        "normal", description="Connection type: normal for data flow, subnode for configuration"
+    )
+    slot_name: str | None = Field(None, description="Slot name for subnode connections")
 
     class Config:
         json_schema_extra = {
@@ -42,6 +46,7 @@ class ConnectionSchema(BaseModel):
                 "target_node": "http_request_1",
                 "source_output": "main",
                 "target_input": "main",
+                "connection_type": "normal",
             }
         }
 

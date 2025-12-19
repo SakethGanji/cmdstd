@@ -204,6 +204,152 @@ EXAMPLE_WORKFLOWS = [
             "settings": {},
         },
     },
+    {
+        "name": "Support Ticket Router",
+        "description": "Routes support tickets to different queues based on priority using the Switch node",
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Start",
+                    "type": "Start",
+                    "parameters": {},
+                    "position": {"x": 100, "y": 300},
+                },
+                {
+                    "name": "Sample Tickets",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Generate sample support tickets with different priorities
+tickets = [
+    {"id": 1, "title": "Server down", "priority": "critical", "customer": "Acme Corp"},
+    {"id": 2, "title": "Login issues", "priority": "high", "customer": "TechStart"},
+    {"id": 3, "title": "Feature request", "priority": "low", "customer": "BigCo"},
+    {"id": 4, "title": "Data export bug", "priority": "high", "customer": "DataFlow"},
+    {"id": 5, "title": "UI glitch", "priority": "medium", "customer": "DesignHub"},
+    {"id": 6, "title": "API timeout", "priority": "critical", "customer": "CloudNet"},
+    {"id": 7, "title": "Documentation update", "priority": "low", "customer": "DevTeam"},
+    {"id": 8, "title": "Password reset", "priority": "medium", "customer": "SecureCo"},
+]
+# Return as multiple items so Switch processes each one
+return [{"ticket": t} for t in tickets]"""
+                    },
+                    "position": {"x": 350, "y": 300},
+                },
+                {
+                    "name": "Route by Priority",
+                    "type": "Switch",
+                    "parameters": {
+                        "numberOfOutputs": 3,
+                        "mode": "rules",
+                        "rules": [
+                            {
+                                "output": 0,
+                                "field": "ticket.priority",
+                                "operation": "equals",
+                                "value": "critical",
+                            },
+                            {
+                                "output": 1,
+                                "field": "ticket.priority",
+                                "operation": "equals",
+                                "value": "high",
+                            },
+                            {
+                                "output": 2,
+                                "field": "ticket.priority",
+                                "operation": "equals",
+                                "value": "medium",
+                            },
+                        ],
+                    },
+                    # outputStrategy tells frontend how to compute dynamic outputs on load
+                    "outputStrategy": {
+                        "type": "dynamicFromParameter",
+                        "parameter": "numberOfOutputs",
+                        "addFallback": True,
+                    },
+                    "position": {"x": 650, "y": 300},
+                },
+                {
+                    "name": "Critical Queue",
+                    "type": "Set",
+                    "parameters": {
+                        "mode": "manual",
+                        "assignments": [
+                            {"name": "queue", "value": "critical"},
+                            {"name": "sla_minutes", "value": "15"},
+                            {"name": "escalate_to", "value": "on-call-engineer"},
+                        ],
+                    },
+                    "position": {"x": 950, "y": 100},
+                },
+                {
+                    "name": "High Priority Queue",
+                    "type": "Set",
+                    "parameters": {
+                        "mode": "manual",
+                        "assignments": [
+                            {"name": "queue", "value": "high_priority"},
+                            {"name": "sla_minutes", "value": "60"},
+                            {"name": "escalate_to", "value": "senior-support"},
+                        ],
+                    },
+                    "position": {"x": 950, "y": 250},
+                },
+                {
+                    "name": "Medium Priority Queue",
+                    "type": "Set",
+                    "parameters": {
+                        "mode": "manual",
+                        "assignments": [
+                            {"name": "queue", "value": "standard"},
+                            {"name": "sla_minutes", "value": "240"},
+                            {"name": "escalate_to", "value": "support-team"},
+                        ],
+                    },
+                    "position": {"x": 950, "y": 400},
+                },
+                {
+                    "name": "Low Priority Queue",
+                    "type": "Set",
+                    "parameters": {
+                        "mode": "manual",
+                        "assignments": [
+                            {"name": "queue", "value": "backlog"},
+                            {"name": "sla_minutes", "value": "1440"},
+                            {"name": "escalate_to", "value": "none"},
+                        ],
+                    },
+                    "position": {"x": 950, "y": 550},
+                },
+            ],
+            "connections": [
+                {"source_node": "Start", "target_node": "Sample Tickets"},
+                {"source_node": "Sample Tickets", "target_node": "Route by Priority"},
+                {
+                    "source_node": "Route by Priority",
+                    "target_node": "Critical Queue",
+                    "source_output": "output0",
+                },
+                {
+                    "source_node": "Route by Priority",
+                    "target_node": "High Priority Queue",
+                    "source_output": "output1",
+                },
+                {
+                    "source_node": "Route by Priority",
+                    "target_node": "Medium Priority Queue",
+                    "source_output": "output2",
+                },
+                {
+                    "source_node": "Route by Priority",
+                    "target_node": "Low Priority Queue",
+                    "source_output": "fallback",
+                },
+            ],
+            "settings": {},
+        },
+    },
 ]
 
 

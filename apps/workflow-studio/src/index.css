@@ -7,34 +7,65 @@
   --background: #ffffff;
   --foreground: #18181b;
 
-  /* Node Group Colors - Light Mode (Minimal: icon-only color) */
-  --node-trigger: #f97316;
-  --node-trigger-light: #ffffff;
-  --node-trigger-border: #d4d4d8;
-  --node-trigger-icon-bg: rgba(249, 115, 22, 0.12);
+  /* Node Group Colors - Light Mode (Vibrant, distinct colors) */
+  /* Trigger: Warm orange - starting points */
+  --node-trigger: #ea580c;
+  --node-trigger-light: #fff7ed;
+  --node-trigger-border: #fed7aa;
+  --node-trigger-icon-bg: rgba(234, 88, 12, 0.15);
 
-  --node-transform: #3b82f6;
-  --node-transform-light: #ffffff;
-  --node-transform-border: #d4d4d8;
-  --node-transform-icon-bg: rgba(59, 130, 246, 0.12);
+  /* Transform: Cool blue - data processing */
+  --node-transform: #2563eb;
+  --node-transform-light: #eff6ff;
+  --node-transform-border: #bfdbfe;
+  --node-transform-icon-bg: rgba(37, 99, 235, 0.12);
 
-  --node-flow: #8b5cf6;
-  --node-flow-light: #ffffff;
-  --node-flow-border: #d4d4d8;
-  --node-flow-icon-bg: rgba(139, 92, 246, 0.12);
+  /* Flow: Deep purple - control flow/branching */
+  --node-flow: #7c3aed;
+  --node-flow-light: #f5f3ff;
+  --node-flow-border: #ddd6fe;
+  --node-flow-icon-bg: rgba(124, 58, 237, 0.12);
 
-  --node-ai: #10b981;
-  --node-ai-light: #ffffff;
-  --node-ai-border: #d4d4d8;
-  --node-ai-icon-bg: rgba(16, 185, 129, 0.12);
+  /* AI: Vibrant emerald - intelligence */
+  --node-ai: #059669;
+  --node-ai-light: #ecfdf5;
+  --node-ai-border: #a7f3d0;
+  --node-ai-icon-bg: rgba(5, 150, 105, 0.12);
 
-  --node-action: #6b7280;
-  --node-action-light: #ffffff;
-  --node-action-border: #d4d4d8;
-  --node-action-icon-bg: rgba(107, 114, 128, 0.12);
+  /* Action: Slate gray - generic actions */
+  --node-action: #475569;
+  --node-action-light: #f8fafc;
+  --node-action-border: #cbd5e1;
+  --node-action-icon-bg: rgba(71, 85, 105, 0.12);
+
+  /* Output: Cyan/teal - display/output */
+  --node-output: #0891b2;
+  --node-output-light: #ecfeff;
+  --node-output-border: #a5f3fc;
+  --node-output-icon-bg: rgba(8, 145, 178, 0.12);
 
   /* Neutral node handle color */
   --node-handle: #71717a;
+
+  /* Subnode colors - Light Mode */
+  /* Model: Purple */
+  --subnode-model: #a855f7;
+  --subnode-model-light: #faf5ff;
+  --subnode-model-border: #e9d5ff;
+  --subnode-model-icon-bg: rgba(168, 85, 247, 0.12);
+
+  /* Memory: Blue */
+  --subnode-memory: #3b82f6;
+  --subnode-memory-light: #eff6ff;
+  --subnode-memory-border: #bfdbfe;
+  --subnode-memory-icon-bg: rgba(59, 130, 246, 0.12);
+
+  /* Tool: Amber */
+  --subnode-tool: #f59e0b;
+  --subnode-tool-light: #fffbeb;
+  --subnode-tool-border: #fde68a;
+  --subnode-tool-icon-bg: rgba(245, 158, 11, 0.12);
+
   --card: #ffffff;
   --card-foreground: #18181b;
   --popover: #ffffff;
@@ -88,67 +119,100 @@
 }
 
 .dark {
-  --background: #0f0f0f;
-  --foreground: #e4e4e7;
+  /* Neutral dark grays - no blue/purple tint */
+  --background: #121212;
+  --foreground: #e5e5e5;
 
-  /* Node Group Colors - Dark Mode (Minimal: icon-only color) */
+  /* Node Group Colors - Dark Mode (Brighter backgrounds for visibility) */
+  /* Trigger: Warm orange */
   --node-trigger: #fb923c;
-  --node-trigger-light: #18181b;
-  --node-trigger-border: #2e2e32;
-  --node-trigger-icon-bg: rgba(251, 146, 60, 0.12);
+  --node-trigger-light: #292524;
+  --node-trigger-border: #92400e;
+  --node-trigger-icon-bg: rgba(251, 146, 60, 0.22);
 
+  /* Transform: Bright blue */
   --node-transform: #60a5fa;
-  --node-transform-light: #18181b;
-  --node-transform-border: #2e2e32;
-  --node-transform-icon-bg: rgba(96, 165, 250, 0.12);
+  --node-transform-light: #1e293b;
+  --node-transform-border: #1d4ed8;
+  --node-transform-icon-bg: rgba(96, 165, 250, 0.22);
 
+  /* Flow: Purple */
   --node-flow: #a78bfa;
-  --node-flow-light: #18181b;
-  --node-flow-border: #2e2e32;
-  --node-flow-icon-bg: rgba(167, 139, 250, 0.12);
+  --node-flow-light: #27242e;
+  --node-flow-border: #6d28d9;
+  --node-flow-icon-bg: rgba(167, 139, 250, 0.22);
 
+  /* AI: Emerald green */
   --node-ai: #34d399;
-  --node-ai-light: #18181b;
-  --node-ai-border: #2e2e32;
-  --node-ai-icon-bg: rgba(52, 211, 153, 0.12);
+  --node-ai-light: #1a2e25;
+  --node-ai-border: #047857;
+  --node-ai-icon-bg: rgba(52, 211, 153, 0.22);
 
+  /* Action: Neutral gray */
   --node-action: #a1a1aa;
-  --node-action-light: #18181b;
-  --node-action-border: #2e2e32;
-  --node-action-icon-bg: rgba(161, 161, 170, 0.12);
+  --node-action-light: #262626;
+  --node-action-border: #525252;
+  --node-action-icon-bg: rgba(161, 161, 170, 0.2);
 
-  /* Neutral node handle color */
-  --node-handle: #52525b;
-  --card: #18181b;
-  --card-foreground: #e4e4e7;
-  --popover: #18181b;
-  --popover-foreground: #e4e4e7;
-  --primary: #2563eb;
+  /* Output: Cyan */
+  --node-output: #22d3ee;
+  --node-output-light: #1a2a2e;
+  --node-output-border: #0e7490;
+  --node-output-icon-bg: rgba(34, 211, 238, 0.22);
+
+  /* Node handle - slightly brighter for visibility */
+  --node-handle: #71717a;
+
+  /* Subnode colors - matching main node pattern */
+  /* Model: Purple */
+  --subnode-model: #c084fc;
+  --subnode-model-light: #2a2435;
+  --subnode-model-border: #7c3aed;
+  --subnode-model-icon-bg: rgba(192, 132, 252, 0.22);
+
+  /* Memory: Blue */
+  --subnode-memory: #60a5fa;
+  --subnode-memory-light: #1e2a3b;
+  --subnode-memory-border: #2563eb;
+  --subnode-memory-icon-bg: rgba(96, 165, 250, 0.22);
+
+  /* Tool: Amber */
+  --subnode-tool: #fbbf24;
+  --subnode-tool-light: #2a2620;
+  --subnode-tool-border: #d97706;
+  --subnode-tool-icon-bg: rgba(251, 191, 36, 0.22);
+
+  /* Neutral panels and cards */
+  --card: #1e1e1e;
+  --card-foreground: #e5e5e5;
+  --popover: #252525;
+  --popover-foreground: #e5e5e5;
+  --primary: #3b82f6;
   --primary-foreground: #ffffff;
-  --secondary: #27272a;
-  --secondary-foreground: #e4e4e7;
-  --muted: #27272a;
-  --muted-foreground: #a1a1aa;
-  --accent: #3f3f46;
+  --secondary: #262626;
+  --secondary-foreground: #e5e5e5;
+  --muted: #262626;
+  --muted-foreground: #a3a3a3;
+  --accent: #333333;
   --accent-foreground: #fafafa;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #27272a;
-  --input: #27272a;
-  --ring: #2563eb;
-  --chart-1: #2563eb;
-  --chart-2: #3b82f6;
-  --chart-3: #60a5fa;
-  --chart-4: #93c5fd;
-  --chart-5: #1d4ed8;
-  --sidebar: #18181b;
-  --sidebar-foreground: #e4e4e7;
-  --sidebar-primary: #2563eb;
+  --border: #333333;
+  --input: #262626;
+  --ring: #3b82f6;
+  --chart-1: #3b82f6;
+  --chart-2: #60a5fa;
+  --chart-3: #93c5fd;
+  --chart-4: #bfdbfe;
+  --chart-5: #2563eb;
+  --sidebar: #171717;
+  --sidebar-foreground: #e5e5e5;
+  --sidebar-primary: #3b82f6;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #27272a;
+  --sidebar-accent: #262626;
   --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #27272a;
-  --sidebar-ring: #2563eb;
+  --sidebar-border: #2a2a2a;
+  --sidebar-ring: #3b82f6;
   --font-sans: "Inter", sans-serif;
   --font-serif: "PT Serif", serif;
   --font-mono: "Fira Mono", monospace;
@@ -157,16 +221,16 @@
   --shadow-y: 4px;
   --shadow-blur: 12px;
   --shadow-spread: 0px;
-  --shadow-opacity: 0.2;
+  --shadow-opacity: 0.3;
   --shadow-color: #000000;
-  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.2);
-  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.2);
-  --shadow-sm: 0px 2px 4px 0px hsl(0 0% 0% / 0.2), 0px 1px 2px -1px hsl(0 0% 0% / 0.15);
-  --shadow: 0px 4px 6px 0px hsl(0 0% 0% / 0.2), 0px 2px 4px -1px hsl(0 0% 0% / 0.15);
-  --shadow-md: 0px 6px 8px 0px hsl(0 0% 0% / 0.2), 0px 3px 6px -2px hsl(0 0% 0% / 0.15);
-  --shadow-lg: 0px 8px 12px 0px hsl(0 0% 0% / 0.2), 0px 4px 8px -2px hsl(0 0% 0% / 0.15);
-  --shadow-xl: 0px 12px 16px 0px hsl(0 0% 0% / 0.25), 0px 6px 12px -3px hsl(0 0% 0% / 0.15);
-  --shadow-2xl: 0px 16px 24px 0px hsl(0 0% 0% / 0.35);
+  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.3);
+  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.3);
+  --shadow-sm: 0px 2px 4px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.2);
+  --shadow: 0px 4px 6px 0px hsl(0 0% 0% / 0.3), 0px 2px 4px -1px hsl(0 0% 0% / 0.2);
+  --shadow-md: 0px 6px 8px 0px hsl(0 0% 0% / 0.3), 0px 3px 6px -2px hsl(0 0% 0% / 0.2);
+  --shadow-lg: 0px 8px 12px 0px hsl(0 0% 0% / 0.3), 0px 4px 8px -2px hsl(0 0% 0% / 0.2);
+  --shadow-xl: 0px 12px 16px 0px hsl(0 0% 0% / 0.35), 0px 6px 12px -3px hsl(0 0% 0% / 0.2);
+  --shadow-2xl: 0px 16px 24px 0px hsl(0 0% 0% / 0.45);
 }
 
 @theme inline {
@@ -318,7 +382,7 @@
   background: linear-gradient(
     135deg,
     var(--node-ai-icon-bg) 0%,
-    rgba(52, 211, 153, 0.25) 50%,
+    rgba(52, 211, 153, 0.3) 50%,
     var(--node-ai-icon-bg) 100%
   );
   background-size: 200% 200%;

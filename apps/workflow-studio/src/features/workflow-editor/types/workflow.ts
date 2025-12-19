@@ -1,5 +1,26 @@
 import type { NodeGroup, NodeIO } from '../lib/nodeStyles';
 
+// Subnode slot definition (from backend)
+export interface SubnodeSlotDefinition {
+  name: string;                        // "chatModel", "memory", "tools"
+  displayName: string;                 // "Chat Model", "Memory", "Tool"
+  slotType: 'model' | 'memory' | 'tool';
+  required: boolean;
+  multiple: boolean;                   // Can accept multiple subnodes (tools=true)
+  acceptedNodeTypes?: string[];        // Restrict to specific node types
+}
+
+// Subnode type identifier
+export type SubnodeType = 'model' | 'memory' | 'tool';
+
+// Output strategy for dynamic output nodes (like Switch)
+export interface OutputStrategy {
+  type: 'dynamicFromCollection' | 'dynamicFromParameter' | 'static';
+  collectionName?: string;  // For dynamicFromCollection: parameter name containing array
+  parameter?: string;       // For dynamicFromParameter: parameter name with output count
+  addFallback?: boolean;    // Add a fallback output
+}
+
 // Node data types - aligned with backend schema
 export interface WorkflowNodeData {
   // Required fields for backend compatibility
@@ -33,6 +54,14 @@ export interface WorkflowNodeData {
   outputCount?: number;                 // Number of output handles
   inputs?: NodeIO[];                    // Input handle definitions with names
   outputs?: NodeIO[];                   // Output handle definitions with names
+  outputStrategy?: OutputStrategy;      // How to calculate dynamic outputs
+
+  // Subnode support
+  isSubnode?: boolean;                  // True if this is a subnode type
+  subnodeType?: SubnodeType;            // "model" | "memory" | "tool"
+  providesToSlot?: string;              // Which slot this subnode provides to
+  subnodeSlots?: SubnodeSlotDefinition[];  // Slots for subnodes (parent nodes only)
+  nodeShape?: 'rectangular' | 'circular';  // Visual shape variant
 }
 
 export interface StickyNoteData {
@@ -52,7 +81,14 @@ export interface NodeDefinition {
 }
 
 // Node creator view types
-export type NodeCreatorView = 'trigger' | 'regular' | 'ai';
+export type NodeCreatorView = 'trigger' | 'regular' | 'ai' | 'subnode';
+
+// Subnode slot context for node creator
+export interface SubnodeSlotContext {
+  parentNodeId: string;
+  slotName: string;
+  slotType: SubnodeType;
+}
 
 // Execution data
 interface ExecutionData {
@@ -66,4 +102,18 @@ export interface NodeExecutionData {
   startTime?: number;
   endTime?: number;
   status: 'idle' | 'running' | 'success' | 'error';
+}
+
+// Subnode edge data
+export interface SubnodeEdgeData {
+  isSubnodeEdge: true;
+  slotName: string;           // "chatModel", "memory", "tools"
+  slotType: SubnodeType;      // "model", "memory", "tool"
+}
+
+// Extended node definition for node picker
+export interface SubnodeNodeDefinition extends NodeDefinition {
+  isSubnode: true;
+  subnodeType: SubnodeType;
+  providesToSlot: string;
 }

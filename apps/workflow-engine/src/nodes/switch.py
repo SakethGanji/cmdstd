@@ -9,9 +9,11 @@ from .base import (
     BaseNode,
     NodeTypeDescription,
     NodeInputDefinition,
+    NodeOutputDefinition,
     NodeProperty,
     NodePropertyOption,
 )
+from ..engine.expression_engine import expression_engine, ExpressionEngine
 
 if TYPE_CHECKING:
     from ..engine.types import ExecutionContext, NodeData, NodeDefinition, NodeExecutionResult
@@ -27,13 +29,28 @@ class SwitchNode(BaseNode):
         icon="fa:random",
         group=["flow"],
         inputs=[NodeInputDefinition(name="main", display_name="Input")],
-        outputs="dynamic",
+        # Explicit outputs - frontend will show/hide based on numberOfOutputs
+        outputs=[
+            NodeOutputDefinition(name="output0", display_name="Output 0"),
+            NodeOutputDefinition(name="output1", display_name="Output 1"),
+            NodeOutputDefinition(name="output2", display_name="Output 2"),
+            NodeOutputDefinition(name="output3", display_name="Output 3"),
+            NodeOutputDefinition(name="fallback", display_name="Fallback"),
+        ],
         output_strategy={
-            "type": "dynamicFromCollection",
-            "collectionName": "rules",
+            "type": "dynamicFromParameter",
+            "parameter": "numberOfOutputs",
             "addFallback": True,
         },
         properties=[
+            NodeProperty(
+                display_name="Number of Outputs",
+                name="numberOfOutputs",
+                type="number",
+                default=2,
+                type_options={"minValue": 1, "maxValue": 4},
+                description="How many output branches to create (plus fallback)",
+            ),
             NodeProperty(
                 display_name="Mode",
                 name="mode",
@@ -61,12 +78,12 @@ class SwitchNode(BaseNode):
                 display_options={"show": {"mode": ["rules"]}},
                 properties=[
                     NodeProperty(
-                        display_name="Output Index",
+                        display_name="Route to Output",
                         name="output",
                         type="number",
                         default=0,
-                        type_options={"minValue": 0},
-                        description="Which output to route matching items to",
+                        type_options={"minValue": 0, "maxValue": 3},
+                        description="Which output to route matching items to (0-3)",
                     ),
                     NodeProperty(
                         display_name="Field",
@@ -74,7 +91,7 @@ class SwitchNode(BaseNode):
                         type="string",
                         default="",
                         placeholder="status",
-                        description="Field path to evaluate (supports dot notation)",
+                        description="Field path (e.g., 'status') or expression (e.g., '{{ $json.status }}')",
                     ),
                     NodeProperty(
                         display_name="Operation",
@@ -110,20 +127,13 @@ class SwitchNode(BaseNode):
                 ],
             ),
             NodeProperty(
-                display_name="Expression",
-                name="expression",
-                type="string",
-                default="0",
-                description="Expression that evaluates to output index (0-based)",
-                display_options={"show": {"mode": ["expression"]}},
-            ),
-            NodeProperty(
-                display_name="Fallback Output",
-                name="fallbackOutput",
+                display_name="Output Index",
+                name="outputIndex",
                 type="number",
                 default=0,
-                type_options={"minValue": 0},
-                description="Output index when no rules match",
+                type_options={"minValue": 0, "maxValue": 3},
+                description="Output index to route all items to (0-based)",
+                display_options={"show": {"mode": ["expression"]}},
             ),
         ],
     )
@@ -143,67 +153,46 @@ class SwitchNode(BaseNode):
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
         mode = self.get_parameter(node_definition, "mode", "rules")
+        num_outputs = self.get_parameter(node_definition, "numberOfOutputs", 2)
         rules = self.get_parameter(node_definition, "rules", [])
-        fallback_output = self.get_parameter(node_definition, "fallback", "fallback")
-        # Also support "field" for simple value routing
-        field_path = self.get_parameter(node_definition, "field", "")
 
-        # Initialize output buckets based on rules
+        # Initialize all output buckets (output0, output1, etc. + fallback)
         outputs: dict[str, list[NodeData]] = {}
+        for i in range(num_outputs):
+            outputs[f"output{i}"] = []
+        outputs["fallback"] = []
 
-        # If using simple field mode with string output names
-        if field_path and rules:
-            for rule in rules:
-                output_name = str(rule.get("output", ""))
-                if output_name:
-                    outputs[output_name] = []
-            outputs[str(fallback_output)] = []
-
+        if mode == "expression":
+            # Expression mode: route all items to a single output index
+            output_index = self.get_parameter(node_definition, "outputIndex", 0)
+            # Clamp to valid range
+            output_index = max(0, min(output_index, num_outputs - 1))
+            key = f"output{output_index}"
             for item in input_data:
-                field_value = self._get_nested_value(item.json, field_path)
-                matched = False
-                for rule in rules:
-                    if field_value == rule.get("value"):
-                        output_name = str(rule.get("output", ""))
-                        outputs[output_name].append(item)
-                        matched = True
-                        break
-                if not matched:
-                    outputs[str(fallback_output)].append(item)
-        elif mode == "expression":
-            # Expression mode: evaluate expression to get output index
-            expression = self.get_parameter(node_definition, "expression", "0")
-            outputs["output0"] = []
-            for item in input_data:
-                try:
-                    output_index = int(expression)
-                except ValueError:
-                    output_index = 0
-                key = f"output{output_index}"
-                if key not in outputs:
-                    outputs[key] = []
                 outputs[key].append(item)
         else:
-            # Rules mode: evaluate each rule against each item (numeric outputs)
-            for rule in rules:
-                output_idx = rule.get("output", 0)
-                key = f"output{output_idx}" if isinstance(output_idx, int) else str(output_idx)
-                outputs[key] = []
-            outputs[f"output{fallback_output}" if isinstance(fallback_output, int) else str(fallback_output)] = []
-
-            for item in input_data:
+            # Rules mode: evaluate each rule against each item
+            for idx, item in enumerate(input_data):
                 matched = False
+                # Create expression context for this item (for $json resolution)
+                expr_context = ExpressionEngine.create_context(
+                    input_data,
+                    context.node_states,
+                    context.execution_id,
+                    item_index=idx,
+                )
                 for rule in rules:
-                    if self._evaluate_rule(rule, item.json):
+                    if self._evaluate_rule(rule, item.json, expr_context):
                         output_idx = rule.get("output", 0)
-                        key = f"output{output_idx}" if isinstance(output_idx, int) else str(output_idx)
+                        # Clamp to valid range
+                        output_idx = max(0, min(output_idx, num_outputs - 1))
+                        key = f"output{output_idx}"
                         outputs[key].append(item)
                         matched = True
                         break
 
                 if not matched:
-                    key = f"output{fallback_output}" if isinstance(fallback_output, int) else str(fallback_output)
-                    outputs[key].append(item)
+                    outputs["fallback"].append(item)
 
         # Convert empty lists to None for NO_OUTPUT signal
         result: dict[str, list[NodeData] | None] = {}
@@ -212,11 +201,24 @@ class SwitchNode(BaseNode):
 
         return self.outputs(result)
 
-    def _evaluate_rule(self, rule: dict[str, Any], json_data: dict[str, Any]) -> bool:
+    def _evaluate_rule(self, rule: dict[str, Any], json_data: dict[str, Any], expr_context: Any) -> bool:
         """Evaluate a single rule against JSON data."""
-        field_value = self._get_nested_value(json_data, rule.get("field", ""))
-        rule_value = rule.get("value")
+        field_raw = rule.get("field", "")
+        rule_value_raw = rule.get("value")
         operation = rule.get("operation", "equals")
+
+        # Resolve $json expressions in field (e.g., {{ $json.status }})
+        if field_raw and "{{" in str(field_raw):
+            field_value = expression_engine.resolve(field_raw, expr_context)
+        else:
+            # Simple field path lookup (e.g., "status" or "user.name")
+            field_value = self._get_nested_value(json_data, field_raw)
+
+        # Resolve $json expressions in value
+        if rule_value_raw and "{{" in str(rule_value_raw):
+            rule_value = expression_engine.resolve(rule_value_raw, expr_context)
+        else:
+            rule_value = rule_value_raw
 
         if operation == "equals":
             return field_value == rule_value

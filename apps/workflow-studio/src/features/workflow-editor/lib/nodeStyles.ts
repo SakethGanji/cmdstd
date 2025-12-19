@@ -2,7 +2,7 @@
  * Node styling utilities for dynamic group-based colors and sizing
  */
 
-export type NodeGroup = 'trigger' | 'transform' | 'flow' | 'ai' | 'action';
+export type NodeGroup = 'trigger' | 'transform' | 'flow' | 'ai' | 'action' | 'output';
 
 interface NodeStyleConfig {
   group: NodeGroup;
@@ -14,7 +14,7 @@ interface NodeStyleConfig {
 }
 
 export interface NodeShapeConfig {
-  borderRadiusClass: string;
+  borderRadius: string; // CSS border-radius value (can be asymmetric)
   accentType: 'left-bar' | 'bottom-bar' | 'diamond' | 'shimmer' | 'none';
 }
 
@@ -36,19 +36,23 @@ export function getNodeGroupFromType(type: string, apiGroup?: string[]): NodeGro
   // First check API-provided group
   if (apiGroup?.length) {
     const group = apiGroup[0].toLowerCase();
-    if (['trigger', 'transform', 'flow', 'ai'].includes(group)) {
+    if (['trigger', 'transform', 'flow', 'ai', 'action', 'output'].includes(group)) {
       return group as NodeGroup;
     }
+    // Map 'ui' group to 'output'
+    if (group === 'ui') return 'output';
   }
 
   // Fallback: infer from type name
-  const triggerTypes = ['Start', 'Webhook', 'Cron', 'ErrorTrigger', 'manualTrigger', 'webhook', 'scheduleTrigger', 'errorTrigger'];
+  const triggerTypes = ['Start', 'Webhook', 'Cron', 'ErrorTrigger', 'manualTrigger', 'webhook', 'scheduleTrigger', 'errorTrigger', 'ChatInput', 'chatInput'];
   const flowTypes = ['If', 'Switch', 'Merge', 'Wait', 'SplitInBatches', 'if', 'switch', 'merge', 'wait', 'splitInBatches'];
   const aiTypes = ['LLMChat', 'AIAgent', 'llmChat', 'aiAgent'];
+  const outputTypes = ['HTMLDisplay', 'htmlDisplay', 'ChatOutput', 'chatOutput'];
 
   if (triggerTypes.some(t => type === t || type.toLowerCase().includes(t.toLowerCase()))) return 'trigger';
   if (flowTypes.some(t => type === t)) return 'flow';
   if (aiTypes.some(t => type === t)) return 'ai';
+  if (outputTypes.some(t => type === t)) return 'output';
 
   return 'transform'; // Default for HttpRequest, Set, Code, etc.
 }
@@ -98,6 +102,14 @@ export function getNodeStyles(group: NodeGroup): NodeStyleConfig {
       accentColor: 'var(--node-action)',
       handleColor: 'var(--node-handle)',
     },
+    output: {
+      group: 'output',
+      bgColor: 'var(--node-output-light)',
+      borderColor: 'var(--node-output-border)',
+      iconBgColor: 'var(--node-output-icon-bg)',
+      accentColor: 'var(--node-output)',
+      handleColor: 'var(--node-handle)',
+    },
   };
 
   return styles[group];
@@ -106,13 +118,27 @@ export function getNodeStyles(group: NodeGroup): NodeStyleConfig {
 /**
  * Calculate handle positions as percentages for vertical distribution
  * Returns array of top percentages for each handle
+ *
+ * Dynamically adjusts padding based on handle count:
+ * - 1-4 handles: 20% padding (comfortable spacing)
+ * - 5-8 handles: 15% padding (more compact)
+ * - 9+ handles: 12% padding (maximize usable space)
  */
 export function calculateHandlePositions(handleCount: number): number[] {
   if (handleCount <= 0) return [];
   if (handleCount === 1) return [50]; // Single handle centered
 
-  // Distribute handles evenly with padding from edges
-  const padding = 20; // % from top/bottom
+  // Dynamic padding - reduce for many handles to maximize space
+  let padding: number;
+  if (handleCount <= 4) {
+    padding = 20; // Comfortable spacing for few handles
+  } else if (handleCount <= 8) {
+    padding = 15; // More compact for medium count
+  } else {
+    padding = 12; // Maximize space for many handles
+  }
+
+  // Distribute handles evenly with dynamic padding from edges
   const availableSpace = 100 - (padding * 2);
   const spacing = availableSpace / (handleCount - 1);
 
@@ -123,13 +149,16 @@ export function calculateHandlePositions(handleCount: number): number[] {
 
 /**
  * Calculate minimum node height based on handle count
+ * Uses dynamic spacing consistent with calculateNodeDimensions
  */
 export function calculateNodeMinHeight(inputCount: number, outputCount: number): number {
   const baseHeight = 48; // Base height for icon-only node (label is now outside)
-  const handleSpacing = 24; // Pixels per additional handle
   const maxHandles = Math.max(inputCount, outputCount);
 
   if (maxHandles <= 1) return baseHeight;
+
+  // Dynamic handle spacing - same logic as calculateNodeDimensions
+  const handleSpacing = maxHandles <= 4 ? 24 : maxHandles <= 8 ? 22 : 20;
 
   return baseHeight + ((maxHandles - 1) * handleSpacing);
 }
@@ -144,6 +173,7 @@ export function getMiniMapColor(group: NodeGroup): string {
     flow: 'var(--node-flow)',
     ai: 'var(--node-ai)',
     action: 'var(--node-action)',
+    output: 'var(--node-output)',
   };
 
   return colors[group];
@@ -151,27 +181,37 @@ export function getMiniMapColor(group: NodeGroup): string {
 
 /**
  * Get shape configuration for a node group (subtle differentiation)
+ *
+ * Border radius order: top-left top-right bottom-right bottom-left
+ * - Trigger nodes: more rounded on LEFT (signifies start/entry point)
+ * - Output nodes: more rounded on RIGHT (signifies end/exit point)
  */
 export function getNodeShapeConfig(group: NodeGroup): NodeShapeConfig {
   const shapes: Record<NodeGroup, NodeShapeConfig> = {
     trigger: {
-      borderRadiusClass: 'rounded-2xl',
+      // More rounded on left side (start point)
+      borderRadius: '20px 10px 10px 20px',
       accentType: 'left-bar',
     },
     transform: {
-      borderRadiusClass: 'rounded-xl',
+      borderRadius: '12px',
       accentType: 'none',
     },
     flow: {
-      borderRadiusClass: 'rounded-xl',
+      borderRadius: '12px',
       accentType: 'diamond',
     },
     ai: {
-      borderRadiusClass: 'rounded-2xl',
+      borderRadius: '16px',
       accentType: 'shimmer',
     },
     action: {
-      borderRadiusClass: 'rounded-xl',
+      borderRadius: '12px',
+      accentType: 'bottom-bar',
+    },
+    output: {
+      // More rounded on right side (end point)
+      borderRadius: '10px 20px 20px 10px',
       accentType: 'bottom-bar',
     },
   };
@@ -181,24 +221,64 @@ export function getNodeShapeConfig(group: NodeGroup): NodeShapeConfig {
 
 /**
  * Calculate node dimensions based on handle count (proportional sizing)
+ *
+ * Handles different node types:
+ * - Standard nodes (1 input, 1 output): 64x64 square
+ * - If/Switch nodes (multiple outputs): Height grows, width proportional
+ * - AI Agent with subnodes: Wider to fit slot labels
+ * - Many-output nodes (10+): Scales dynamically with balanced aspect ratio
  */
-export function calculateNodeDimensions(inputCount: number, outputCount: number): NodeDimensions {
+export function calculateNodeDimensions(
+  inputCount: number,
+  outputCount: number,
+  subnodeSlotCount: number = 0
+): NodeDimensions {
   const baseSize = 64; // Square base for icon-only node
-  const handleSpacing = 24; // Pixels per additional handle
   const maxHandles = Math.max(inputCount, outputCount);
 
+  // Dynamic handle spacing - slightly compress for many handles to prevent overly tall nodes
+  // 1-4 handles: 24px, 5-8: 22px, 9+: 20px
+  const handleSpacing = maxHandles <= 4 ? 24 : maxHandles <= 8 ? 22 : 20;
+
+  // Calculate height based on max handles (always applies)
+  const extraHandles = Math.max(0, maxHandles - 1);
+  const baseHeight = baseSize + (extraHandles * handleSpacing);
+
+  // If node has subnode slots, it needs to be wider to accommodate them
+  if (subnodeSlotCount > 0) {
+    // Width: slots need ~55px each + padding
+    const slotWidth = Math.max(180, subnodeSlotCount * 55 + 20);
+    // Height: base + extra for slot labels area
+    const height = Math.max(baseHeight, 80);
+    return { width: slotWidth, height, minWidth: slotWidth };
+  }
+
+  // Single handle nodes stay square
   if (maxHandles <= 1) {
     return { width: baseSize, height: baseSize, minWidth: baseSize };
   }
 
-  // For multiple handles, grow both dimensions to stay more square
-  const extraHandles = maxHandles - 1;
-  const height = baseSize + (extraHandles * handleSpacing);
+  // Multi-handle nodes (If, Switch, Merge, etc.)
+  // Width scales proportionally to maintain a balanced aspect ratio
+  // Target aspect ratio: keep width roughly proportional to height
+  // 2 handles: 74px, 3: 83px, 4-6: grows gradually, 7+: continues scaling
+  let width: number;
+  if (maxHandles <= 4) {
+    // Small multi-output: modest width growth
+    width = baseSize + (extraHandles * 10);
+  } else if (maxHandles <= 8) {
+    // Medium multi-output: moderate width growth
+    // Base + 30 (from first 4) + continued growth
+    width = baseSize + 30 + ((maxHandles - 4) * 8);
+  } else {
+    // Large multi-output (9+ handles): continued proportional growth
+    // Base + 30 + 32 (from handles 5-8) + continued growth
+    width = baseSize + 30 + 32 + ((maxHandles - 8) * 6);
+  }
 
-  // Width grows proportionally to maintain balanced aspect ratio
-  // For 2 handles: ~1.15x, for 3: ~1.25x, for 4+: ~1.3x
-  const widthRatio = Math.min(1.3, 1 + (extraHandles * 0.15));
-  const width = Math.round(baseSize * widthRatio);
+  // Ensure minimum aspect ratio - width should be at least 40% of height for very tall nodes
+  const minWidthFromHeight = Math.ceil(baseHeight * 0.4);
+  width = Math.max(width, minWidthFromHeight);
 
-  return { width, height, minWidth: width };
+  return { width, height: baseHeight, minWidth: width };
 }

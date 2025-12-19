@@ -81,3 +81,4 @@ apps/workflow-engine/workflows.db
 # OS
 .DS_Store
 Thumbs.db
+*.db

@@ -49,14 +49,12 @@ class LLMChatNode(BaseNode):
                 display_name="Model",
                 name="model",
                 type="options",
-                default="mock",
+                default="gemini-2.0-flash",
                 options=[
                     NodePropertyOption(name="Mock (Testing)", value="mock"),
-                    NodePropertyOption(name="Gemini 2.5 Flash", value="gemini-2.5-flash"),
-                    NodePropertyOption(name="Gemini 2.5 Pro", value="gemini-2.5-pro"),
                     NodePropertyOption(name="Gemini 2.0 Flash", value="gemini-2.0-flash"),
-                    NodePropertyOption(name="Gemini 1.5 Pro", value="gemini-1.5-pro"),
                     NodePropertyOption(name="Gemini 1.5 Flash", value="gemini-1.5-flash"),
+                    NodePropertyOption(name="Gemini 1.5 Pro", value="gemini-1.5-pro"),
                 ],
             ),
             NodeProperty(
@@ -210,9 +208,8 @@ class LLMChatNode(BaseNode):
         max_tokens: int,
     ) -> dict[str, Any]:
         """Call Google Gemini API."""
-        api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if not api_key:
-            raise RuntimeError("GEMINI_API_KEY or GOOGLE_API_KEY environment variable not set")
+        # Hardcoded for POC - move to config/env in production
+        api_key = os.environ.get("GEMINI_API_KEY") or "AIzaSyD5KPJ77iwkDr-y_-fv97rADxFR0XJzzVE"
 
         base_url = "https://generativelanguage.googleapis.com/v1beta"
 

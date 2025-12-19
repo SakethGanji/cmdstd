@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from 'react';
-import { Link, useMatchRoute } from '@tanstack/react-router';
 import {
   User,
   Plus,
@@ -19,7 +18,6 @@ import {
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useUIModeStore } from '../../stores/uiModeStore';
 import { useSidebar } from '@/shared/components/ui/sidebar';
-import { Switch } from '@/shared/components/ui/switch';
 import { Button } from '@/shared/components/ui/button';
 import {
   DropdownMenu,
@@ -28,7 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
-import { useSaveWorkflow, useToggleWorkflowActive } from '../../hooks/useWorkflowApi';
+import { useSaveWorkflow } from '../../hooks/useWorkflowApi';
 import { toBackendWorkflow } from '../../lib/workflowTransform';
 import type { WorkflowNodeData } from '../../types/workflow';
 import type { Node } from 'reactflow';
@@ -37,24 +35,18 @@ export default function WorkflowNavbar() {
   const {
     workflowName,
     workflowTags,
-    isActive,
     workflowId,
     nodes,
     edges,
     setWorkflowName,
     addTag,
     removeTag,
-    setIsActive,
   } = useWorkflowStore();
 
   const { saveWorkflow, isSaving } = useSaveWorkflow();
-  const { toggleActive, isToggling } = useToggleWorkflowActive();
 
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
-
-  const matchRoute = useMatchRoute();
-  const isEditorActive = matchRoute({ to: '/editor' });
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(workflowName);
@@ -190,52 +182,10 @@ export default function WorkflowNavbar() {
           {/* Builder / UI Mode Toggle */}
           <ModeToggle />
 
-          {/* Navigation tabs */}
-          <div className="flex items-center rounded-lg bg-muted p-1">
-            <Link
-              to="/editor"
-              className={`rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-                isEditorActive
-                  ? 'bg-background text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              Editor
-            </Link>
-            <button
-              className="rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Executions
-            </button>
-            <button
-              className="rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Evaluations
-            </button>
-          </div>
         </div>
 
-        {/* Right section - Active toggle, Share, Save, History, More */}
+        {/* Right section - Share, Save, History, More */}
         <div className="flex items-center gap-2">
-          {/* Active/Inactive toggle */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {isActive ? 'Active' : 'Inactive'}
-            </span>
-            <Switch
-              checked={isActive}
-              onCheckedChange={(checked) => {
-                if (workflowId) {
-                  toggleActive(checked);
-                } else {
-                  setIsActive(checked);
-                }
-              }}
-              disabled={isToggling}
-            />
-          </div>
-
-          <div className="h-5 w-px bg-border mx-1" />
 
           {/* Share button */}
           <Button variant="outline" size="icon-sm">
@@ -307,22 +257,20 @@ function ModeToggle() {
     <div className="flex items-center rounded-lg bg-muted p-1">
       <button
         onClick={() => setMode('builder')}
-        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-          mode === 'builder'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        }`}
+        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${mode === 'builder'
+          ? 'bg-background text-foreground shadow-sm'
+          : 'text-muted-foreground hover:text-foreground'
+          }`}
       >
         <Workflow size={14} />
         Builder
       </button>
       <button
         onClick={() => setMode('ui')}
-        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${
-          mode === 'ui'
-            ? 'bg-background text-foreground shadow-sm'
-            : 'text-muted-foreground hover:text-foreground'
-        }`}
+        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${mode === 'ui'
+          ? 'bg-background text-foreground shadow-sm'
+          : 'text-muted-foreground hover:text-foreground'
+          }`}
       >
         <Play size={14} />
         UI

@@ -176,6 +176,8 @@ async def stream_adhoc_execution(
                 target_node=c.get("target_node") or c.get("targetNode"),
                 source_output=c.get("source_output") or c.get("sourceOutput", "main"),
                 target_input=c.get("target_input") or c.get("targetInput", "main"),
+                connection_type=c.get("connection_type") or c.get("connectionType", "normal"),
+                slot_name=c.get("slot_name") or c.get("slotName"),
             )
             for c in workflow.connections
         ],

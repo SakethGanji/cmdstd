@@ -48,8 +48,17 @@ function WorkflowEdge({
     if (targetExec?.status === 'success') return 'success';
     // If target errored, edge shows error
     if (targetExec?.status === 'error') return 'error';
-    // If source completed but target hasn't started, edge is "pending flow"
-    if (sourceExec?.status === 'success' && !targetExec) return 'running';
+    // If source completed but target hasn't started, check if execution is still in progress
+    if (sourceExec?.status === 'success' && !targetExec) {
+      // Check if any node is still running
+      const hasRunningNodes = Object.values(executionData).some(
+        (exec) => exec?.status === 'running'
+      );
+      // If nothing is running, execution is done - this edge had no data
+      if (!hasRunningNodes) return 'default';
+      // Still running, show as pending
+      return 'running';
+    }
 
     return 'default';
   }, [source, target, executionData]);

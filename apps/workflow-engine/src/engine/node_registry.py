@@ -25,6 +25,11 @@ class NodeTypeInfo:
     outputs: list[dict[str, Any]] | None = None
     input_strategy: dict[str, Any] | None = None
     output_strategy: dict[str, Any] | None = None
+    # Subnode fields
+    is_subnode: bool = False
+    subnode_type: str | None = None
+    provides_to_slot: str | None = None
+    subnode_slots: list[dict[str, Any]] | None = None
 
 
 class NodeRegistryClass:
@@ -62,136 +67,10 @@ class NodeRegistryClass:
 
         This is what the frontend uses to generate configuration forms.
         """
-        result = []
-        for instance in self._instances.values():
-            desc = instance.node_description
+        return [self._build_node_type_info(instance) for instance in self._instances.values()]
 
-            # Determine inputs
-            input_count: int | str = 1
-            inputs: list[dict[str, Any]] = [
-                {"name": "main", "displayName": "Input", "type": "main"}
-            ]
-
-            if desc:
-                if desc.inputs == "dynamic":
-                    input_count = "dynamic"
-                    inputs = []
-                elif isinstance(desc.inputs, list):
-                    inputs = [
-                        {
-                            "name": i.name,
-                            "displayName": i.display_name,
-                            "type": i.type,
-                        }
-                        for i in desc.inputs
-                    ]
-                    input_count = len(inputs)
-            elif instance.input_count == float("inf"):
-                input_count = "dynamic"
-                inputs = []
-            elif instance.input_count > 1:
-                input_count = int(instance.input_count)
-
-            # Determine outputs
-            output_count: int | str = 1
-            outputs: list[dict[str, Any]] = [
-                {"name": "main", "displayName": "Output", "type": "main"}
-            ]
-
-            if desc:
-                if desc.outputs == "dynamic":
-                    output_count = "dynamic"
-                    outputs = []
-                elif isinstance(desc.outputs, list):
-                    outputs = [
-                        {
-                            "name": o.name,
-                            "displayName": o.display_name,
-                            "type": o.type,
-                            "schema": o.schema,
-                        }
-                        for o in desc.outputs
-                    ]
-                    output_count = len(outputs)
-
-            # Convert properties to dict format
-            properties = []
-            if desc:
-                for prop in desc.properties:
-                    prop_dict: dict[str, Any] = {
-                        "displayName": prop.display_name,
-                        "name": prop.name,
-                        "type": prop.type,
-                        "default": prop.default,
-                    }
-                    if prop.required:
-                        prop_dict["required"] = True
-                    if prop.description:
-                        prop_dict["description"] = prop.description
-                    if prop.placeholder:
-                        prop_dict["placeholder"] = prop.placeholder
-                    if prop.options:
-                        prop_dict["options"] = [
-                            {"name": o.name, "value": o.value, "description": o.description}
-                            for o in prop.options
-                        ]
-                    if prop.properties:
-                        prop_dict["properties"] = self._convert_properties(prop.properties)
-                    if prop.display_options:
-                        prop_dict["displayOptions"] = prop.display_options
-                    if prop.type_options:
-                        prop_dict["typeOptions"] = prop.type_options
-                    properties.append(prop_dict)
-
-            result.append(
-                NodeTypeInfo(
-                    type=instance.type,
-                    display_name=desc.display_name if desc else instance.type,
-                    description=instance.description,
-                    icon=desc.icon if desc else None,
-                    group=desc.group if desc else None,
-                    input_count=input_count,
-                    output_count=output_count,
-                    properties=properties,
-                    inputs=inputs if input_count != "dynamic" else None,
-                    outputs=outputs if output_count != "dynamic" else None,
-                    input_strategy=desc.input_strategy if desc else None,
-                    output_strategy=desc.output_strategy if desc else None,
-                )
-            )
-
-        return result
-
-    def _convert_properties(self, properties: list) -> list[dict[str, Any]]:
-        """Convert nested properties to dict format."""
-        result = []
-        for prop in properties:
-            prop_dict: dict[str, Any] = {
-                "displayName": prop.display_name,
-                "name": prop.name,
-                "type": prop.type,
-                "default": prop.default,
-            }
-            if prop.description:
-                prop_dict["description"] = prop.description
-            if prop.placeholder:
-                prop_dict["placeholder"] = prop.placeholder
-            if prop.options:
-                prop_dict["options"] = [
-                    {"name": o.name, "value": o.value}
-                    for o in prop.options
-                ]
-            if prop.display_options:
-                prop_dict["displayOptions"] = prop.display_options
-            result.append(prop_dict)
-        return result
-
-    def get_node_type_info(self, node_type: str) -> NodeTypeInfo | None:
-        """Get full info for a specific node type."""
-        instance = self._instances.get(node_type)
-        if not instance:
-            return None
-
+    def _build_node_type_info(self, instance: BaseNode) -> NodeTypeInfo:
+        """Build NodeTypeInfo from a node instance."""
         desc = instance.node_description
 
         # Determine inputs
@@ -243,33 +122,21 @@ class NodeRegistryClass:
                 output_count = len(outputs)
 
         # Convert properties to dict format
-        properties = []
-        if desc:
-            for prop in desc.properties:
-                prop_dict: dict[str, Any] = {
-                    "displayName": prop.display_name,
-                    "name": prop.name,
-                    "type": prop.type,
-                    "default": prop.default,
+        properties = self._convert_properties(desc.properties) if desc else []
+
+        # Build subnode slots list
+        subnode_slots = None
+        if desc and desc.subnode_slots:
+            subnode_slots = [
+                {
+                    "name": slot.name,
+                    "displayName": slot.display_name,
+                    "slotType": slot.slot_type,
+                    "required": slot.required,
+                    "multiple": slot.multiple,
                 }
-                if prop.required:
-                    prop_dict["required"] = True
-                if prop.description:
-                    prop_dict["description"] = prop.description
-                if prop.placeholder:
-                    prop_dict["placeholder"] = prop.placeholder
-                if prop.options:
-                    prop_dict["options"] = [
-                        {"name": o.name, "value": o.value, "description": o.description}
-                        for o in prop.options
-                    ]
-                if prop.properties:
-                    prop_dict["properties"] = self._convert_properties(prop.properties)
-                if prop.display_options:
-                    prop_dict["displayOptions"] = prop.display_options
-                if prop.type_options:
-                    prop_dict["typeOptions"] = prop.type_options
-                properties.append(prop_dict)
+                for slot in desc.subnode_slots
+            ]
 
         return NodeTypeInfo(
             type=instance.type,
@@ -284,7 +151,57 @@ class NodeRegistryClass:
             outputs=outputs if output_count != "dynamic" else None,
             input_strategy=desc.input_strategy if desc else None,
             output_strategy=desc.output_strategy if desc else None,
+            # Subnode fields
+            is_subnode=desc.is_subnode if desc else False,
+            subnode_type=desc.subnode_type if desc else None,
+            provides_to_slot=desc.provides_to_slot if desc else None,
+            subnode_slots=subnode_slots,
         )
+
+    def _convert_properties(self, properties: list) -> list[dict[str, Any]]:
+        """Convert properties to dict format for API responses."""
+        result = []
+        for prop in properties:
+            prop_dict: dict[str, Any] = {
+                "displayName": prop.display_name,
+                "name": prop.name,
+                "type": prop.type,
+                "default": prop.default,
+            }
+            if prop.required:
+                prop_dict["required"] = True
+            if prop.description:
+                prop_dict["description"] = prop.description
+            if prop.placeholder:
+                prop_dict["placeholder"] = prop.placeholder
+            if prop.options:
+                prop_dict["options"] = [
+                    {"name": o.name, "value": o.value, "description": o.description}
+                    for o in prop.options
+                ]
+            if prop.properties:
+                # Recursively convert nested properties
+                prop_dict["properties"] = self._convert_properties(prop.properties)
+            if prop.display_options:
+                prop_dict["displayOptions"] = prop.display_options
+            if prop.type_options:
+                prop_dict["typeOptions"] = prop.type_options
+            result.append(prop_dict)
+        return result
+
+    def get_node_type_info(self, node_type: str) -> NodeTypeInfo | None:
+        """Get full info for a specific node type."""
+        instance = self._instances.get(node_type)
+        if not instance:
+            return None
+        return self._build_node_type_info(instance)
+
+    def register(self, node_class: type[BaseNode]) -> None:
+        """Register a node class if not already registered."""
+        instance = node_class()
+        if instance.type not in self._nodes:
+            self._nodes[instance.type] = node_class
+            self._instances[instance.type] = instance
 
 
 # Singleton instance
@@ -315,7 +232,19 @@ def register_all_nodes() -> None:
         ChatOutputNode,
     )
 
-    node_classes: list[type[BaseNode]] = [
+    # Import subnode types
+    from ..nodes.subnodes import (
+        GeminiModelNode,
+        SimpleMemoryNode,
+        CalculatorToolNode,
+        CurrentTimeToolNode,
+        RandomNumberToolNode,
+        TextToolNode,
+    )
+
+    # All node classes (regular nodes + subnodes)
+    all_node_classes: list[type[BaseNode]] = [
+        # Regular nodes
         StartNode,
         WebhookNode,
         CronNode,
@@ -335,13 +264,14 @@ def register_all_nodes() -> None:
         ErrorTriggerNode,
         ChatInputNode,
         ChatOutputNode,
+        # Subnodes
+        GeminiModelNode,
+        SimpleMemoryNode,
+        CalculatorToolNode,
+        CurrentTimeToolNode,
+        RandomNumberToolNode,
+        TextToolNode,
     ]
 
-    for node_class in node_classes:
-        # Create instance once for type check and registration
-        instance = node_class()
-        if not node_registry.has(instance.type):
-            # Register the class directly, reusing our instance knowledge
-            if instance.type not in node_registry._nodes:
-                node_registry._nodes[instance.type] = node_class
-                node_registry._instances[instance.type] = instance
+    for node_class in all_node_classes:
+        node_registry.register(node_class)

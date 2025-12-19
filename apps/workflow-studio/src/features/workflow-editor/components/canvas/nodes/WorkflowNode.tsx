@@ -1,29 +1,6 @@
 import { memo, useState, useMemo } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
-import {
-  Plus,
-  Play,
-  MoreHorizontal,
-  MousePointer,
-  Clock,
-  Webhook,
-  Code,
-  Filter,
-  GitBranch,
-  Route,
-  GitMerge,
-  Layers,
-  Globe,
-  Pen,
-  Calendar,
-  AlertTriangle,
-  MessageSquare,
-  Bot,
-  File,
-  BarChart3,
-  Check,
-  X,
-} from 'lucide-react';
+import { Plus, Play, MoreHorizontal, Check, X } from 'lucide-react';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
 import { useNDVStore } from '../../../stores/ndvStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
@@ -36,6 +13,7 @@ import {
   calculateNodeDimensions,
   type NodeGroup,
 } from '../../../lib/nodeStyles';
+import { getIconForNode } from '../../../lib/nodeIcons';
 
 // Status badge component for success/error states
 const StatusBadge = ({ status }: { status: 'success' | 'error' }) => {
@@ -81,51 +59,30 @@ const GroupAccent = ({ group, accentColor }: { group: NodeGroup; accentColor: st
           style={{ backgroundColor: accentColor }}
         />
       );
+    case 'output':
+      // Right accent bar for output nodes (opposite of trigger)
+      return (
+        <div
+          className="absolute right-0 top-3 bottom-3 w-[3px] rounded-l-full"
+          style={{ backgroundColor: accentColor }}
+        />
+      );
     default:
       return null;
   }
 };
 
-// Icon mapping - using LucideIcon type for proper typing
-type LucideIconComponent = React.ComponentType<{ size?: string | number; className?: string }>;
-const iconMap: Record<string, LucideIconComponent> = {
-  'mouse-pointer': MousePointer,
-  play: MousePointer,
-  clock: Clock,
-  webhook: Webhook,
-  bolt: Webhook,
-  code: Code,
-  filter: Filter,
-  'git-branch': GitBranch,
-  'code-branch': GitBranch,
-  route: Route,
-  random: Route,
-  'git-merge': GitMerge,
-  'compress-arrows-alt': GitMerge,
-  layers: Layers,
-  'th-large': Layers,
-  globe: Globe,
-  pen: Pen,
-  edit: Pen,
-  calendar: Calendar,
-  'calendar-alt': Calendar,
-  'alert-triangle': AlertTriangle,
-  'exclamation-triangle': AlertTriangle,
-  'message-square': MessageSquare,
-  'comment-dots': MessageSquare,
-  bot: Bot,
-  robot: Bot,
-  file: File,
-  'chart-bar': BarChart3,
-};
-
 function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const [isHovered, setIsHovered] = useState(false);
   const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
+  const openForSubnode = useNodeCreatorStore((s) => s.openForSubnode);
   const openNDV = useNDVStore((s) => s.openNDV);
   const executionData = useWorkflowStore((s) => s.executionData[id]);
 
-  const IconComponent = iconMap[data.icon || 'code'] || Code;
+  const IconComponent = useMemo(
+    () => getIconForNode(data.icon, data.type),
+    [data.icon, data.type]
+  );
   const isTrigger = data.type?.includes('Trigger') || data.type?.includes('trigger') ||
     data.type === 'Start' || data.type === 'manualTrigger' ||
     data.type === 'Webhook' || data.type === 'webhook' ||
@@ -144,9 +101,10 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const outputCount = Math.max(1, data.outputCount ?? data.outputs?.length ?? 1);
 
   // Calculate dimensions and handle positions (proportional sizing)
+  const subnodeSlotCount = data.subnodeSlots?.length ?? 0;
   const dimensions = useMemo(
-    () => calculateNodeDimensions(inputCount, outputCount),
-    [inputCount, outputCount]
+    () => calculateNodeDimensions(inputCount, outputCount, subnodeSlotCount),
+    [inputCount, outputCount, subnodeSlotCount]
   );
   const inputPositions = useMemo(
     () => calculateHandlePositions(inputCount),
@@ -239,6 +197,94 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     });
   };
 
+  // Get edges to check which slots have connections
+  const edges = useWorkflowStore((s) => s.edges);
+
+  // Check if a slot can accept more subnodes
+  const canSlotAcceptMore = (slotName: string, multiple: boolean) => {
+    if (multiple) return true; // Multiple slots always show +
+    // Check if there's already a connection to this slot
+    const hasConnection = edges.some(
+      (e) => e.target === id && e.targetHandle === slotName && e.data?.isSubnodeEdge
+    );
+    return !hasConnection;
+  };
+
+  // Render bottom section for subnode slots (n8n style - inside node)
+  const renderSubnodeSlotSection = () => {
+    const slots = data.subnodeSlots;
+    if (!slots || slots.length === 0) return null;
+
+    return (
+      <>
+        {/* Slot labels row - inside node at bottom */}
+        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center border-t border-border/20 rounded-b-xl">
+          {slots.map((slot, index) => (
+            <div key={`slot-${slot.name}`} className="flex items-center">
+              {/* Divider between slots (not before first) */}
+              {index > 0 && (
+                <div className="h-4 w-px bg-border/30" />
+              )}
+              {/* Slot label */}
+              <span className="px-2.5 py-1.5 text-[10px] text-muted-foreground/70 whitespace-nowrap">
+                {slot.displayName}
+                {slot.required && <span className="text-destructive/70">*</span>}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* Handles and + buttons at bottom - one per slot */}
+        {slots.map((slot, index) => {
+          // Position evenly across the node width
+          const slotPercent = (index + 0.5) / slots.length * 100;
+          const canAdd = canSlotAcceptMore(slot.name, slot.multiple);
+
+          return (
+            <div key={`slot-group-${slot.name}`}>
+              {/* Handle */}
+              <Handle
+                type="target"
+                position={Position.Bottom}
+                id={slot.name}
+                style={{
+                  left: `${slotPercent}%`,
+                  bottom: '-4px',
+                }}
+                className="!h-1.5 !w-1.5 !border !bg-muted-foreground/50 !border-muted-foreground/50"
+              />
+
+              {/* + button for this slot (only if can accept more) */}
+              {canAdd && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openForSubnode(id, slot.name, slot.slotType as 'model' | 'memory' | 'tool');
+                  }}
+                  className={`
+                    nodrag absolute flex h-4 w-4 items-center justify-center
+                    rounded-full border border-border/50 bg-card/90 backdrop-blur-sm
+                    transition-all hover:scale-110 hover:bg-accent hover:shadow-md
+                    ${showActions ? 'opacity-100' : 'opacity-0'}
+                  `}
+                  style={{
+                    bottom: '-24px',
+                    left: `${slotPercent}%`,
+                    transform: 'translateX(-50%)',
+                    pointerEvents: 'all',
+                  }}
+                  title={`Add ${slot.displayName}`}
+                >
+                  <Plus size={10} className="text-muted-foreground" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
   return (
     <div
       className="relative flex flex-col items-center"
@@ -248,7 +294,6 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
       <div
         className={`
           relative cursor-grab border transition-all duration-300 flex items-center justify-center
-          ${shapeConfig.borderRadiusClass}
           ${selected ? 'ring-2 ring-offset-1' : ''}
           ${data.disabled ? 'opacity-50' : ''}
           ${isRunning ? 'animate-pulse-border' : ''}
@@ -259,6 +304,7 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
           backgroundColor: styles.bgColor,
           borderColor: isRunning ? styles.accentColor : (selected ? styles.accentColor : styles.borderColor),
           borderWidth: 2,
+          borderRadius: shapeConfig.borderRadius,
           boxShadow: selected ? `0 4px 12px ${styles.accentColor}40` : '0 1px 3px rgba(0,0,0,0.1)',
           // @ts-expect-error CSS custom property
           '--tw-ring-color': styles.accentColor,
@@ -291,10 +337,16 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
 
         {/* Output Handles */}
         {renderOutputHandles()}
+
+        {/* Subnode Slot Section (bottom - n8n style) */}
+        {renderSubnodeSlotSection()}
       </div>
 
       {/* Node Label - Below the node */}
-      <span className="mt-2 max-w-[120px] text-center text-xs font-medium text-muted-foreground leading-tight">
+      <span
+        className="mt-2 text-center text-xs font-medium text-muted-foreground leading-tight"
+        style={{ maxWidth: Math.max(120, dimensions.width + 20) }}
+      >
         {data.label}
       </span>
 

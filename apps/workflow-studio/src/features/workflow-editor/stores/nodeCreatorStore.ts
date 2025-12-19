@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { NodeCreatorView } from '../types/workflow';
+import type { NodeCreatorView, SubnodeSlotContext, SubnodeType } from '../types/workflow';
 
 interface NodeCreatorState {
   // Panel state
@@ -11,6 +11,9 @@ interface NodeCreatorState {
   sourceNodeId: string | null;
   sourceHandleId: string | null;
 
+  // Subnode slot context - when adding subnode to a parent's slot
+  subnodeSlotContext: SubnodeSlotContext | null;
+
   // Actions
   openPanel: (view: NodeCreatorView) => void;
   closePanel: () => void;
@@ -20,6 +23,10 @@ interface NodeCreatorState {
   // Open with connection context (from + button on node)
   openForConnection: (sourceNodeId: string, sourceHandleId: string) => void;
   clearConnectionContext: () => void;
+
+  // Open for subnode selection (from slot + button on parent node)
+  openForSubnode: (parentNodeId: string, slotName: string, slotType: SubnodeType) => void;
+  clearSubnodeContext: () => void;
 }
 
 export const useNodeCreatorStore = create<NodeCreatorState>((set) => ({
@@ -28,6 +35,7 @@ export const useNodeCreatorStore = create<NodeCreatorState>((set) => ({
   search: '',
   sourceNodeId: null,
   sourceHandleId: null,
+  subnodeSlotContext: null,
 
   openPanel: (view) => set({ isOpen: true, view, search: '' }),
   closePanel: () => set({
@@ -35,6 +43,7 @@ export const useNodeCreatorStore = create<NodeCreatorState>((set) => ({
     search: '',
     sourceNodeId: null,
     sourceHandleId: null,
+    subnodeSlotContext: null,
   }),
   setView: (view) => set({ view, search: '' }),
   setSearch: (search) => set({ search }),
@@ -46,8 +55,26 @@ export const useNodeCreatorStore = create<NodeCreatorState>((set) => ({
       search: '',
       sourceNodeId,
       sourceHandleId,
+      subnodeSlotContext: null,
     }),
 
   clearConnectionContext: () =>
     set({ sourceNodeId: null, sourceHandleId: null }),
+
+  openForSubnode: (parentNodeId, slotName, slotType) =>
+    set({
+      isOpen: true,
+      view: 'subnode',
+      search: '',
+      sourceNodeId: null,
+      sourceHandleId: null,
+      subnodeSlotContext: {
+        parentNodeId,
+        slotName,
+        slotType,
+      },
+    }),
+
+  clearSubnodeContext: () =>
+    set({ subnodeSlotContext: null }),
 }));

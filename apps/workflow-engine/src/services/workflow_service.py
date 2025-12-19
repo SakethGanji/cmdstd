@@ -121,6 +121,8 @@ class WorkflowService:
                     target_node=c.target_node,
                     source_output=c.source_output,
                     target_input=c.target_input,
+                    connection_type=c.connection_type,
+                    slot_name=c.slot_name,
                 )
                 for c in (request.connections or [])
             ]
@@ -265,6 +267,8 @@ class WorkflowService:
                     target_node=c.target_node,
                     source_output=c.source_output,
                     target_input=c.target_input,
+                    connection_type=c.connection_type,
+                    slot_name=c.slot_name,
                 )
                 for c in request.connections
             ],

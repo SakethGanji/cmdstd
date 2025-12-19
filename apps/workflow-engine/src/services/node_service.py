@@ -34,6 +34,11 @@ class NodeService:
                 "outputs": n.outputs,
                 "inputStrategy": n.input_strategy,
                 "outputStrategy": n.output_strategy,
+                # Subnode fields
+                "isSubnode": n.is_subnode,
+                "subnodeType": n.subnode_type,
+                "providesToSlot": n.provides_to_slot,
+                "subnodeSlots": n.subnode_slots,
             }
             for n in nodes
         ]
@@ -57,6 +62,11 @@ class NodeService:
             "outputs": info.outputs,
             "inputStrategy": info.input_strategy,
             "outputStrategy": info.output_strategy,
+            # Subnode fields
+            "isSubnode": info.is_subnode,
+            "subnodeType": info.subnode_type,
+            "providesToSlot": info.provides_to_slot,
+            "subnodeSlots": info.subnode_slots,
         }
 
     def get_nodes_by_group(self, group: str) -> list[dict[str, Any]]:

@@ -12,6 +12,8 @@ if TYPE_CHECKING:
         NodeData,
         NodeDefinition,
         NodeExecutionResult,
+        SubnodeContext,
+        SubnodeSlotDefinition,
     )
 
 
@@ -78,6 +80,12 @@ class NodeTypeDescription:
     properties: list[NodeProperty] = field(default_factory=list)
     input_strategy: dict[str, Any] | None = None
     output_strategy: dict[str, Any] | None = None
+
+    # Subnode support
+    subnode_slots: list[SubnodeSlotDefinition] | None = None  # Slots for subnodes (parent nodes)
+    is_subnode: bool = False  # True if this node is a subnode type
+    subnode_type: str | None = None  # "model" | "memory" | "tool"
+    provides_to_slot: str | None = None  # Which slot type this provides to
 
 
 class BaseNode(ABC):

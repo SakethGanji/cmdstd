@@ -106,24 +106,29 @@ class ExpressionEngine:
             "get": lambda d, key, default=None: d.get(key, default) if isinstance(d, dict) else default,
         }
 
-    def resolve(self, value: Any, context: ExpressionContext) -> Any:
+    def resolve(self, value: Any, context: ExpressionContext, skip_json: bool = False) -> Any:
         """
         Resolve all {{ }} expressions in a value.
 
         Handles strings, objects, and arrays recursively.
+
+        Args:
+            value: The value to resolve expressions in
+            context: Expression context with $json, $node, etc.
+            skip_json: If True, leave $json expressions unresolved (for per-item evaluation)
         """
         if isinstance(value, str):
-            return self._resolve_string(value, context)
+            return self._resolve_string(value, context, skip_json)
 
         if isinstance(value, list):
-            return [self.resolve(item, context) for item in value]
+            return [self.resolve(item, context, skip_json) for item in value]
 
         if isinstance(value, dict):
-            return {key: self.resolve(val, context) for key, val in value.items()}
+            return {key: self.resolve(val, context, skip_json) for key, val in value.items()}
 
         return value
 
-    def _resolve_string(self, string: str, context: ExpressionContext) -> Any:
+    def _resolve_string(self, string: str, context: ExpressionContext, skip_json: bool = False) -> Any:
         """
         Resolve expressions in a string.
 
@@ -136,17 +141,23 @@ class ExpressionEngine:
             inner = trimmed[2:-2].strip()
             # Check if it's a single expression without other text
             if "{{" not in inner:
+                # Skip $json expressions if requested (for per-item evaluation later)
+                if skip_json and ("$json" in inner or "$itemIndex" in inner):
+                    return string  # Return original template
                 return self._evaluate(inner, context)
 
         # Multiple expressions or mixed content - return string
-        return self._replace_expressions(string, context)
+        return self._replace_expressions(string, context, skip_json)
 
-    def _replace_expressions(self, string: str, context: ExpressionContext) -> str:
+    def _replace_expressions(self, string: str, context: ExpressionContext, skip_json: bool = False) -> str:
         """Replace all {{ }} expressions in a string with evaluated values."""
         pattern = r"\{\{(.+?)\}\}"
 
         def replacer(match: re.Match[str]) -> str:
             expr = match.group(1).strip()
+            # Skip $json expressions if requested
+            if skip_json and ("$json" in expr or "$itemIndex" in expr):
+                return match.group(0)  # Return original {{ expression }}
             result = self._evaluate(expr, context)
             return self._stringify(result)
 
