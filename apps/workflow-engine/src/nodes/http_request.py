@@ -141,39 +141,62 @@ class HttpRequestNode(BaseNode):
         node_definition: NodeDefinition,
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
+        import json
         from ..engine.types import NodeData
+        from ..engine.expression_engine import ExpressionEngine, expression_engine
 
-        url = self.get_parameter(node_definition, "url")
+        url_template = self.get_parameter(node_definition, "url")
         method = self.get_parameter(node_definition, "method", "GET")
         response_type = self.get_parameter(node_definition, "responseType", "json")
-
-        # Process headers
         headers_param = self.get_parameter(node_definition, "headers", [])
-        headers: dict[str, str] = {"Content-Type": "application/json"}
-
-        if isinstance(headers_param, list):
-            for h in headers_param:
-                if h.get("name"):
-                    headers[h["name"]] = h.get("value", "")
-        elif isinstance(headers_param, dict):
-            headers.update(headers_param)
-
-        # Process body
-        body = None
-        if method in ("POST", "PUT", "PATCH"):
-            body = node_definition.parameters.get("body")
-            if isinstance(body, str) and body:
-                import json
-                try:
-                    body = json.loads(body)
-                except json.JSONDecodeError:
-                    pass  # Keep as string
+        body_template = node_definition.parameters.get("body", "")
 
         results: list[NodeData] = []
         items = input_data if input_data else [NodeData(json={})]
 
         async def make_requests(client: httpx.AsyncClient) -> None:
-            for _item in items:
+            for idx, item in enumerate(items):
+                # Create expression context for this item
+                expr_context = ExpressionEngine.create_context(
+                    input_data,
+                    context.node_states,
+                    context.execution_id,
+                    idx,
+                )
+
+                # Resolve URL expressions
+                url = expression_engine.resolve(url_template, expr_context)
+
+                # Process and resolve headers
+                headers: dict[str, str] = {"Content-Type": "application/json"}
+                if isinstance(headers_param, list):
+                    for h in headers_param:
+                        if h.get("name"):
+                            header_value = h.get("value", "")
+                            # Resolve expressions in header values
+                            resolved_value = expression_engine.resolve(header_value, expr_context)
+                            headers[h["name"]] = str(resolved_value) if resolved_value else ""
+                elif isinstance(headers_param, dict):
+                    for name, value in headers_param.items():
+                        resolved_value = expression_engine.resolve(value, expr_context)
+                        headers[name] = str(resolved_value) if resolved_value else ""
+
+                # Process body with expression resolution
+                body = None
+                if method in ("POST", "PUT", "PATCH") and body_template:
+                    # Resolve expressions in body
+                    resolved_body = expression_engine.resolve(body_template, expr_context)
+
+                    if isinstance(resolved_body, dict):
+                        # Already a dict (expression returned object)
+                        body = resolved_body
+                    elif isinstance(resolved_body, str) and resolved_body:
+                        # Try to parse as JSON
+                        try:
+                            body = json.loads(resolved_body)
+                        except json.JSONDecodeError:
+                            body = resolved_body  # Keep as string
+
                 response = await client.request(
                     method=method,
                     url=url,
