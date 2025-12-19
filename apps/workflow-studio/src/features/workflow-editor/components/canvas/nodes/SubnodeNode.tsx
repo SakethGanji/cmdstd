@@ -37,13 +37,6 @@ function getSubnodeStyles(type: SubnodeType): SubnodeStyleConfig {
   return styles[type];
 }
 
-// Type display names
-const typeLabels: Record<SubnodeType, string> = {
-  model: 'Model',
-  memory: 'Memory',
-  tool: 'Tool',
-};
-
 function SubnodeNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const openNDV = useNDVStore((s) => s.openNDV);
 
@@ -58,21 +51,11 @@ function SubnodeNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   };
 
   return (
-    <div className="relative flex flex-col items-center">
-      {/* Type label above node */}
-      <div className="absolute -top-5 left-1/2 -translate-x-1/2 whitespace-nowrap">
-        <span
-          className="text-[10px] font-medium"
-          style={{ color: styles.accentColor }}
-        >
-          {typeLabels[subnodeType]}
-        </span>
-      </div>
-
+    <div className="relative flex flex-col items-center pt-1">
       {/* Circular node with consistent styling */}
       <div
         className={cn(
-          'w-12 h-12 rounded-full flex items-center justify-center',
+          'w-11 h-11 rounded-full flex items-center justify-center',
           'border-2 transition-all duration-200 cursor-grab',
           selected && 'ring-2 ring-offset-2 ring-offset-background',
           data.disabled && 'opacity-50',
@@ -100,19 +83,22 @@ function SubnodeNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
 
         {/* Icon with background */}
         <div
-          className="flex h-7 w-7 items-center justify-center rounded-full"
+          className="flex h-6 w-6 items-center justify-center rounded-full"
           style={{
             backgroundColor: styles.iconBgColor,
             color: styles.accentColor,
           }}
         >
-          <IconComponent size={16} />
+          <IconComponent size={14} />
         </div>
       </div>
 
-      {/* Label below node */}
-      <div className="mt-2 max-w-[90px] text-center">
-        <span className="text-[11px] text-foreground/90 font-medium leading-tight block">
+      {/* Label below node - truncated with ellipsis */}
+      <div className="mt-1.5 w-[80px] text-center">
+        <span
+          className="text-[10px] text-foreground/80 font-medium leading-tight block truncate"
+          title={data.label}
+        >
           {data.label}
         </span>
       </div>

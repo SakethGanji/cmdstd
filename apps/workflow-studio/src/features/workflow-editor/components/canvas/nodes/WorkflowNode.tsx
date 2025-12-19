@@ -32,46 +32,6 @@ const StatusBadge = ({ status }: { status: 'success' | 'error' }) => {
   );
 };
 
-// Group accent components for visual differentiation
-const GroupAccent = ({ group, accentColor }: { group: NodeGroup; accentColor: string }) => {
-  switch (group) {
-    case 'trigger':
-      // Left accent bar
-      return (
-        <div
-          className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
-          style={{ backgroundColor: accentColor }}
-        />
-      );
-    case 'action':
-      // Bottom accent bar
-      return (
-        <div
-          className="absolute bottom-0 left-3 right-3 h-[2px] rounded-t-full"
-          style={{ backgroundColor: accentColor }}
-        />
-      );
-    case 'flow':
-      // Top accent bar for flow nodes
-      return (
-        <div
-          className="absolute top-0 left-3 right-3 h-[2px] rounded-b-full"
-          style={{ backgroundColor: accentColor }}
-        />
-      );
-    case 'output':
-      // Right accent bar for output nodes (opposite of trigger)
-      return (
-        <div
-          className="absolute right-0 top-3 bottom-3 w-[3px] rounded-l-full"
-          style={{ backgroundColor: accentColor }}
-        />
-      );
-    default:
-      return null;
-  }
-};
-
 function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const [isHovered, setIsHovered] = useState(false);
   const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
@@ -217,23 +177,6 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
 
     return (
       <>
-        {/* Slot labels row - inside node at bottom */}
-        <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center border-t border-border/20 rounded-b-xl">
-          {slots.map((slot, index) => (
-            <div key={`slot-${slot.name}`} className="flex items-center">
-              {/* Divider between slots (not before first) */}
-              {index > 0 && (
-                <div className="h-4 w-px bg-border/30" />
-              )}
-              {/* Slot label */}
-              <span className="px-2.5 py-1.5 text-[10px] text-muted-foreground/70 whitespace-nowrap">
-                {slot.displayName}
-                {slot.required && <span className="text-destructive/70">*</span>}
-              </span>
-            </div>
-          ))}
-        </div>
-
         {/* Handles and + buttons at bottom - one per slot */}
         {slots.map((slot, index) => {
           // Position evenly across the node width
@@ -268,7 +211,7 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
                     ${showActions ? 'opacity-100' : 'opacity-0'}
                   `}
                   style={{
-                    bottom: '-24px',
+                    bottom: '-20px',
                     left: `${slotPercent}%`,
                     transform: 'translateX(-50%)',
                     pointerEvents: 'all',
@@ -311,9 +254,6 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
         }}
         onDoubleClick={handleDoubleClick}
       >
-        {/* Group accent (left bar for triggers, top bar for flow, bottom bar for actions) */}
-        <GroupAccent group={nodeGroup} accentColor={styles.accentColor} />
-
         {/* Input Handles */}
         {renderInputHandles()}
 
@@ -344,8 +284,9 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
 
       {/* Node Label - Below the node */}
       <span
-        className="mt-2 text-center text-xs font-medium text-muted-foreground leading-tight"
-        style={{ maxWidth: Math.max(120, dimensions.width + 20) }}
+        className={`text-center text-xs font-medium text-muted-foreground leading-tight truncate ${subnodeSlotCount > 0 ? 'mt-6' : 'mt-2'}`}
+        style={{ maxWidth: Math.max(120, dimensions.width + 40) }}
+        title={data.label}
       >
         {data.label}
       </span>
