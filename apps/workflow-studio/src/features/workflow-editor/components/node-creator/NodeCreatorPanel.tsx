@@ -219,41 +219,9 @@ export default function NodeCreatorPanel() {
         }
       }
 
-      // For dynamic output nodes, calculate initial outputs based on default parameters
-      let initialOutputCount = nodeDef.outputCount;
-      let initialOutputs = nodeDef.outputs;
-
-      // If node has outputStrategy, calculate initial outputs
-      if (nodeDef.outputStrategy?.type === 'dynamicFromParameter') {
-        // Get number of outputs from parameter value (e.g., numberOfOutputs)
-        const paramName = nodeDef.outputStrategy.parameter;
-        const numOutputs = paramName ? (defaultParams[paramName] as number) || 2 : 2;
-        initialOutputCount = numOutputs + (nodeDef.outputStrategy.addFallback ? 1 : 0);
-
-        // Generate output definitions: output0, output1, ... + fallback
-        initialOutputs = [];
-        for (let i = 0; i < numOutputs; i++) {
-          initialOutputs.push({ name: `output${i}`, displayName: `Output ${i}` });
-        }
-        if (nodeDef.outputStrategy.addFallback) {
-          initialOutputs.push({ name: 'fallback', displayName: 'Fallback' });
-        }
-      } else if (nodeDef.outputStrategy?.type === 'dynamicFromCollection') {
-        const collectionName = nodeDef.outputStrategy.collectionName;
-        const collection = collectionName ? (defaultParams[collectionName] as unknown[]) || [] : [];
-        const numOutputs = collection.length + (nodeDef.outputStrategy.addFallback ? 1 : 0);
-        // Minimum of 1 output (fallback) for Switch node
-        initialOutputCount = Math.max(1, numOutputs);
-        initialOutputs = Array.from({ length: initialOutputCount }, (_, i) => ({
-          name: i === initialOutputCount - 1 && nodeDef.outputStrategy?.addFallback
-            ? 'fallback'
-            : `output${i}`,
-          displayName: i === initialOutputCount - 1 && nodeDef.outputStrategy?.addFallback
-            ? 'Fallback'
-            : `Output ${i}`,
-        }));
-      }
-
+      // Backend now returns computed default outputs, so we use them directly.
+      // No need to recalculate here - the API already computed outputs based on
+      // property defaults (e.g., Switch with numberOfOutputs=2 returns 3 outputs).
       const nodeData: WorkflowNodeData = {
         name: nodeName,           // Unique name for backend connections
         label: nodeDef.displayName,  // Display label in UI
@@ -264,13 +232,13 @@ export default function NodeCreatorPanel() {
         continueOnFail: false,
         retryOnFail: 0,
         retryDelay: 1000,
-        // Dynamic UI metadata from API
+        // Dynamic UI metadata from API (already computed with defaults)
         group: nodeDef.group,
         inputCount: nodeDef.inputCount,
-        outputCount: initialOutputCount,
+        outputCount: nodeDef.outputCount,
         inputs: nodeDef.inputs,
-        outputs: initialOutputs,
-        // Output strategy for dynamic recalculation
+        outputs: nodeDef.outputs,
+        // Output strategy for dynamic recalculation when user changes params
         outputStrategy: nodeDef.outputStrategy,
         // Subnode slots for parent nodes (like AI Agent)
         subnodeSlots: nodeDef.subnodeSlots,

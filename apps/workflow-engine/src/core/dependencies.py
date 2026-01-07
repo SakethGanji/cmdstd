@@ -50,14 +50,24 @@ def get_node_registry():
 # --- Service Dependencies ---
 
 
+def get_node_service(
+    node_registry=Depends(get_node_registry),
+):
+    """Get node service instance."""
+    from ..services.node_service import NodeService
+
+    return NodeService(node_registry)
+
+
 def get_workflow_service(
     workflow_repo=Depends(get_workflow_repository),
     execution_repo=Depends(get_execution_repository),
+    node_service=Depends(get_node_service),
 ):
     """Get workflow service instance."""
     from ..services.workflow_service import WorkflowService
 
-    return WorkflowService(workflow_repo, execution_repo)
+    return WorkflowService(workflow_repo, execution_repo, node_service)
 
 
 def get_execution_service(
@@ -68,12 +78,3 @@ def get_execution_service(
     from ..services.execution_service import ExecutionService
 
     return ExecutionService(execution_repo, workflow_repo)
-
-
-def get_node_service(
-    node_registry=Depends(get_node_registry),
-):
-    """Get node service instance."""
-    from ..services.node_service import NodeService
-
-    return NodeService(node_registry)

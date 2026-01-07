@@ -30,6 +30,7 @@ from ..schemas.execution import ExecutionResponse, ExecutionErrorSchema
 
 if TYPE_CHECKING:
     from ..repositories import WorkflowRepository, ExecutionRepository
+    from .node_service import NodeService
 
 
 class WorkflowService:
@@ -39,9 +40,11 @@ class WorkflowService:
         self,
         workflow_repo: WorkflowRepository,
         execution_repo: ExecutionRepository,
+        node_service: NodeService,
     ) -> None:
         self._workflow_repo = workflow_repo
         self._execution_repo = execution_repo
+        self._node_service = node_service
 
     async def list_workflows(self) -> list[WorkflowListItem]:
         """List all workflows."""
@@ -278,22 +281,33 @@ class WorkflowService:
 
     def _workflow_to_dict(self, workflow: Workflow) -> dict[str, Any]:
         """Convert internal Workflow to dict for API response."""
+        enriched_nodes = []
+        for n in workflow.nodes:
+            # Compute dynamic I/O based on node type and parameters
+            io_data = self._node_service.compute_node_io(n.type, n.parameters or {})
+
+            enriched_nodes.append({
+                "name": n.name,
+                "type": n.type,
+                "parameters": n.parameters,
+                "position": n.position,
+                "retry_on_fail": n.retry_on_fail,
+                "retry_delay": n.retry_delay,
+                "continue_on_fail": n.continue_on_fail,
+                # Enriched I/O data for frontend
+                "inputs": io_data["inputs"],
+                "inputCount": io_data["inputCount"],
+                "outputs": io_data["outputs"],
+                "outputCount": io_data["outputCount"],
+                "inputStrategy": io_data["inputStrategy"],
+                "outputStrategy": io_data["outputStrategy"],
+            })
+
         return {
             "name": workflow.name,
             "id": workflow.id,
             "description": workflow.description,
-            "nodes": [
-                {
-                    "name": n.name,
-                    "type": n.type,
-                    "parameters": n.parameters,
-                    "position": n.position,
-                    "retry_on_fail": n.retry_on_fail,
-                    "retry_delay": n.retry_delay,
-                    "continue_on_fail": n.continue_on_fail,
-                }
-                for n in workflow.nodes
-            ],
+            "nodes": enriched_nodes,
             "connections": [
                 {
                     "source_node": c.source_node,

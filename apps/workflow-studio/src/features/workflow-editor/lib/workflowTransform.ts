@@ -340,6 +340,13 @@ interface ApiWorkflowDetail {
       type: string;
       parameters: Record<string, unknown>;
       position?: { x: number; y: number };
+      // Enriched I/O data from backend
+      inputs?: Array<{ name: string; displayName: string }>;
+      inputCount?: number;
+      outputs?: Array<{ name: string; displayName: string }>;
+      outputCount?: number;
+      inputStrategy?: Record<string, unknown>;
+      outputStrategy?: Record<string, unknown>;
     }>;
     connections: Array<{
       source_node: string;
@@ -371,6 +378,12 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
       label: node.name,
       icon: getIconForType(node.type),
       parameters: node.parameters,
+      // Use enriched I/O data from backend
+      inputs: node.inputs?.map((i) => ({ name: i.name, displayName: i.displayName })),
+      inputCount: node.inputCount ?? 1,
+      outputs: node.outputs?.map((o) => ({ name: o.name, displayName: o.displayName })),
+      outputCount: node.outputCount ?? 1,
+      outputStrategy: node.outputStrategy as WorkflowNodeData['outputStrategy'],
     },
   }));
 
