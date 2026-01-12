@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { Eye, EyeOff, Plus, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import ExpressionEditor from './ExpressionEditor';
 import CodeEditor from '@/shared/components/ui/code-editor';
+import { WorkflowSelectorField } from './WorkflowSelectorField';
 
 // Type definitions matching the API schema
 // These are compatible with INodeProperty from workflow-engine
@@ -34,7 +35,7 @@ interface DisplayOptions {
 }
 
 // Type for property field types
-type NodePropertyType = 'string' | 'number' | 'boolean' | 'options' | 'json' | 'collection';
+type NodePropertyType = 'string' | 'number' | 'boolean' | 'options' | 'json' | 'collection' | 'workflowSelector';
 
 interface NodeProperty {
   displayName: string;
@@ -240,6 +241,15 @@ function PropertyField({ property, value, onChange, allValues, upstreamSchema, s
           value={(value as unknown[]) || []}
           onChange={onChange}
           allValues={allValues}
+        />
+      );
+
+    case 'workflowSelector':
+      return (
+        <WorkflowSelectorField
+          property={property}
+          value={value as string}
+          onChange={onChange}
         />
       );
 

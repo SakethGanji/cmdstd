@@ -3,7 +3,7 @@ import { X, Search, ArrowLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { generateNodeName, getExistingNodeNames } from '../../lib/workflowTransform';
-import { useNodeTypes, getNodeIcon, backendTypeToUIType } from '../../hooks/useNodeTypes';
+import { useNodeTypes, getNodeIcon } from '../../hooks/useNodeTypes';
 import NodeItem from './NodeItem';
 import type { NodeDefinition, WorkflowNodeData, SubnodeType, SubnodeSlotDefinition, OutputStrategy } from '../../types/workflow';
 import type { NodeGroup, NodeIO } from '../../lib/nodeStyles';
@@ -97,8 +97,8 @@ export default function NodeCreatorPanel() {
         : (node.outputCount === 'dynamic' ? outputs.length || 1 : outputs.length);
 
       const nodeDef: ExtendedNodeDefinition = {
-        type: backendTypeToUIType(node.type),
-        name: node.type, // Backend type (PascalCase)
+        type: node.type, // Backend type (PascalCase) - used everywhere
+        name: node.type, // Same as type
         displayName: node.displayName,
         description: node.description,
         icon: getNodeIcon(node.type, node.icon),

@@ -3,7 +3,7 @@ import { Database, Code, ChevronDown, ChevronUp, Copy, Check, Settings, FileText
 import type { NodeExecutionData } from '../../types/workflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { getAllUpstreamNodes, getExpressionBasePath } from '../../lib/graphUtils';
-import { useNodeTypes, uiTypeToBackendType } from '../../hooks/useNodeTypes';
+import { useNodeTypes } from '../../hooks/useNodeTypes';
 import RunDataDisplay from './RunDataDisplay';
 import SchemaDisplay from './SchemaDisplay';
 
@@ -63,12 +63,12 @@ export default function InputPanel({ nodeId, executionData }: InputPanelProps) {
   }, [effectiveSelectedNode, nodes]);
 
   // Get output schema from node type definition (for fallback when no execution data)
+  // Node types are already in backend format
   const selectedNodeOutputSchema = useMemo(() => {
     if (!selectedReactFlowNode || !nodeTypes) return null;
     const nodeType = selectedReactFlowNode.data?.type;
     if (!nodeType) return null;
-    const backendType = uiTypeToBackendType(nodeType);
-    const typeDef = nodeTypes.find((t) => t.type === backendType);
+    const typeDef = nodeTypes.find((t) => t.type === nodeType);
     return typeDef?.outputs?.[0]?.schema || null;
   }, [selectedReactFlowNode, nodeTypes]);
 

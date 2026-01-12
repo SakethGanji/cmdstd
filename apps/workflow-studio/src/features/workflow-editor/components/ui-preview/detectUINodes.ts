@@ -13,21 +13,16 @@ export interface UIConfig {
   placeholder?: string;
 }
 
-// Support both camelCase (UI) and PascalCase (backend) node types
+// Node types use backend PascalCase format
 const INPUT_NODE_TYPES: Record<string, InputType> = {
   ChatInput: 'chat',
-  chatInput: 'chat',
   FormInput: 'form',
-  formInput: 'form',
 };
 
 const OUTPUT_NODE_TYPES: Record<string, OutputType> = {
   ChatOutput: 'chat',
-  chatOutput: 'chat',
   HTMLDisplay: 'html',
-  htmlDisplay: 'html',
   TextDisplay: 'text',
-  textDisplay: 'text',
 };
 
 /**

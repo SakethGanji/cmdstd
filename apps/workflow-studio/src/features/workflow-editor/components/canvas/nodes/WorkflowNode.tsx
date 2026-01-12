@@ -14,6 +14,7 @@ import {
   type NodeGroup,
 } from '../../../lib/nodeStyles';
 import { getIconForNode } from '../../../lib/nodeIcons';
+import { isTriggerType } from '../../../lib/nodeConfig';
 
 // Status badge component for success/error states
 const StatusBadge = ({ status }: { status: 'success' | 'error' }) => {
@@ -43,10 +44,8 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     () => getIconForNode(data.icon, data.type),
     [data.icon, data.type]
   );
-  const isTrigger = data.type?.includes('Trigger') || data.type?.includes('trigger') ||
-    data.type === 'Start' || data.type === 'manualTrigger' ||
-    data.type === 'Webhook' || data.type === 'webhook' ||
-    data.type === 'Cron' || data.type === 'scheduleTrigger';
+  // Use centralized trigger detection (backend types only)
+  const isTrigger = isTriggerType(data.type || '');
 
   // Get group-based styling and shape
   const nodeGroup = useMemo(

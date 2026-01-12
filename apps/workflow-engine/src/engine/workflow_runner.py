@@ -10,7 +10,7 @@ import asyncio
 import logging
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Literal
+from typing import Any, TYPE_CHECKING, Literal
 
 import httpx
 
@@ -27,6 +27,7 @@ from .types import (
     NodeData,
     NodeDefinition,
     NodeExecutionResult,
+    RecursionLimitError,
     ResolvedSubnode,
     SubnodeContext,
     SubnodeSlotDefinition,
@@ -52,6 +53,7 @@ class WorkflowRunner:
         initial_data: list[NodeData] | None = None,
         mode: Literal["manual", "webhook", "cron"] = "manual",
         on_event: ExecutionEventCallback | None = None,
+        workflow_repository: Any | None = None,
     ) -> ExecutionContext:
         """
         Run a workflow from a starting node.
@@ -62,6 +64,7 @@ class WorkflowRunner:
             initial_data: Initial input data for the start node
             mode: Execution mode (manual, webhook, cron)
             on_event: Optional callback for real-time execution events
+            workflow_repository: Optional repository for subworkflow loading
 
         Returns:
             ExecutionContext with all node states and errors
@@ -70,6 +73,7 @@ class WorkflowRunner:
             initial_data = [NodeData(json={})]
 
         context = self._create_context(workflow, mode)
+        context.workflow_repository = workflow_repository
 
         total_nodes = len(workflow.nodes)
         completed_nodes = 0
@@ -202,6 +206,211 @@ class WorkflowRunner:
                         error=error,
                     ),
                 )
+
+        # Emit execution complete event
+        self._emit_event(
+            on_event,
+            ExecutionEvent(
+                type=ExecutionEventType.EXECUTION_COMPLETE,
+                execution_id=context.execution_id,
+                timestamp=datetime.now(),
+                progress={"completed": completed_nodes, "total": total_nodes},
+            ),
+        )
+
+        return context
+
+    async def run_subworkflow(
+        self,
+        workflow: Workflow,
+        start_node_name: str,
+        input_data: list[NodeData],
+        parent_context: ExecutionContext,
+        on_event: ExecutionEventCallback | None = None,
+    ) -> ExecutionContext:
+        """
+        Run a workflow as a subworkflow of another execution.
+
+        Inherits execution context from parent (depth tracking, HTTP client, etc.)
+        while maintaining isolation for node states.
+
+        Args:
+            workflow: The subworkflow definition to execute
+            start_node_name: Name of the node to start execution from
+            input_data: Input data for the subworkflow
+            parent_context: Parent execution context for depth tracking
+            on_event: Optional callback for real-time execution events
+
+        Returns:
+            ExecutionContext with subworkflow results
+
+        Raises:
+            RecursionLimitError: If max execution depth is exceeded
+        """
+        # Check recursion limit
+        if parent_context.execution_depth >= parent_context.max_execution_depth:
+            raise RecursionLimitError(
+                f"Maximum subworkflow depth of {parent_context.max_execution_depth} exceeded"
+            )
+
+        # Create child context with incremented depth
+        child_context = self._create_context(workflow, parent_context.mode)
+        child_context.execution_depth = parent_context.execution_depth + 1
+        child_context.max_execution_depth = parent_context.max_execution_depth
+        child_context.parent_execution_id = parent_context.execution_id
+        child_context.workflow_repository = parent_context.workflow_repository
+
+        # Share HTTP client for efficiency
+        child_context.http_client = parent_context.http_client
+
+        # Run the subworkflow
+        # Note: We don't use self.run() directly because it creates its own HTTP client
+        # Instead we run the core execution logic with the pre-configured context
+        return await self._run_with_context(
+            workflow=workflow,
+            start_node_name=start_node_name,
+            initial_data=input_data,
+            context=child_context,
+            on_event=on_event,
+        )
+
+    async def _run_with_context(
+        self,
+        workflow: Workflow,
+        start_node_name: str,
+        initial_data: list[NodeData],
+        context: ExecutionContext,
+        on_event: ExecutionEventCallback | None = None,
+    ) -> ExecutionContext:
+        """
+        Run a workflow with a pre-configured execution context.
+
+        Used by run_subworkflow to execute with inherited context.
+        """
+        total_nodes = len(workflow.nodes)
+        completed_nodes = 0
+
+        # Build node lookup dict for O(1) access
+        node_map: dict[str, NodeDefinition] = {n.name: n for n in workflow.nodes}
+
+        # Emit execution start event
+        self._emit_event(
+            on_event,
+            ExecutionEvent(
+                type=ExecutionEventType.EXECUTION_START,
+                execution_id=context.execution_id,
+                timestamp=datetime.now(),
+                progress={"completed": 0, "total": total_nodes},
+            ),
+        )
+
+        # Find start node
+        start_node = node_map.get(start_node_name)
+        if not start_node:
+            error = f'Start node "{start_node_name}" not found in workflow'
+            self._emit_event(
+                on_event,
+                ExecutionEvent(
+                    type=ExecutionEventType.EXECUTION_ERROR,
+                    execution_id=context.execution_id,
+                    timestamp=datetime.now(),
+                    error=error,
+                ),
+            )
+            raise ValueError(error)
+
+        # Initialize job queue with start node
+        queue: list[ExecutionJob] = [
+            ExecutionJob(
+                node_name=start_node_name,
+                input_data=initial_data,
+                source_node=None,
+                source_output="main",
+                run_index=0,
+            )
+        ]
+
+        # Track which nodes have been executed
+        executed_nodes: set[str] = set()
+
+        # Process jobs until queue is empty
+        iteration = 0
+        max_iterations = workflow.settings.get("max_iterations", 1000)
+
+        while queue and iteration < max_iterations:
+            iteration += 1
+
+            # Process all currently available jobs in parallel (BFS layer)
+            current_batch = queue[:]
+            queue.clear()
+
+            tasks = []
+            for job in current_batch:
+                node_def = node_map.get(job.node_name)
+                if node_def and job.node_name not in executed_nodes:
+                    self._emit_event(
+                        on_event,
+                        ExecutionEvent(
+                            type=ExecutionEventType.NODE_START,
+                            execution_id=context.execution_id,
+                            timestamp=datetime.now(),
+                            node_name=job.node_name,
+                            node_type=node_def.type,
+                            progress={"completed": completed_nodes, "total": total_nodes},
+                        ),
+                    )
+
+                tasks.append(self._process_job(context, job, queue, node_map, on_event))
+
+            # Run batch
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+            # Process results
+            for job, result in zip(current_batch, results):
+                had_error = False
+                if isinstance(result, Exception):
+                    logger.error(f"Error processing job {job.node_name}: {result}")
+                    had_error = True
+                else:
+                    had_error = result
+
+                node_def = node_map.get(job.node_name)
+                if job.node_name not in executed_nodes:
+                    executed_nodes.add(job.node_name)
+                    completed_nodes += 1
+
+                    if not had_error and node_def:
+                        self._emit_event(
+                            on_event,
+                            ExecutionEvent(
+                                type=ExecutionEventType.NODE_COMPLETE,
+                                execution_id=context.execution_id,
+                                timestamp=datetime.now(),
+                                node_name=job.node_name,
+                                node_type=node_def.type,
+                                data=context.node_states.get(job.node_name),
+                                progress={"completed": completed_nodes, "total": total_nodes},
+                            ),
+                        )
+
+        if iteration >= max_iterations:
+            error = "Execution exceeded maximum iterations (possible infinite loop)"
+            context.errors.append(
+                ExecutionError(
+                    node_name="WorkflowRunner",
+                    error=error,
+                    timestamp=datetime.now(),
+                )
+            )
+            self._emit_event(
+                on_event,
+                ExecutionEvent(
+                    type=ExecutionEventType.EXECUTION_ERROR,
+                    execution_id=context.execution_id,
+                    timestamp=datetime.now(),
+                    error=error,
+                ),
+            )
 
         # Emit execution complete event
         self._emit_event(

@@ -1,8 +1,15 @@
 /**
  * Node styling utilities for dynamic group-based colors and sizing
+ *
+ * Note: Node groups should come from the backend API. The normalizeNodeGroup
+ * function in nodeConfig.ts handles normalization. This file only contains
+ * styling-related utilities.
  */
 
-export type NodeGroup = 'trigger' | 'transform' | 'flow' | 'ai' | 'action' | 'output';
+import { normalizeNodeGroup, type NodeGroup } from './nodeConfig';
+
+// Re-export NodeGroup type for convenience
+export type { NodeGroup };
 
 interface NodeStyleConfig {
   group: NodeGroup;
@@ -30,31 +37,14 @@ export interface NodeIO {
 }
 
 /**
- * Determine node group from type and API-provided group
+ * Determine node group from API-provided group.
+ * Uses centraliz config for normalization.
+ *
+ * @deprecated Use normalizeNodeGroup from nodeConfig.ts directly.
+ * This function is kept for backward compatibility.
  */
-export function getNodeGroupFromType(type: string, apiGroup?: string[]): NodeGroup {
-  // First check API-provided group
-  if (apiGroup?.length) {
-    const group = apiGroup[0].toLowerCase();
-    if (['trigger', 'transform', 'flow', 'ai', 'action', 'output'].includes(group)) {
-      return group as NodeGroup;
-    }
-    // Map 'ui' group to 'output'
-    if (group === 'ui') return 'output';
-  }
-
-  // Fallback: infer from type name
-  const triggerTypes = ['Start', 'Webhook', 'Cron', 'ErrorTrigger', 'manualTrigger', 'webhook', 'scheduleTrigger', 'errorTrigger', 'ChatInput', 'chatInput'];
-  const flowTypes = ['If', 'Switch', 'Merge', 'Wait', 'SplitInBatches', 'if', 'switch', 'merge', 'wait', 'splitInBatches'];
-  const aiTypes = ['LLMChat', 'AIAgent', 'llmChat', 'aiAgent'];
-  const outputTypes = ['HTMLDisplay', 'htmlDisplay', 'ChatOutput', 'chatOutput'];
-
-  if (triggerTypes.some(t => type === t || type.toLowerCase().includes(t.toLowerCase()))) return 'trigger';
-  if (flowTypes.some(t => type === t)) return 'flow';
-  if (aiTypes.some(t => type === t)) return 'ai';
-  if (outputTypes.some(t => type === t)) return 'output';
-
-  return 'transform'; // Default for HttpRequest, Set, Code, etc.
+export function getNodeGroupFromType(_type: string, apiGroup?: string[]): NodeGroup {
+  return normalizeNodeGroup(apiGroup);
 }
 
 /**

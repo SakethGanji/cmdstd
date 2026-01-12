@@ -25,6 +25,12 @@ class NoOutputSignal:
 NO_OUTPUT_SIGNAL = NoOutputSignal()
 
 
+class RecursionLimitError(Exception):
+    """Raised when subworkflow execution exceeds max depth."""
+
+    pass
+
+
 @dataclass
 class NodeData:
     """Data item passed between nodes."""
@@ -61,6 +67,14 @@ class ExecutionContext:
 
     # Shared HTTP client for performance
     http_client: Any | None = None  # httpx.AsyncClient
+
+    # Subworkflow support: depth tracking
+    execution_depth: int = 0  # Current nesting level
+    max_execution_depth: int = 10  # Configurable limit
+    parent_execution_id: str | None = None  # For tracing/debugging
+
+    # Workflow repository for subworkflow loading
+    workflow_repository: Any | None = None  # WorkflowRepository
 
 
 @dataclass

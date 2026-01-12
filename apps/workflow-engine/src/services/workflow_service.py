@@ -191,7 +191,13 @@ class WorkflowService:
 
         initial_data = [NodeData(json=base_data)]
 
-        context = await runner.run(stored.workflow, start_node.name, initial_data, "manual")
+        context = await runner.run(
+            stored.workflow,
+            start_node.name,
+            initial_data,
+            "manual",
+            workflow_repository=self._workflow_repo,
+        )
         await self._execution_repo.complete(context, stored.id, stored.name)
 
         return self._build_execution_response(context)
@@ -218,7 +224,11 @@ class WorkflowService:
         initial_data = [NodeData(json=base_data)]
 
         context = await runner.run(
-            internal_workflow, start_node.name, initial_data, "manual"
+            internal_workflow,
+            start_node.name,
+            initial_data,
+            "manual",
+            workflow_repository=self._workflow_repo,
         )
         await self._execution_repo.complete(
             context, internal_workflow.id or "adhoc", internal_workflow.name
@@ -301,6 +311,8 @@ class WorkflowService:
                 "outputCount": io_data["outputCount"],
                 "inputStrategy": io_data["inputStrategy"],
                 "outputStrategy": io_data["outputStrategy"],
+                # Node group for styling
+                "group": io_data["group"],
             })
 
         return {

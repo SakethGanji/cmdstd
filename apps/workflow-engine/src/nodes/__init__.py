@@ -21,6 +21,7 @@ from .switch import SwitchNode
 from .merge import MergeNode
 from .wait import WaitNode
 from .split_in_batches import SplitInBatchesNode
+from .execute_workflow import ExecuteWorkflowNode
 
 # Transform nodes
 from .set_node import SetNode
@@ -60,6 +61,7 @@ __all__ = [
     "MergeNode",
     "WaitNode",
     "SplitInBatchesNode",
+    "ExecuteWorkflowNode",
     # Transform
     "SetNode",
     "HttpRequestNode",

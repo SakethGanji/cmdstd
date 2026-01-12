@@ -17,7 +17,7 @@ import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNDVStore } from '../../stores/ndvStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import DynamicNodeForm, { type NodeProperty, type OutputSchema } from './DynamicNodeForm';
-import { useNodeTypes, uiTypeToBackendType } from '../../hooks/useNodeTypes';
+import { useNodeTypes } from '../../hooks/useNodeTypes';
 
 interface NodeSettingsProps {
   node: Node<WorkflowNodeData>;
@@ -58,18 +58,14 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
   // Fetch node type schema from API
   const { data: nodeTypes, isLoading: isLoadingSchema } = useNodeTypes();
 
-  // Get the schema for this node type
-  const backendType = uiTypeToBackendType(node.data.type || '');
-  const nodeSchema = nodeTypes?.find((n) => n.type === backendType);
+  // Get the schema for this node type (type is already backend format)
+  const nodeSchema = nodeTypes?.find((n) => n.type === node.data.type);
 
   // Find upstream node(s) connected to this node's input
   const upstreamNodeId = edges.find((e) => e.target === node.id)?.source;
   const upstreamNode = upstreamNodeId ? nodes.find((n) => n.id === upstreamNodeId) : null;
-  const upstreamBackendType = upstreamNode?.data?.type
-    ? uiTypeToBackendType(upstreamNode.data.type)
-    : null;
-  const upstreamNodeSchema = upstreamBackendType
-    ? nodeTypes?.find((n) => n.type === upstreamBackendType)
+  const upstreamNodeSchema = upstreamNode?.data?.type
+    ? nodeTypes?.find((n) => n.type === upstreamNode.data.type)
     : null;
 
   // Get the output schema from the upstream node's first output

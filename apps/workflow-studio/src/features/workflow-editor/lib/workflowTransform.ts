@@ -5,11 +5,13 @@
  * The key differences:
  * - UI uses node.id (React Flow generated), backend uses node.name
  * - UI uses edge.source/target, backend uses connection.sourceNode/targetNode
- * - UI node types use camelCase, backend uses PascalCase
+ *
+ * Node types use backend PascalCase names everywhere (Start, Set, HttpRequest, etc.)
  */
 
 import type { Node, Edge } from 'reactflow';
 import type { WorkflowNodeData } from '../types/workflow';
+import { getNodeIcon, normalizeNodeGroup } from './nodeConfig';
 
 // Backend types (internal)
 interface BackendNodeData {
@@ -42,61 +44,6 @@ export interface BackendWorkflow {
   name: string;
   nodes: BackendNodeDefinition[];
   connections: BackendConnection[];
-}
-
-// ============================================================================
-// Node Type Mapping
-// ============================================================================
-
-/**
- * Maps UI node types (camelCase) to backend node types (PascalCase)
- */
-const UI_TO_BACKEND_NODE_TYPE: Record<string, string> = {
-  // Triggers
-  manualTrigger: 'Start',
-  scheduleTrigger: 'Cron',
-  cronTrigger: 'Cron',
-  webhook: 'Webhook',
-  errorTrigger: 'ErrorTrigger',
-
-  // Transform
-  set: 'Set',
-  code: 'Code',
-  // Note: 'filter' doesn't exist in backend - remove from UI or implement in backend
-
-  // Flow
-  if: 'If',
-  switch: 'Switch',
-  merge: 'Merge',
-  splitInBatches: 'SplitInBatches',
-
-  // Helpers
-  httpRequest: 'HttpRequest',
-  wait: 'Wait',
-
-  // AI
-  llmChat: 'LLMChat',
-  aiAgent: 'AIAgent',
-
-  // Data/File
-  readFile: 'ReadFile',
-  pandasExplore: 'PandasExplore',
-  htmlDisplay: 'HTMLDisplay',
-
-  // UI nodes
-  chatInput: 'ChatInput',
-  chatOutput: 'ChatOutput',
-
-  // Storage nodes
-  objectRead: 'ObjectRead',
-  objectWrite: 'ObjectWrite',
-};
-
-/**
- * Get the backend node type for a UI node type
- */
-function toBackendNodeType(uiType: string): string {
-  return UI_TO_BACKEND_NODE_TYPE[uiType] || uiType;
 }
 
 // ============================================================================
@@ -186,10 +133,10 @@ export function toBackendWorkflow(
   // Track which nodes are subnodes for connection type
   const subnodeIds = new Set(subnodeNodes.map((n) => n.id));
 
-  // Transform workflow nodes
+  // Transform workflow nodes - type is already backend format
   const backendNodes: BackendNodeDefinition[] = workflowNodes.map((node) => ({
     name: node.data.name,
-    type: toBackendNodeType(node.data.type),
+    type: node.data.type,
     parameters: node.data.parameters || {},
     position: {
       x: Math.round(node.position.x),
@@ -201,10 +148,10 @@ export function toBackendWorkflow(
     pinnedData: node.data.pinnedData,
   }));
 
-  // Transform subnode nodes
+  // Transform subnode nodes - type is already backend format
   const backendSubnodes: BackendNodeDefinition[] = subnodeNodes.map((node) => ({
     name: node.data.name,
-    type: toBackendNodeType(node.data.type),
+    type: node.data.type,
     parameters: node.data.parameters || {},
     position: {
       x: Math.round(node.position.x),
@@ -274,60 +221,6 @@ export function getExistingNodeNames(nodes: Node<WorkflowNodeData>[]): string[] 
 // ============================================================================
 
 /**
- * Maps backend node types (PascalCase) to UI node types (camelCase)
- */
-const BACKEND_TO_UI_NODE_TYPE: Record<string, string> = {
-  Start: 'manualTrigger',
-  Cron: 'scheduleTrigger',
-  Webhook: 'webhook',
-  ErrorTrigger: 'errorTrigger',
-  Set: 'set',
-  Code: 'code',
-  If: 'if',
-  Switch: 'switch',
-  Merge: 'merge',
-  SplitInBatches: 'splitInBatches',
-  HttpRequest: 'httpRequest',
-  Wait: 'wait',
-  LLMChat: 'llmChat',
-  AIAgent: 'aiAgent',
-  ReadFile: 'readFile',
-  PandasExplore: 'pandasExplore',
-  HTMLDisplay: 'htmlDisplay',
-  ChatInput: 'chatInput',
-  ChatOutput: 'chatOutput',
-  ObjectRead: 'objectRead',
-  ObjectWrite: 'objectWrite',
-};
-
-function toUINodeType(backendType: string): string {
-  return BACKEND_TO_UI_NODE_TYPE[backendType] || backendType;
-}
-
-/**
- * Get icon for a node type
- */
-function getIconForType(backendType: string): string {
-  const iconMap: Record<string, string> = {
-    Start: 'mouse-pointer',
-    Webhook: 'webhook',
-    Cron: 'clock',
-    ErrorTrigger: 'alert-triangle',
-    HttpRequest: 'globe',
-    Set: 'pen',
-    Code: 'code',
-    If: 'git-branch',
-    Switch: 'route',
-    Merge: 'git-merge',
-    Wait: 'clock',
-    SplitInBatches: 'layers',
-    LLMChat: 'message-square',
-    AIAgent: 'bot',
-  };
-  return iconMap[backendType] || 'code';
-}
-
-/**
  * API response types (snake_case from backend)
  */
 interface ApiWorkflowDetail {
@@ -347,6 +240,8 @@ interface ApiWorkflowDetail {
       outputCount?: number;
       inputStrategy?: Record<string, unknown>;
       outputStrategy?: Record<string, unknown>;
+      // Node group for styling
+      group?: string[];
     }>;
     connections: Array<{
       source_node: string;
@@ -368,15 +263,16 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
   isActive: boolean;
 } {
   // Build name to ID map (we use the name as the ID for simplicity)
+  // Node types use backend PascalCase format directly
   const nodes: Node<WorkflowNodeData>[] = api.definition.nodes.map((node) => ({
     id: node.name,
     type: 'workflowNode',
     position: node.position || { x: 0, y: 0 },
     data: {
       name: node.name,
-      type: toUINodeType(node.type),
+      type: node.type,
       label: node.name,
-      icon: getIconForType(node.type),
+      icon: getNodeIcon(node.type),
       parameters: node.parameters,
       // Use enriched I/O data from backend
       inputs: node.inputs?.map((i) => ({ name: i.name, displayName: i.displayName })),
@@ -384,6 +280,8 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
       outputs: node.outputs?.map((o) => ({ name: o.name, displayName: o.displayName })),
       outputCount: node.outputCount ?? 1,
       outputStrategy: node.outputStrategy as WorkflowNodeData['outputStrategy'],
+      // Node group for styling (normalized from backend array)
+      group: normalizeNodeGroup(node.group),
     },
   }));
 

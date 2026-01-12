@@ -41,6 +41,7 @@ class NodeService:
                 "outputCount": 1,
                 "inputStrategy": None,
                 "outputStrategy": None,
+                "group": None,
             }
 
         # Start with base schema
@@ -102,6 +103,7 @@ class NodeService:
             "outputCount": output_count,
             "inputStrategy": info.input_strategy,
             "outputStrategy": info.output_strategy,
+            "group": info.group,
         }
 
     def _get_property_default(
