@@ -10,7 +10,7 @@ from ..core.exceptions import (
     WorkflowInactiveError,
     WebhookError,
 )
-from ..engine.types import NodeData
+from ..engine.types import NodeData, WebhookResponse
 from ..engine.workflow_runner import WorkflowRunner
 from ..schemas.execution import ExecutionResponse, ExecutionErrorSchema
 
@@ -36,8 +36,11 @@ class WebhookService:
         body: dict[str, Any],
         headers: dict[str, str],
         query_params: dict[str, str],
-    ) -> dict[str, Any]:
-        """Handle incoming webhook request."""
+    ) -> dict[str, Any] | WebhookResponse:
+        """Handle incoming webhook request.
+
+        Returns either a dict (default response) or WebhookResponse (custom response from node).
+        """
         stored = await self._workflow_repo.get(workflow_id)
         if not stored:
             raise WorkflowNotFoundError(workflow_id)
@@ -78,11 +81,16 @@ class WebhookService:
             webhook_node.name,
             [webhook_data],
             "webhook",
+            workflow_repository=self._workflow_repo,
         )
 
         await self._execution_repo.complete(context, stored.id, stored.name)
 
-        # Check response mode
+        # Check if a RespondToWebhook node set a custom response
+        if context.webhook_response:
+            return context.webhook_response
+
+        # Check response mode from Webhook node configuration
         response_mode = webhook_node.parameters.get("responseMode", "onReceived")
 
         if response_mode == "lastNode" and context.node_states:

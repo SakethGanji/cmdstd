@@ -211,28 +211,39 @@ node_registry = NodeRegistryClass()
 def register_all_nodes() -> None:
     """Register all built-in nodes."""
     from ..nodes import (
+        # Triggers
         StartNode,
         WebhookNode,
         CronNode,
-        SetNode,
-        HttpRequestNode,
-        CodeNode,
+        ErrorTriggerNode,
+        ExecuteWorkflowTriggerNode,
+        # Flow control
         IfNode,
         SwitchNode,
         MergeNode,
         WaitNode,
         SplitInBatchesNode,
         ExecuteWorkflowNode,
-        LLMChatNode,
-        AIAgentNode,
+        StopAndErrorNode,
+        # Transform
+        SetNode,
+        HttpRequestNode,
+        CodeNode,
         ReadFileNode,
+        WriteFileNode,
         PandasExploreNode,
         HTMLDisplayNode,
-        ErrorTriggerNode,
-        ChatInputNode,
-        ChatOutputNode,
         ObjectReadNode,
         ObjectWriteNode,
+        FilterNode,
+        ItemListsNode,
+        RespondToWebhookNode,
+        # AI
+        LLMChatNode,
+        AIAgentNode,
+        # UI
+        ChatInputNode,
+        ChatOutputNode,
     )
 
     # Import subnode types
@@ -247,29 +258,39 @@ def register_all_nodes() -> None:
 
     # All node classes (regular nodes + subnodes)
     all_node_classes: list[type[BaseNode]] = [
-        # Regular nodes
+        # Triggers
         StartNode,
         WebhookNode,
         CronNode,
-        SetNode,
-        HttpRequestNode,
-        CodeNode,
+        ErrorTriggerNode,
+        ExecuteWorkflowTriggerNode,
+        # Flow control
         IfNode,
         SwitchNode,
         MergeNode,
         WaitNode,
         SplitInBatchesNode,
         ExecuteWorkflowNode,
-        LLMChatNode,
-        AIAgentNode,
+        StopAndErrorNode,
+        # Transform
+        SetNode,
+        HttpRequestNode,
+        CodeNode,
         ReadFileNode,
+        WriteFileNode,
         PandasExploreNode,
         HTMLDisplayNode,
-        ErrorTriggerNode,
-        ChatInputNode,
-        ChatOutputNode,
         ObjectReadNode,
         ObjectWriteNode,
+        FilterNode,
+        ItemListsNode,
+        RespondToWebhookNode,
+        # AI
+        LLMChatNode,
+        AIAgentNode,
+        # UI
+        ChatInputNode,
+        ChatOutputNode,
         # Subnodes
         GeminiModelNode,
         SimpleMemoryNode,

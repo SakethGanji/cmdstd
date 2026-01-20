@@ -31,6 +31,25 @@ class RecursionLimitError(Exception):
     pass
 
 
+class WorkflowStopSignal(Exception):
+    """Signal to stop workflow execution gracefully."""
+
+    def __init__(self, message: str = "Workflow stopped", error_type: str = "error"):
+        self.message = message
+        self.error_type = error_type  # "error" or "warning"
+        super().__init__(message)
+
+
+@dataclass
+class WebhookResponse:
+    """Custom response for webhook-triggered workflows."""
+
+    status_code: int = 200
+    body: Any = None
+    headers: dict[str, str] | None = None
+    content_type: str = "application/json"
+
+
 @dataclass
 class NodeData:
     """Data item passed between nodes."""
@@ -75,6 +94,12 @@ class ExecutionContext:
 
     # Workflow repository for subworkflow loading
     workflow_repository: Any | None = None  # WorkflowRepository
+
+    # Custom webhook response (set by RespondToWebhook node)
+    webhook_response: WebhookResponse | None = None
+
+    # Subworkflow input data (set by ExecuteWorkflow node)
+    subworkflow_input: list[NodeData] | None = None
 
 
 @dataclass

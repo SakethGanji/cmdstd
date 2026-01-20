@@ -32,6 +32,7 @@ from .types import (
     SubnodeContext,
     SubnodeSlotDefinition,
     Workflow,
+    WorkflowStopSignal,
     NO_OUTPUT_SIGNAL,
 )
 
@@ -531,6 +532,23 @@ class WorkflowRunner:
                     result = await node.execute(context, resolved_node_def, job.input_data)
                 last_error = None
                 break  # Success, exit retry loop
+            except WorkflowStopSignal as stop:
+                # Handle graceful workflow stop
+                if stop.error_type == "error":
+                    context.errors.append(
+                        ExecutionError(
+                            node_name=job.node_name,
+                            error=stop.message,
+                            timestamp=datetime.now(),
+                        )
+                    )
+                # Clear the queue to stop execution
+                queue.clear()
+                # Store stop info in node state for visibility
+                context.node_states[job.node_name] = [
+                    NodeData(json={"_stopped": True, "_message": stop.message, "_type": stop.error_type})
+                ]
+                return stop.error_type == "error"  # Return True if error, False if warning
             except Exception as e:
                 last_error = e
                 if attempt < max_retries:
@@ -746,8 +764,8 @@ class WorkflowRunner:
         # Filter out subnodes first
         main_nodes = [n for n in workflow.nodes if not self._is_subnode(n.type)]
 
-        # Priority: Webhook > Cron > Start > first node
-        for node_type in ["Webhook", "Cron", "Start"]:
+        # Priority: Webhook > Cron > ExecuteWorkflowTrigger > Start > first node
+        for node_type in ["Webhook", "Cron", "ExecuteWorkflowTrigger", "Start"]:
             node = next((n for n in main_nodes if n.type == node_type), None)
             if node:
                 return node

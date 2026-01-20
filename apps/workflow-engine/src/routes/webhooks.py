@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse, PlainTextResponse, HTMLResponse, Response
 
 from ..core.exceptions import (
     WorkflowNotFoundError,
@@ -12,10 +14,48 @@ from ..core.exceptions import (
     WebhookError,
 )
 from ..core.dependencies import get_workflow_repository, get_execution_repository
+from ..engine.types import WebhookResponse
 from ..services.webhook_service import WebhookService
 from ..repositories import WorkflowRepository, ExecutionRepository
 
 router = APIRouter()
+
+
+def _build_response(result: dict[str, Any] | WebhookResponse) -> Response:
+    """Build appropriate FastAPI response from service result."""
+    if isinstance(result, WebhookResponse):
+        # Custom response from RespondToWebhook node
+        headers = result.headers or {}
+
+        if result.body is None:
+            # No content response
+            return Response(
+                status_code=result.status_code,
+                headers=headers,
+            )
+
+        if result.content_type == "text/plain":
+            return PlainTextResponse(
+                content=str(result.body),
+                status_code=result.status_code,
+                headers=headers,
+            )
+        elif result.content_type == "text/html":
+            return HTMLResponse(
+                content=str(result.body),
+                status_code=result.status_code,
+                headers=headers,
+            )
+        else:
+            # Default to JSON
+            return JSONResponse(
+                content=result.body,
+                status_code=result.status_code,
+                headers=headers,
+            )
+    else:
+        # Standard dict response
+        return JSONResponse(content=result)
 
 
 def get_webhook_service(
@@ -47,18 +87,19 @@ async def handle_webhook_post(
     workflow_id: str,
     request: Request,
     service: WebhookServiceDep,
-) -> dict[str, Any]:
+) -> Response:
     """Handle POST webhook to trigger a workflow."""
     body, headers, query_params = await _extract_request_data(request)
 
     try:
-        return await service.handle_webhook(
+        result = await service.handle_webhook(
             workflow_id=workflow_id,
             method="POST",
             body=body,
             headers=headers,
             query_params=query_params,
         )
+        return _build_response(result)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
     except WorkflowInactiveError as e:
@@ -72,18 +113,19 @@ async def handle_webhook_get(
     workflow_id: str,
     request: Request,
     service: WebhookServiceDep,
-) -> dict[str, Any]:
+) -> Response:
     """Handle GET webhook to trigger a workflow."""
     _, headers, query_params = await _extract_request_data(request)
 
     try:
-        return await service.handle_webhook(
+        result = await service.handle_webhook(
             workflow_id=workflow_id,
             method="GET",
             body={},
             headers=headers,
             query_params=query_params,
         )
+        return _build_response(result)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
     except WorkflowInactiveError as e:
@@ -97,18 +139,19 @@ async def handle_webhook_put(
     workflow_id: str,
     request: Request,
     service: WebhookServiceDep,
-) -> dict[str, Any]:
+) -> Response:
     """Handle PUT webhook to trigger a workflow."""
     body, headers, query_params = await _extract_request_data(request)
 
     try:
-        return await service.handle_webhook(
+        result = await service.handle_webhook(
             workflow_id=workflow_id,
             method="PUT",
             body=body,
             headers=headers,
             query_params=query_params,
         )
+        return _build_response(result)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
     except WorkflowInactiveError as e:
@@ -122,18 +165,19 @@ async def handle_webhook_delete(
     workflow_id: str,
     request: Request,
     service: WebhookServiceDep,
-) -> dict[str, Any]:
+) -> Response:
     """Handle DELETE webhook to trigger a workflow."""
     body, headers, query_params = await _extract_request_data(request)
 
     try:
-        return await service.handle_webhook(
+        result = await service.handle_webhook(
             workflow_id=workflow_id,
             method="DELETE",
             body=body,
             headers=headers,
             query_params=query_params,
         )
+        return _build_response(result)
     except WorkflowNotFoundError as e:
         raise HTTPException(status_code=404, detail=e.message)
     except WorkflowInactiveError as e:
