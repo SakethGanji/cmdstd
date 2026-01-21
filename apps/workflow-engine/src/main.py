@@ -14,7 +14,6 @@ from .engine.node_registry import register_all_nodes
 from .routes import api_router, webhook_router, stream_router
 from .schemas.common import RootResponse, HealthResponse
 from .db import init_db
-from .db.seed import seed_workflows
 
 
 @asynccontextmanager
@@ -23,9 +22,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Initialize database tables
     await init_db()
     print("Database initialized")
-
-    # Seed example workflows
-    await seed_workflows()
 
     register_all_nodes()
     print(f"{settings.app_name} v{settings.app_version} started")

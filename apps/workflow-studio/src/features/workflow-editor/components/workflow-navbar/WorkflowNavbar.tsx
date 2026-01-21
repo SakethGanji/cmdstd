@@ -26,8 +26,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
-import { useSaveWorkflow } from '../../hooks/useWorkflowApi';
+import { useSaveWorkflow, useToggleWorkflowActive } from '../../hooks/useWorkflowApi';
 import { toBackendWorkflow } from '../../lib/workflowTransform';
+import { Switch } from '@/shared/components/ui/switch';
 import type { WorkflowNodeData } from '../../types/workflow';
 import type { Node } from 'reactflow';
 
@@ -38,12 +39,14 @@ export default function WorkflowNavbar() {
     workflowId,
     nodes,
     edges,
+    isActive,
     setWorkflowName,
     addTag,
     removeTag,
   } = useWorkflowStore();
 
   const { saveWorkflow, isSaving } = useSaveWorkflow();
+  const { toggleActive, isToggling } = useToggleWorkflowActive();
 
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
@@ -184,8 +187,21 @@ export default function WorkflowNavbar() {
 
         </div>
 
-        {/* Right section - Share, Save, History, More */}
+        {/* Right section - Active toggle, Share, Save, History, More */}
         <div className="flex items-center gap-2">
+
+          {/* Active toggle */}
+          <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
+            <span className={`text-xs font-medium ${isActive ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+              {isActive ? 'Active' : 'Inactive'}
+            </span>
+            <Switch
+              checked={isActive}
+              onCheckedChange={(checked) => toggleActive(checked)}
+              disabled={isToggling || !workflowId}
+              className="data-[state=checked]:bg-emerald-500"
+            />
+          </div>
 
           {/* Share button */}
           <Button variant="outline" size="icon-sm">

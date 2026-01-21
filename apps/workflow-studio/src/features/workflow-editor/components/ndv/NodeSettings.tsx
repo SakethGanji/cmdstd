@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   Settings,
   Info,
@@ -10,6 +10,9 @@ import {
   Database,
   Wrench,
   X,
+  Copy,
+  Check,
+  Link,
 } from 'lucide-react';
 import type { Node } from 'reactflow';
 import type { WorkflowNodeData, SubnodeSlotDefinition, SubnodeType } from '../../types/workflow';
@@ -18,6 +21,7 @@ import { useNDVStore } from '../../stores/ndvStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import DynamicNodeForm, { type NodeProperty, type OutputSchema } from './DynamicNodeForm';
 import { useNodeTypes } from '../../hooks/useNodeTypes';
+import { backends } from '@/shared/lib/config';
 
 interface NodeSettingsProps {
   node: Node<WorkflowNodeData>;
@@ -45,15 +49,29 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
     subnodes: true,
     options: false,
   });
-  const { updateNodeData, edges, nodes, executionData, deleteNode } = useWorkflowStore((s) => ({
+  const [copiedUrl, setCopiedUrl] = useState(false);
+  const { updateNodeData, edges, nodes, executionData, deleteNode, workflowId } = useWorkflowStore((s) => ({
     updateNodeData: s.updateNodeData,
     edges: s.edges,
     nodes: s.nodes,
     executionData: s.executionData,
     deleteNode: s.deleteNode,
+    workflowId: s.workflowId,
   }));
   const { openNDV } = useNDVStore();
   const { openForSubnode } = useNodeCreatorStore();
+
+  // Webhook URL for Webhook nodes
+  const isWebhookNode = node.data.type === 'Webhook';
+  const webhookUrl = workflowId ? `${backends.workflow}/webhook/${workflowId}` : null;
+
+  const copyWebhookUrl = useCallback(() => {
+    if (webhookUrl) {
+      navigator.clipboard.writeText(webhookUrl);
+      setCopiedUrl(true);
+      setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  }, [webhookUrl]);
 
   // Fetch node type schema from API
   const { data: nodeTypes, isLoading: isLoadingSchema } = useNodeTypes();
@@ -156,6 +174,43 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
       <div className="flex-1 overflow-auto p-3">
         {activeTab === 'parameters' ? (
           <div className="space-y-3">
+            {/* Webhook URL Section - only for Webhook nodes */}
+            {isWebhookNode && (
+              <div className="rounded-md border border-border bg-muted/30">
+                <div className="px-3 py-2">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Link size={14} className="text-muted-foreground" />
+                    <span className="text-sm font-medium text-foreground">Webhook URL</span>
+                  </div>
+                  {webhookUrl ? (
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 text-xs bg-secondary px-2 py-1.5 rounded border border-border truncate">
+                        {webhookUrl}
+                      </code>
+                      <button
+                        onClick={copyWebhookUrl}
+                        className="flex items-center justify-center size-8 rounded-md border border-border bg-secondary hover:bg-accent transition-colors"
+                        title="Copy URL"
+                      >
+                        {copiedUrl ? (
+                          <Check size={14} className="text-emerald-500" />
+                        ) : (
+                          <Copy size={14} className="text-muted-foreground" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Save workflow to generate webhook URL
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Workflow must be <span className="font-medium text-emerald-500">active</span> to receive webhooks
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Main Parameters Section */}
             <div className="rounded-md border border-border">
               <button

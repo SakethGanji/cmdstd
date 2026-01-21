@@ -110,6 +110,13 @@ class RespondToWebhookNode(BaseNode):
                 ],
             ),
             NodeProperty(
+                display_name="Wrap in Metadata",
+                name="wrapResponse",
+                type="boolean",
+                default=True,
+                description="Wrap response in {status, executionId, data} envelope",
+            ),
+            NodeProperty(
                 display_name="Custom Headers",
                 name="headers",
                 type="collection",
@@ -180,7 +187,19 @@ class RespondToWebhookNode(BaseNode):
             response_field = self.get_parameter(node_definition, "responseField", "")
             if input_data:
                 if response_field:
-                    body = self._get_nested_value(input_data[0].json, response_field)
+                    # Check if it's an expression or a simple field path
+                    if "{{" in response_field:
+                        # It's an expression - evaluate it
+                        expr_context = ExpressionEngine.create_context(
+                            input_data,
+                            context.node_states,
+                            context.execution_id,
+                            item_index=0,
+                        )
+                        body = expression_engine.resolve(response_field, expr_context)
+                    else:
+                        # Simple field path
+                        body = self._get_nested_value(input_data[0].json, response_field)
                 else:
                     # Return all items if multiple, single item if one
                     if len(input_data) == 1:
@@ -204,6 +223,17 @@ class RespondToWebhookNode(BaseNode):
                     )
                     value = str(expression_engine.resolve(value, expr_context))
                 headers[name] = value
+
+        # Wrap response in metadata envelope if requested
+        wrap_response = self.get_parameter(node_definition, "wrapResponse", True)
+        if wrap_response and content_type == "application/json":
+            # Determine status string based on status code
+            status_str = "success" if status_code < 400 else "error"
+            body = {
+                "status": status_str,
+                "executionId": context.execution_id,
+                "data": body,
+            }
 
         # Set the webhook response in context
         context.webhook_response = WebhookResponse(

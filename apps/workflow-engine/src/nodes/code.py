@@ -154,13 +154,27 @@ External imports and file system access are limited.""",
         import json
         import math
         import re
+        import random
+        import base64
+        import io
         from datetime import datetime, timedelta
 
         restricted_globals["json"] = json
         restricted_globals["math"] = math
         restricted_globals["re"] = re
+        restricted_globals["random"] = random
+        restricted_globals["base64"] = base64
+        restricted_globals["io"] = io
         restricted_globals["datetime"] = datetime
         restricted_globals["timedelta"] = timedelta
+
+        # Add pandas if available (for data processing)
+        try:
+            import pandas as pd
+            restricted_globals["pd"] = pd
+            restricted_globals["pandas"] = pd
+        except ImportError:
+            pass
 
         try:
             # Wrap code in a function - properly indent each line

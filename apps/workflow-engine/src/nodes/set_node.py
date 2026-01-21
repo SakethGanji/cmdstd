@@ -155,6 +155,7 @@ class SetNode(BaseNode):
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
         from ..engine.types import NodeData
+        from ..engine.expression_engine import expression_engine, ExpressionEngine
 
         mode = self.get_parameter(node_definition, "mode", "manual")
         keep_only_set = self.get_parameter(node_definition, "keepOnlySet", False)
@@ -162,27 +163,43 @@ class SetNode(BaseNode):
         results: list[NodeData] = []
         items = input_data if input_data else [NodeData(json={})]
 
-        for item in items:
+        for idx, item in enumerate(items):
             if keep_only_set:
                 new_json: dict[str, Any] = {}
             else:
                 new_json = dict(item.json)
+
+            # Build expression context for this item
+            expr_context = ExpressionEngine.create_context(
+                current_data=input_data,
+                node_states=context.node_states,
+                execution_id=context.execution_id,
+                item_index=idx,
+            )
 
             if mode == "manual":
                 # Manual mode: explicit field definitions
                 fields = self.get_parameter(node_definition, "fields", [])
                 for field in fields:
                     if field.get("name"):
-                        self._set_nested_value(new_json, field["name"], field.get("value"))
+                        # Evaluate expression in value
+                        raw_value = field.get("value", "")
+                        resolved_value = expression_engine.resolve(raw_value, expr_context)
+                        self._set_nested_value(new_json, field["name"], resolved_value)
             elif mode == "json":
                 # JSON mode: merge entire JSON object
                 json_data = self.get_parameter(node_definition, "jsonData", {})
                 if isinstance(json_data, str):
-                    import json
-                    try:
-                        json_data = json.loads(json_data)
-                    except json.JSONDecodeError:
-                        json_data = {}
+                    # First resolve any expressions in the string
+                    json_data = expression_engine.resolve(json_data, expr_context)
+                    if isinstance(json_data, str):
+                        import json
+                        try:
+                            json_data = json.loads(json_data)
+                        except json.JSONDecodeError:
+                            json_data = {}
+                # Resolve expressions in nested values
+                json_data = expression_engine.resolve(json_data, expr_context)
                 new_json.update(json_data)
 
             # Handle field deletions

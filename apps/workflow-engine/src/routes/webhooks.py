@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from typing import Annotated, Any
 
@@ -71,10 +72,35 @@ WebhookServiceDep = Annotated[WebhookService, Depends(get_webhook_service)]
 
 async def _extract_request_data(request: Request) -> tuple[dict[str, Any], dict[str, str], dict[str, str]]:
     """Extract body, headers, and query params from request."""
-    try:
-        body = await request.json()
-    except Exception:
-        body = {}
+    content_type = request.headers.get("content-type", "")
+
+    if "multipart/form-data" in content_type:
+        # Handle file uploads
+        form = await request.form()
+        body: dict[str, Any] = {}
+        for key, value in form.items():
+            if hasattr(value, "read"):  # It's an UploadFile
+                file_bytes = await value.read()
+                body[key] = {
+                    "filename": value.filename,
+                    "content": base64.b64encode(file_bytes).decode(),
+                    "content_type": value.content_type,
+                    "size": len(file_bytes),
+                }
+            else:
+                # Try to parse as number if possible
+                try:
+                    body[key] = int(value)
+                except ValueError:
+                    try:
+                        body[key] = float(value)
+                    except ValueError:
+                        body[key] = value
+    else:
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
 
     headers = dict(request.headers)
     query_params = dict(request.query_params)

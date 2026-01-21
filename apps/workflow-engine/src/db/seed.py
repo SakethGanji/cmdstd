@@ -7,7 +7,7 @@ import hashlib
 import time
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, delete
 
 from .session import async_session_factory, init_db
 from .models import WorkflowModel
@@ -16,336 +16,391 @@ from .models import WorkflowModel
 def generate_workflow_id(name: str) -> str:
     """Generate a unique workflow ID."""
     timestamp = int(time.time() * 1000)
-    # Include name in hash to ensure uniqueness for same-millisecond calls
     hash_input = f"{timestamp}_{name}"
     hash_suffix = hashlib.sha256(hash_input.encode()).hexdigest()[:8]
     return f"wf_{timestamp}_{hash_suffix}"
 
 
 EXAMPLE_WORKFLOWS = [
+    # ========================================
+    # 1. USER PROFILE API - Fetches user data from external API
+    # ========================================
     {
-        "name": "Weather Alert Monitor",
-        "description": "Checks for active weather alerts and categorizes by severity",
+        "name": "User Profile API",
+        "description": "API that fetches user profile from JSONPlaceholder, enriches with posts count. POST with {\"user_id\": 1}",
+        "active": True,
         "definition": {
             "nodes": [
                 {
-                    "name": "Start",
-                    "type": "Start",
-                    "parameters": {},
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "POST"},
                     "position": {"x": 100, "y": 200},
                 },
                 {
-                    "name": "Fetch DC Alerts",
+                    "name": "Fetch User",
                     "type": "HttpRequest",
                     "parameters": {
-                        "url": "https://api.weather.gov/alerts/active?area=DC",
+                        "url": "https://jsonplaceholder.typicode.com/users/{{ $json.body.user_id }}",
                         "method": "GET",
                     },
                     "position": {"x": 350, "y": 200},
                 },
                 {
-                    "name": "Check Alerts Exist",
-                    "type": "Code",
+                    "name": "Fetch Posts",
+                    "type": "HttpRequest",
                     "parameters": {
-                        "code": 'response = items[0]["json"]\nfeatures = response["body"].get("features", [])\nreturn {"has_alerts": len(features) > 0, "alert_count": len(features), "features": features}'
+                        "url": "https://jsonplaceholder.typicode.com/posts?userId={{ $node[\"Webhook\"].json.body.user_id }}",
+                        "method": "GET",
                     },
                     "position": {"x": 600, "y": 200},
                 },
                 {
-                    "name": "Has Alerts?",
-                    "type": "If",
-                    "parameters": {"condition": "{{ $json.has_alerts }}"},
+                    "name": "Build Response",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Get data from previous nodes
+user = node_data["Fetch User"]["json"].get("body", {})
+posts = node_data["Fetch Posts"]["json"].get("body", [])
+
+# Build enriched profile
+return {
+    "profile": {
+        "id": user.get("id"),
+        "name": user.get("name"),
+        "email": user.get("email"),
+        "company": user.get("company", {}).get("name"),
+        "city": user.get("address", {}).get("city"),
+    },
+    "stats": {
+        "total_posts": len(posts) if isinstance(posts, list) else 0,
+        "recent_post": posts[0].get("title") if posts else None,
+    }
+}"""
+                    },
                     "position": {"x": 850, "y": 200},
                 },
                 {
-                    "name": "Process Alerts",
-                    "type": "Code",
+                    "name": "Send Response",
+                    "type": "RespondToWebhook",
                     "parameters": {
-                        "code": 'features = items[0]["json"]["features"]\nalerts = []\nfor f in features[:5]:\n    props = f.get("properties", {})\n    alerts.append({\n        "event": props.get("event", "Unknown"),\n        "severity": props.get("severity", "Unknown"),\n        "headline": props.get("headline", ""),\n        "areas": props.get("areaDesc", "")\n    })\nreturn {"alerts": alerts, "total": len(features)}'
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "contentType": "application/json",
+                        "wrapResponse": True,
                     },
-                    "position": {"x": 1100, "y": 100},
+                    "position": {"x": 1100, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Webhook", "target_node": "Fetch User"},
+                {"source_node": "Fetch User", "target_node": "Fetch Posts"},
+                {"source_node": "Fetch Posts", "target_node": "Build Response"},
+                {"source_node": "Build Response", "target_node": "Send Response"},
+            ],
+            "settings": {},
+        },
+    },
+    # ========================================
+    # 2. ECHO API - Simple request/response example
+    # ========================================
+    {
+        "name": "Echo API",
+        "description": "Simple API that echoes back transformed input. POST with any JSON body.",
+        "active": True,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "POST"},
+                    "position": {"x": 100, "y": 200},
                 },
                 {
-                    "name": "No Alerts",
+                    "name": "Transform",
                     "type": "Set",
                     "parameters": {
-                        "mode": "json",
-                        "jsonData": '{"message": "No active weather alerts for DC", "status": "all_clear"}',
+                        "mode": "manual",
                         "keepOnlySet": True,
+                        "fields": [
+                            {"name": "received", "value": "{{ $json.body }}"},
+                            {"name": "timestamp", "value": "{{ $json.triggeredAt }}"},
+                            {"name": "method", "value": "{{ $json.method }}"},
+                        ],
                     },
-                    "position": {"x": 1100, "y": 300},
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Respond",
+                    "type": "RespondToWebhook",
+                    "parameters": {
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "contentType": "application/json",
+                        "wrapResponse": True,
+                    },
+                    "position": {"x": 600, "y": 200},
                 },
             ],
             "connections": [
-                {"source_node": "Start", "target_node": "Fetch DC Alerts"},
-                {"source_node": "Fetch DC Alerts", "target_node": "Check Alerts Exist"},
-                {"source_node": "Check Alerts Exist", "target_node": "Has Alerts?"},
-                {
-                    "source_node": "Has Alerts?",
-                    "target_node": "Process Alerts",
-                    "source_output": "true",
-                },
-                {
-                    "source_node": "Has Alerts?",
-                    "target_node": "No Alerts",
-                    "source_output": "false",
-                },
+                {"source_node": "Webhook", "target_node": "Transform"},
+                {"source_node": "Transform", "target_node": "Respond"},
             ],
             "settings": {},
         },
     },
+    # ========================================
+    # 3. RANDOM JOKE API - Fetches and formats external data
+    # ========================================
     {
-        "name": "Near-Earth Asteroid Tracker",
-        "description": "Fetches asteroid data from NASA and identifies potentially hazardous objects",
+        "name": "Random Joke API",
+        "description": "Fetches a random joke from an external API and returns it formatted. GET request, no body needed.",
+        "active": True,
         "definition": {
             "nodes": [
                 {
-                    "name": "Start",
-                    "type": "Start",
-                    "parameters": {},
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "GET"},
                     "position": {"x": 100, "y": 200},
                 },
                 {
-                    "name": "Fetch Asteroids",
+                    "name": "Fetch Joke",
                     "type": "HttpRequest",
                     "parameters": {
-                        "url": "https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=DEMO_KEY",
+                        "url": "https://official-joke-api.appspot.com/random_joke",
                         "method": "GET",
                     },
                     "position": {"x": 350, "y": 200},
                 },
                 {
-                    "name": "Parse Asteroid Data",
-                    "type": "Code",
+                    "name": "Format Joke",
+                    "type": "Set",
                     "parameters": {
-                        "code": 'response = items[0]["json"]\nasteroids = response["body"].get("near_earth_objects", [])\nparsed = []\nfor a in asteroids[:10]:\n    diameter = a.get("estimated_diameter", {}).get("kilometers", {})\n    parsed.append({\n        "name": a.get("name", "Unknown"),\n        "id": a.get("id", ""),\n        "is_hazardous": a.get("is_potentially_hazardous_asteroid", False),\n        "diameter_km_min": round(diameter.get("estimated_diameter_min", 0), 3),\n        "diameter_km_max": round(diameter.get("estimated_diameter_max", 0), 3),\n        "first_observed": a.get("orbital_data", {}).get("first_observation_date", "Unknown")\n    })\nreturn {"asteroids": parsed, "total_fetched": len(parsed)}'
+                        "mode": "manual",
+                        "keepOnlySet": True,
+                        "fields": [
+                            {"name": "setup", "value": "{{ $json.body.setup }}"},
+                            {"name": "punchline", "value": "{{ $json.body.punchline }}"},
+                            {"name": "type", "value": "{{ $json.body.type }}"},
+                        ],
                     },
                     "position": {"x": 600, "y": 200},
                 },
                 {
-                    "name": "Filter Hazardous",
-                    "type": "Code",
+                    "name": "Respond",
+                    "type": "RespondToWebhook",
                     "parameters": {
-                        "code": 'asteroids = items[0]["json"]["asteroids"]\nhazardous = [a for a in asteroids if a["is_hazardous"]]\nsafe = [a for a in asteroids if not a["is_hazardous"]]\nreturn {\n    "hazardous_count": len(hazardous),\n    "safe_count": len(safe),\n    "hazardous_asteroids": hazardous,\n    "largest_hazardous": max(hazardous, key=lambda x: x["diameter_km_max"]) if hazardous else None\n}'
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "contentType": "application/json",
+                        "wrapResponse": True,
                     },
                     "position": {"x": 850, "y": 200},
                 },
             ],
             "connections": [
-                {"source_node": "Start", "target_node": "Fetch Asteroids"},
-                {"source_node": "Fetch Asteroids", "target_node": "Parse Asteroid Data"},
-                {"source_node": "Parse Asteroid Data", "target_node": "Filter Hazardous"},
+                {"source_node": "Webhook", "target_node": "Fetch Joke"},
+                {"source_node": "Fetch Joke", "target_node": "Format Joke"},
+                {"source_node": "Format Joke", "target_node": "Respond"},
             ],
             "settings": {},
         },
     },
+    # ========================================
+    # 4. EXCEL SAMPLER API - Upload Excel, get sampled rows
+    # ========================================
     {
-        "name": "Space and Weather Dashboard",
-        "description": "Combines NASA space data with weather alerts for a comprehensive dashboard",
+        "name": "Excel Sampler API",
+        "description": "Upload a base64-encoded Excel file and get sampled rows. POST with {\"file\": \"<base64>\", \"sample_size\": 10, \"mode\": \"random\"}",
+        "active": True,
         "definition": {
             "nodes": [
                 {
-                    "name": "Start",
-                    "type": "Start",
-                    "parameters": {},
-                    "position": {"x": 100, "y": 250},
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "POST"},
+                    "position": {"x": 100, "y": 200},
                 },
                 {
-                    "name": "Fetch Space Picture",
-                    "type": "HttpRequest",
-                    "parameters": {
-                        "url": "https://api.nasa.gov/planetary/apod?api_key=DEMO_KEY",
-                        "method": "GET",
-                    },
-                    "position": {"x": 350, "y": 100},
-                },
-                {
-                    "name": "Fetch Weather Alerts",
-                    "type": "HttpRequest",
-                    "parameters": {
-                        "url": "https://api.weather.gov/alerts/active?area=DC",
-                        "method": "GET",
-                    },
-                    "position": {"x": 350, "y": 250},
-                },
-                {
-                    "name": "Fetch Asteroids",
-                    "type": "HttpRequest",
-                    "parameters": {
-                        "url": "https://api.nasa.gov/neo/rest/v1/neo/browse?api_key=DEMO_KEY",
-                        "method": "GET",
-                    },
-                    "position": {"x": 350, "y": 400},
-                },
-                {
-                    "name": "Wait For All",
-                    "type": "Merge",
-                    "parameters": {"mode": "wait_all", "expected_inputs": 3},
-                    "position": {"x": 600, "y": 250},
-                },
-                {
-                    "name": "Build Dashboard",
+                    "name": "Parse and Sample",
                     "type": "Code",
                     "parameters": {
-                        "code": '# Get data from all API calls\napod = node_data.get("Fetch Space Picture", {}).get("json", {}).get("body", {})\nalerts = node_data.get("Fetch Weather Alerts", {}).get("json", {}).get("body", {}).get("features", [])\nasteroids = node_data.get("Fetch Asteroids", {}).get("json", {}).get("body", {}).get("near_earth_objects", [])\n\n# Process alerts\nactive_alerts = [{\n    "event": a.get("properties", {}).get("event", "Unknown"),\n    "severity": a.get("properties", {}).get("severity", "Unknown")\n} for a in alerts[:3]]\n\n# Count hazardous asteroids\nhazardous = sum(1 for a in asteroids if a.get("is_potentially_hazardous_asteroid", False))\n\nreturn {\n    "space_picture": {\n        "title": apod.get("title", "No image today"),\n        "date": apod.get("date", "Unknown")\n    },\n    "weather": {\n        "alert_count": len(alerts),\n        "alerts": active_alerts,\n        "status": "warnings" if alerts else "clear"\n    },\n    "asteroids": {\n        "tracked": len(asteroids),\n        "hazardous": hazardous\n    },\n    "dashboard_generated": "success"\n}'
+                        "code": """# Modules available: pd (pandas), io, base64, random, json, math, re, datetime
+
+# Get inputs from webhook body
+data = node_data["Webhook"]["json"].get("body", {})
+sample_size = data.get("sample_size", 10)
+mode = data.get("mode", "random")
+
+# Handle both file upload (multipart) and base64 JSON formats
+file_data = data.get("file")
+if not file_data:
+    return {"error": "No file provided. Upload Excel file or send base64 in 'file' field."}
+
+# Check if it's a file upload (dict with content) or direct base64 string
+if isinstance(file_data, dict):
+    file_b64 = file_data.get("content")
+    filename = file_data.get("filename", "unknown")
+else:
+    file_b64 = file_data
+    filename = "uploaded.xlsx"
+
+if not file_b64:
+    return {"error": "No file content found."}
+
+try:
+    # Decode and parse Excel
+    file_bytes = base64.b64decode(file_b64)
+    df = pd.read_excel(io.BytesIO(file_bytes))
+    rows = df.to_dict("records")
+
+    # Sample based on mode
+    total = len(rows)
+    sample_size = min(sample_size, total)
+
+    if mode == "first":
+        sampled = rows[:sample_size]
+    elif mode == "last":
+        sampled = rows[-sample_size:]
+    else:  # random
+        sampled = random.sample(rows, sample_size) if rows else []
+
+    return {
+        "filename": filename,
+        "sampled": sampled,
+        "total_rows": total,
+        "sampled_count": len(sampled),
+        "columns": list(df.columns),
+        "mode": mode
+    }
+except Exception as e:
+    return {"error": str(e)}
+"""
                     },
-                    "position": {"x": 850, "y": 250},
+                    "position": {"x": 400, "y": 200},
+                },
+                {
+                    "name": "Respond",
+                    "type": "RespondToWebhook",
+                    "parameters": {
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "contentType": "application/json",
+                        "wrapResponse": True,
+                    },
+                    "position": {"x": 700, "y": 200},
                 },
             ],
             "connections": [
-                {"source_node": "Start", "target_node": "Fetch Space Picture"},
-                {"source_node": "Start", "target_node": "Fetch Weather Alerts"},
-                {"source_node": "Start", "target_node": "Fetch Asteroids"},
-                {"source_node": "Fetch Space Picture", "target_node": "Wait For All"},
-                {"source_node": "Fetch Weather Alerts", "target_node": "Wait For All"},
-                {"source_node": "Fetch Asteroids", "target_node": "Wait For All"},
-                {"source_node": "Wait For All", "target_node": "Build Dashboard"},
+                {"source_node": "Webhook", "target_node": "Parse and Sample"},
+                {"source_node": "Parse and Sample", "target_node": "Respond"},
             ],
             "settings": {},
         },
     },
+    # ========================================
+    # 5. MOCK BANK STATEMENTS API - Generate mock bank statements
+    # ========================================
     {
-        "name": "Support Ticket Router",
-        "description": "Routes support tickets to different queues based on priority using the Switch node",
+        "name": "Mock Bank Statements API",
+        "description": "Get mock bank statements for an account. POST with {\"account_id\": \"123456\", \"days\": 30}",
+        "active": True,
         "definition": {
             "nodes": [
                 {
-                    "name": "Start",
-                    "type": "Start",
-                    "parameters": {},
-                    "position": {"x": 100, "y": 300},
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "POST"},
+                    "position": {"x": 100, "y": 200},
                 },
                 {
-                    "name": "Sample Tickets",
+                    "name": "Generate Statements",
                     "type": "Code",
                     "parameters": {
-                        "code": """# Generate sample support tickets with different priorities
-tickets = [
-    {"id": 1, "title": "Server down", "priority": "critical", "customer": "Acme Corp"},
-    {"id": 2, "title": "Login issues", "priority": "high", "customer": "TechStart"},
-    {"id": 3, "title": "Feature request", "priority": "low", "customer": "BigCo"},
-    {"id": 4, "title": "Data export bug", "priority": "high", "customer": "DataFlow"},
-    {"id": 5, "title": "UI glitch", "priority": "medium", "customer": "DesignHub"},
-    {"id": 6, "title": "API timeout", "priority": "critical", "customer": "CloudNet"},
-    {"id": 7, "title": "Documentation update", "priority": "low", "customer": "DevTeam"},
-    {"id": 8, "title": "Password reset", "priority": "medium", "customer": "SecureCo"},
-]
-# Return as multiple items so Switch processes each one
-return [{"ticket": t} for t in tickets]"""
+                        "code": """# Get inputs
+data = node_data["Webhook"]["json"].get("body", {})
+account_id = str(data.get("account_id", "000000"))
+days = data.get("days", 30)
+
+# Mask account number
+masked_account = "****" + account_id[-4:] if len(account_id) >= 4 else "****" + account_id
+
+# Generate mock transactions
+merchants = ["Amazon", "Walmart", "Starbucks", "Shell Gas", "Netflix", "Uber", "Target", "Whole Foods", "Electric Co", "Water Utility"]
+categories = ["Shopping", "Shopping", "Food & Drink", "Gas", "Entertainment", "Transport", "Shopping", "Groceries", "Utilities", "Utilities"]
+
+transactions = []
+balance = round(random.uniform(3000, 8000), 2)
+running_balance = balance
+
+for i in range(min(days, 50)):
+    merchant_idx = random.randint(0, len(merchants) - 1)
+    is_credit = random.random() < 0.2  # 20% chance of credit
+
+    if is_credit:
+        amount = round(random.uniform(500, 3000), 2)
+        running_balance += amount
+        tx_type = "credit"
+        desc = ["Direct Deposit", "Transfer In", "Refund", "Interest"][random.randint(0, 3)]
+    else:
+        amount = round(random.uniform(5, 200), 2)
+        running_balance -= amount
+        tx_type = "debit"
+        desc = merchants[merchant_idx]
+
+    transactions.append({
+        "id": f"txn_{1000 + i}",
+        "date": f"2026-01-{max(1, 21 - i):02d}",
+        "description": desc,
+        "category": categories[merchant_idx] if tx_type == "debit" else "Income",
+        "amount": amount if is_credit else -amount,
+        "type": tx_type,
+        "balance": round(running_balance, 2)
+    })
+
+# Calculate summary
+total_credits = sum(t["amount"] for t in transactions if t["amount"] > 0)
+total_debits = abs(sum(t["amount"] for t in transactions if t["amount"] < 0))
+
+return {
+    "account": {
+        "number": masked_account,
+        "type": "checking",
+        "holder": "Account Holder",
+        "current_balance": round(running_balance, 2),
+        "available_balance": round(running_balance - 50, 2)
+    },
+    "statement_period": {
+        "from": f"2026-01-01",
+        "to": f"2026-01-21"
+    },
+    "transactions": transactions,
+    "summary": {
+        "total_credits": round(total_credits, 2),
+        "total_debits": round(total_debits, 2),
+        "transaction_count": len(transactions)
+    }
+}
+"""
                     },
-                    "position": {"x": 350, "y": 300},
+                    "position": {"x": 400, "y": 200},
                 },
                 {
-                    "name": "Route by Priority",
-                    "type": "Switch",
+                    "name": "Respond",
+                    "type": "RespondToWebhook",
                     "parameters": {
-                        "numberOfOutputs": 3,
-                        "mode": "rules",
-                        "rules": [
-                            {
-                                "output": 0,
-                                "field": "ticket.priority",
-                                "operation": "equals",
-                                "value": "critical",
-                            },
-                            {
-                                "output": 1,
-                                "field": "ticket.priority",
-                                "operation": "equals",
-                                "value": "high",
-                            },
-                            {
-                                "output": 2,
-                                "field": "ticket.priority",
-                                "operation": "equals",
-                                "value": "medium",
-                            },
-                        ],
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "contentType": "application/json",
+                        "wrapResponse": True,
                     },
-                    # outputStrategy tells frontend how to compute dynamic outputs on load
-                    "outputStrategy": {
-                        "type": "dynamicFromParameter",
-                        "parameter": "numberOfOutputs",
-                        "addFallback": True,
-                    },
-                    "position": {"x": 650, "y": 300},
-                },
-                {
-                    "name": "Critical Queue",
-                    "type": "Set",
-                    "parameters": {
-                        "mode": "manual",
-                        "assignments": [
-                            {"name": "queue", "value": "critical"},
-                            {"name": "sla_minutes", "value": "15"},
-                            {"name": "escalate_to", "value": "on-call-engineer"},
-                        ],
-                    },
-                    "position": {"x": 950, "y": 100},
-                },
-                {
-                    "name": "High Priority Queue",
-                    "type": "Set",
-                    "parameters": {
-                        "mode": "manual",
-                        "assignments": [
-                            {"name": "queue", "value": "high_priority"},
-                            {"name": "sla_minutes", "value": "60"},
-                            {"name": "escalate_to", "value": "senior-support"},
-                        ],
-                    },
-                    "position": {"x": 950, "y": 250},
-                },
-                {
-                    "name": "Medium Priority Queue",
-                    "type": "Set",
-                    "parameters": {
-                        "mode": "manual",
-                        "assignments": [
-                            {"name": "queue", "value": "standard"},
-                            {"name": "sla_minutes", "value": "240"},
-                            {"name": "escalate_to", "value": "support-team"},
-                        ],
-                    },
-                    "position": {"x": 950, "y": 400},
-                },
-                {
-                    "name": "Low Priority Queue",
-                    "type": "Set",
-                    "parameters": {
-                        "mode": "manual",
-                        "assignments": [
-                            {"name": "queue", "value": "backlog"},
-                            {"name": "sla_minutes", "value": "1440"},
-                            {"name": "escalate_to", "value": "none"},
-                        ],
-                    },
-                    "position": {"x": 950, "y": 550},
+                    "position": {"x": 700, "y": 200},
                 },
             ],
             "connections": [
-                {"source_node": "Start", "target_node": "Sample Tickets"},
-                {"source_node": "Sample Tickets", "target_node": "Route by Priority"},
-                {
-                    "source_node": "Route by Priority",
-                    "target_node": "Critical Queue",
-                    "source_output": "output0",
-                },
-                {
-                    "source_node": "Route by Priority",
-                    "target_node": "High Priority Queue",
-                    "source_output": "output1",
-                },
-                {
-                    "source_node": "Route by Priority",
-                    "target_node": "Medium Priority Queue",
-                    "source_output": "output2",
-                },
-                {
-                    "source_node": "Route by Priority",
-                    "target_node": "Low Priority Queue",
-                    "source_output": "fallback",
-                },
+                {"source_node": "Webhook", "target_node": "Generate Statements"},
+                {"source_node": "Generate Statements", "target_node": "Respond"},
             ],
             "settings": {},
         },
@@ -353,42 +408,61 @@ return [{"ticket": t} for t in tickets]"""
 ]
 
 
-async def seed_workflows() -> None:
-    """Seed the database with example workflows."""
+async def seed_workflows(reset: bool = False) -> None:
+    """Seed the database with example workflows.
+
+    Args:
+        reset: If True, delete all existing workflows before seeding.
+               Default is False to preserve user-created workflows.
+    """
     await init_db()
 
     async with async_session_factory() as session:
-        # Check if workflows already exist
-        result = await session.execute(select(WorkflowModel))
-        existing = result.scalars().all()
-        existing_names = {w.name for w in existing}
+        if reset:
+            # Delete all existing workflows
+            await session.execute(delete(WorkflowModel))
+            await session.commit()
+            print("Cleared existing workflows.")
+
+        # Get existing workflow names to avoid duplicates
+        result = await session.execute(select(WorkflowModel.name))
+        existing_names = {row[0] for row in result.fetchall()}
 
         added = 0
+        skipped = 0
         for workflow_data in EXAMPLE_WORKFLOWS:
+            # Skip if workflow already exists
             if workflow_data["name"] in existing_names:
-                print(f"Skipping '{workflow_data['name']}' - already exists")
+                skipped += 1
                 continue
 
+            # Use fixed ID if provided, otherwise generate one
+            workflow_id = workflow_data.get("id") or generate_workflow_id(workflow_data["name"])
+
             workflow = WorkflowModel(
-                id=generate_workflow_id(workflow_data["name"]),
+                id=workflow_id,
                 name=workflow_data["name"],
-                description=workflow_data["description"],
-                active=False,
+                description=workflow_data.get("description", ""),
+                active=workflow_data.get("active", False),
                 definition=workflow_data["definition"],
                 created_at=datetime.now(),
                 updated_at=datetime.now(),
             )
             session.add(workflow)
             added += 1
-            print(f"Added workflow: {workflow_data['name']}")
+            status = "ACTIVE" if workflow_data.get("active") else "inactive"
+            print(f"Added [{status}]: {workflow_data['name']}")
 
         await session.commit()
-        print(f"\nSeeding complete. Added {added} workflows.")
+        if skipped > 0:
+            print(f"\nSeeding complete. Added {added} workflows, skipped {skipped} existing.")
+        else:
+            print(f"\nSeeding complete. Added {added} workflows.")
 
 
 def main() -> None:
     """Run the seed script."""
-    asyncio.run(seed_workflows())
+    asyncio.run(seed_workflows(reset=True))
 
 
 if __name__ == "__main__":

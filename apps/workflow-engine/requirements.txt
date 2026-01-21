@@ -7,3 +7,5 @@ simpleeval
 sqlmodel
 sse-starlette
 aiosqlite
+pandas
+openpyxl

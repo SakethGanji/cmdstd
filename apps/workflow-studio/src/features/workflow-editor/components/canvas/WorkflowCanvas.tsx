@@ -8,7 +8,7 @@ import ReactFlow, {
   useReactFlow,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Play, Square, Plus, Minus } from 'lucide-react';
+import { Square, Plus, Minus } from 'lucide-react';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
@@ -22,6 +22,7 @@ import WorkflowEdge from './edges/WorkflowEdge';
 import SubnodeEdge from './edges/SubnodeEdge';
 import StickyNote from './nodes/StickyNote';
 import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
+import TestInputPanel from '../TestInputPanel';
 import { getNodeGroupFromType, getMiniMapColor } from '../../lib/nodeStyles';
 import { cn } from '@/shared/lib/utils';
 
@@ -225,16 +226,10 @@ export default function WorkflowCanvas() {
               <Square size={16} fill="currentColor" />
             </button>
           ) : (
-            <button
-              onClick={() => executeWorkflow()}
-              className={cn(
-                "flex items-center justify-center size-9 rounded-lg shadow-md transition-all",
-                "bg-emerald-500 text-white hover:bg-emerald-600"
-              )}
-              title="Run workflow"
-            >
-              <Play size={16} fill="currentColor" />
-            </button>
+            <TestInputPanel
+              onExecute={executeWorkflow}
+              isExecuting={isExecuting}
+            />
           )}
 
           {/* Add node button */}

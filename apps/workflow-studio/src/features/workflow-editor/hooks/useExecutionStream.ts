@@ -39,7 +39,7 @@ interface ExecutionEvent {
 }
 
 interface UseExecutionStreamResult {
-  executeWorkflow: () => Promise<void>;
+  executeWorkflow: (inputData?: Record<string, unknown>) => Promise<void>;
   isExecuting: boolean;
   progress: { completed: number; total: number } | null;
   cancelExecution: () => void;
@@ -58,7 +58,6 @@ export function useExecutionStream(): UseExecutionStreamResult {
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
-  const eventSourceRef = useRef<EventSource | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Build name-to-id mapping for translating backend node names to UI node IDs
@@ -92,10 +91,6 @@ export function useExecutionStream(): UseExecutionStreamResult {
   );
 
   const cancelExecution = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
@@ -104,7 +99,7 @@ export function useExecutionStream(): UseExecutionStreamResult {
     setProgress(null);
   }, []);
 
-  const executeWorkflow = useCallback(async () => {
+  const executeWorkflow = useCallback(async (inputData?: Record<string, unknown>) => {
     // Clear previous execution data
     clearExecutionData();
     setIsExecuting(true);
@@ -124,91 +119,76 @@ export function useExecutionStream(): UseExecutionStreamResult {
     const nodeOutputs: Record<string, Array<{ json: Record<string, unknown> }>> = {};
 
     try {
+      abortControllerRef.current = new AbortController();
+
       let url: string;
+      let body: string;
 
       if (workflowId) {
-        // Execute saved workflow via GET
+        // Execute saved workflow via POST with optional input data
         url = `${backends.workflow}/execution-stream/${workflowId}`;
+        body = JSON.stringify({ input_data: inputData || null });
       } else {
-        // Execute ad-hoc workflow via POST - need to use fetch + ReadableStream
+        // Execute ad-hoc workflow via POST
         const backendWorkflow = toBackendWorkflow(
           nodes as Node<WorkflowNodeData>[],
           edges,
           workflowName
         );
-
-        abortControllerRef.current = new AbortController();
-
-        const response = await fetch(`${backends.workflow}/execution-stream/adhoc`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(backendWorkflow),
-          signal: abortControllerRef.current.signal,
+        url = `${backends.workflow}/execution-stream/adhoc`;
+        body = JSON.stringify({
+          ...backendWorkflow,
+          input_data: inputData || null,
         });
+      }
 
-        if (!response.ok) {
-          throw new Error(`HTTP error: ${response.status}`);
-        }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body,
+        signal: abortControllerRef.current.signal,
+      });
 
-        // Process the stream
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error('No response body');
-        }
+      if (!response.ok) {
+        throw new Error(`HTTP error: ${response.status}`);
+      }
 
-        const decoder = new TextDecoder();
-        let buffer = '';
+      // Process the SSE stream
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body');
+      }
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-          buffer += decoder.decode(value, { stream: true });
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-          // Parse SSE events from buffer
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+        buffer += decoder.decode(value, { stream: true });
 
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const jsonStr = line.slice(6);
-              try {
-                const event: ExecutionEvent = JSON.parse(jsonStr);
-                handleEvent(event, nameToId, nodeOutputs, findInputNodeName);
-              } catch (e) {
-                console.error('Failed to parse SSE event:', e);
-              }
+        // Parse SSE events from buffer
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const jsonStr = line.slice(6);
+            try {
+              const event: ExecutionEvent = JSON.parse(jsonStr);
+              handleEvent(event, nameToId, nodeOutputs, findInputNodeName);
+            } catch (e) {
+              console.error('Failed to parse SSE event:', e);
             }
           }
         }
-
-        setIsExecuting(false);
-        setProgress(null);
-        return;
       }
 
-      // For saved workflows, use EventSource (GET request)
-      eventSourceRef.current = new EventSource(url);
-
-      eventSourceRef.current.onmessage = (event) => {
-        try {
-          const data: ExecutionEvent = JSON.parse(event.data);
-          handleEvent(data, nameToId, nodeOutputs, findInputNodeName);
-        } catch (e) {
-          console.error('Failed to parse SSE event:', e);
-        }
-      };
-
-      eventSourceRef.current.onerror = (error) => {
-        console.error('SSE error:', error);
-        eventSourceRef.current?.close();
-        eventSourceRef.current = null;
-        setIsExecuting(false);
-        setProgress(null);
-        toast.error('Connection lost during execution');
-      };
+      setIsExecuting(false);
+      setProgress(null);
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
         toast.info('Execution cancelled');
@@ -296,11 +276,6 @@ export function useExecutionStream(): UseExecutionStreamResult {
         case 'execution:complete':
           setProgress(event.progress || null);
           setIsExecuting(false);
-          // Close EventSource if using it
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
           break;
 
         case 'execution:result':
@@ -324,10 +299,6 @@ export function useExecutionStream(): UseExecutionStreamResult {
           });
           setIsExecuting(false);
           setProgress(null);
-          if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-            eventSourceRef.current = null;
-          }
           break;
       }
     }

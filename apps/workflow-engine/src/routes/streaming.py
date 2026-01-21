@@ -35,6 +35,13 @@ class AdhocWorkflowRequest(BaseModel):
     id: str | None = None
     description: str | None = None
     settings: dict[str, Any] = {}
+    input_data: dict[str, Any] | None = None  # Test input for webhook/trigger
+
+
+class WorkflowTestRequest(BaseModel):
+    """Request schema for testing a saved workflow with input data."""
+
+    input_data: dict[str, Any] | None = None
 
 
 def _event_to_dict(event: ExecutionEvent) -> dict[str, Any]:
@@ -109,43 +116,10 @@ async def _run_workflow_with_events(
             task.cancel()
 
 
-@router.get("/execution-stream/{workflow_id}")
-async def stream_workflow_execution(
-    workflow_id: str,
-    workflow_repo: Annotated[WorkflowRepository, Depends(get_workflow_repository)],
-    execution_repo: Annotated[ExecutionRepository, Depends(get_execution_repository)],
-) -> EventSourceResponse:
-    """Stream workflow execution via SSE for a saved workflow."""
-    stored = await workflow_repo.get(workflow_id)
-    if not stored:
-        raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}")
-
-    runner = WorkflowRunner()
-    start_node = runner.find_start_node(stored.workflow)
-
-    if not start_node:
-        raise HTTPException(status_code=400, detail="No start node found in workflow")
-
-    initial_data = [
-        NodeData(
-            json={
-                "triggeredAt": datetime.now().isoformat(),
-                "mode": "manual",
-            }
-        )
-    ]
-
-    async def event_generator() -> AsyncGenerator[str, None]:
-        async for event in _run_workflow_with_events(
-            stored.workflow,
-            start_node.name,
-            initial_data,
-            "manual",
-            execution_repo,
-        ):
-            yield event
-
-    return EventSourceResponse(event_generator())
+# ============================================================================
+# IMPORTANT: /adhoc routes MUST come BEFORE /{workflow_id} routes
+# Otherwise FastAPI will match "adhoc" as a workflow_id
+# ============================================================================
 
 
 @router.post("/execution-stream/adhoc")
@@ -190,6 +164,61 @@ async def stream_adhoc_execution(
     if not start_node:
         raise HTTPException(status_code=400, detail="No start node found in workflow")
 
+    # Build initial data - if input_data provided, format as webhook-style input
+    if workflow.input_data:
+        initial_data = [
+            NodeData(
+                json={
+                    "body": workflow.input_data,
+                    "headers": {},
+                    "query": {},
+                    "method": "POST",
+                    "triggeredAt": datetime.now().isoformat(),
+                }
+            )
+        ]
+        mode = "webhook"
+    else:
+        initial_data = [
+            NodeData(
+                json={
+                    "triggeredAt": datetime.now().isoformat(),
+                    "mode": "manual",
+                }
+            )
+        ]
+        mode = "manual"
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        async for event in _run_workflow_with_events(
+            internal_workflow,
+            start_node.name,
+            initial_data,
+            mode,
+            execution_repo,
+        ):
+            yield event
+
+    return EventSourceResponse(event_generator())
+
+
+@router.get("/execution-stream/{workflow_id}")
+async def stream_workflow_execution(
+    workflow_id: str,
+    workflow_repo: Annotated[WorkflowRepository, Depends(get_workflow_repository)],
+    execution_repo: Annotated[ExecutionRepository, Depends(get_execution_repository)],
+) -> EventSourceResponse:
+    """Stream workflow execution via SSE for a saved workflow."""
+    stored = await workflow_repo.get(workflow_id)
+    if not stored:
+        raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}")
+
+    runner = WorkflowRunner()
+    start_node = runner.find_start_node(stored.workflow)
+
+    if not start_node:
+        raise HTTPException(status_code=400, detail="No start node found in workflow")
+
     initial_data = [
         NodeData(
             json={
@@ -201,10 +230,66 @@ async def stream_adhoc_execution(
 
     async def event_generator() -> AsyncGenerator[str, None]:
         async for event in _run_workflow_with_events(
-            internal_workflow,
+            stored.workflow,
             start_node.name,
             initial_data,
             "manual",
+            execution_repo,
+        ):
+            yield event
+
+    return EventSourceResponse(event_generator())
+
+
+@router.post("/execution-stream/{workflow_id}")
+async def stream_workflow_execution_with_input(
+    workflow_id: str,
+    request: WorkflowTestRequest,
+    workflow_repo: Annotated[WorkflowRepository, Depends(get_workflow_repository)],
+    execution_repo: Annotated[ExecutionRepository, Depends(get_execution_repository)],
+) -> EventSourceResponse:
+    """Stream workflow execution via SSE with test input data."""
+    stored = await workflow_repo.get(workflow_id)
+    if not stored:
+        raise HTTPException(status_code=404, detail=f"Workflow not found: {workflow_id}")
+
+    runner = WorkflowRunner()
+    start_node = runner.find_start_node(stored.workflow)
+
+    if not start_node:
+        raise HTTPException(status_code=400, detail="No start node found in workflow")
+
+    # Build initial data based on whether input_data is provided
+    if request.input_data:
+        initial_data = [
+            NodeData(
+                json={
+                    "body": request.input_data,
+                    "headers": {},
+                    "query": {},
+                    "method": "POST",
+                    "triggeredAt": datetime.now().isoformat(),
+                }
+            )
+        ]
+        mode = "webhook"
+    else:
+        initial_data = [
+            NodeData(
+                json={
+                    "triggeredAt": datetime.now().isoformat(),
+                    "mode": "manual",
+                }
+            )
+        ]
+        mode = "manual"
+
+    async def event_generator() -> AsyncGenerator[str, None]:
+        async for event in _run_workflow_with_events(
+            stored.workflow,
+            start_node.name,
+            initial_data,
+            mode,
             execution_repo,
         ):
             yield event
