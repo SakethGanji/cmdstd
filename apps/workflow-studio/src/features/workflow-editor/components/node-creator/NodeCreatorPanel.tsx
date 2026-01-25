@@ -43,6 +43,7 @@ export default function NodeCreatorPanel() {
     search,
     sourceNodeId,
     sourceHandleId,
+    dropPosition,
     subnodeSlotContext,
     closePanel,
     setView,
@@ -174,6 +175,15 @@ export default function NodeCreatorPanel() {
 
   // Calculate position for new node
   const getNewNodePosition = useCallback(() => {
+    // If we have a drop position (from dragging a connection), use it
+    if (dropPosition) {
+      // Snap to grid (20px)
+      return {
+        x: Math.round(dropPosition.x / 20) * 20,
+        y: Math.round(dropPosition.y / 20) * 20,
+      };
+    }
+
     if (sourceNodeId) {
       // Position to the right of source node
       const sourceNode = nodes.find((n) => n.id === sourceNodeId);
@@ -196,7 +206,7 @@ export default function NodeCreatorPanel() {
       nodes.reduce((sum, n) => sum + n.position.y, 0) / nodes.length;
 
     return { x: maxX + 250, y: avgY };
-  }, [nodes, sourceNodeId]);
+  }, [nodes, sourceNodeId, dropPosition]);
 
   // Handle node selection
   const handleNodeSelect = useCallback(
@@ -362,7 +372,7 @@ export default function NodeCreatorPanel() {
       />
 
       {/* Panel */}
-      <div className="fixed right-2 top-2 bottom-2 z-50 flex w-[400px] flex-col bg-card shadow-2xl border border-border rounded-lg overflow-hidden">
+      <div className="fixed right-2 top-2 bottom-2 z-50 flex w-[400px] flex-col rounded-xl overflow-hidden bg-white dark:bg-card shadow-2xl">
         {/* Header */}
         <div className="border-b border-border px-4 py-4">
           <div className="flex items-center justify-between">

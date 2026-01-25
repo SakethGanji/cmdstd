@@ -36,6 +36,10 @@ function WorkflowEdge({
   const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
   const { getNode } = useReactFlow();
   const executionData = useWorkflowStore((s) => s.executionData);
+  const draggedNodeType = useWorkflowStore((s) => s.draggedNodeType);
+
+  // Check if something is being dragged (show drop zone on edge)
+  const isDragging = !!draggedNodeType;
 
   // Determine edge status based on source and target node execution states
   const edgeStatus = useMemo(() => {
@@ -132,13 +136,17 @@ function WorkflowEdge({
     openForConnection(source, `edge-${id}`);
   };
 
-  // Get edge colors based on status and hover state
+  // Get edge colors based on status, hover state, and drag state
   const edgeColors = useMemo(() => {
     if (edgeStatus !== 'default') {
       return EDGE_COLORS[edgeStatus];
     }
+    if (isDragging) {
+      // Show emerald color when dragging to indicate drop zone
+      return { start: '#34d399', end: '#10b981' };
+    }
     return isHovered ? EDGE_COLORS.hover : EDGE_COLORS.default;
-  }, [edgeStatus, isHovered]);
+  }, [edgeStatus, isHovered, isDragging]);
 
   // Animation for running/active edges
   const isAnimated = edgeStatus === 'running';
@@ -243,23 +251,31 @@ function WorkflowEdge({
         </EdgeLabelRenderer>
       )}
 
-      {/* Add node button on hover */}
-      {isHovered && (
+      {/* Add node button on hover OR drop zone indicator when dragging */}
+      {(isHovered || isDragging) && (
         <EdgeLabelRenderer>
           <div
             style={{
               position: 'absolute',
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-              pointerEvents: 'all',
+              pointerEvents: isHovered ? 'all' : 'none',
             }}
             className="nodrag nopan"
           >
-            <button
-              onClick={handleAddNode}
-              className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card shadow-sm transition-all hover:bg-accent hover:scale-110"
-            >
-              <Plus size={14} className="text-muted-foreground" />
-            </button>
+            {isDragging ? (
+              // Drop zone indicator when dragging
+              <div className="flex h-8 w-8 items-center justify-center rounded-full border-2 border-dashed border-emerald-500 bg-emerald-500/20 animate-pulse">
+                <Plus size={16} className="text-emerald-500" />
+              </div>
+            ) : (
+              // Regular add button on hover
+              <button
+                onClick={handleAddNode}
+                className="flex h-6 w-6 items-center justify-center rounded-full border border-border bg-card shadow-sm transition-all hover:bg-accent hover:scale-110"
+              >
+                <Plus size={14} className="text-muted-foreground" />
+              </button>
+            )}
           </div>
         </EdgeLabelRenderer>
       )}

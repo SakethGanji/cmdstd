@@ -92,10 +92,9 @@ export default function ExecutionLogsPanel() {
         onClick={() => setIsExpanded(true)}
         className={cn(
           'absolute bottom-4 right-4 z-30',
-          'flex items-center gap-2 px-3 py-1.5 rounded-lg',
-          'bg-card/95 backdrop-blur-sm border shadow-sm text-xs',
-          'transition-all hover:shadow-md cursor-pointer',
-          !hasLogs ? 'border-border' : isRunning ? 'border-amber-500/50' : hasErrors ? 'border-destructive/50' : 'border-emerald-500/50'
+          'flex items-center gap-2 px-3 py-1.5 rounded-xl',
+          'bg-white dark:bg-card shadow-lg text-xs',
+          'transition-all hover:shadow-xl cursor-pointer'
         )}
         title="Click to view execution logs"
       >
@@ -140,7 +139,7 @@ export default function ExecutionLogsPanel() {
     <div
       className={cn(
         'absolute bottom-4 right-4 z-30',
-        'w-[560px] max-w-[calc(100vw-2rem)] h-72 bg-card/95 backdrop-blur-sm border border-border rounded-xl flex flex-col',
+        'w-[560px] max-w-[calc(100vw-2rem)] h-72 bg-white dark:bg-card rounded-xl flex flex-col',
         'shadow-2xl'
       )}
     >

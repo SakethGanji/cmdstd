@@ -93,7 +93,7 @@ export default function WorkflowNavbar() {
       className="fixed top-2 right-2 z-30 flex justify-center transition-[left] duration-200 ease-linear"
       style={{ left: isCollapsed ? 'calc(var(--sidebar-width-icon) + 1rem)' : 'calc(var(--sidebar-width) + 1rem)' }}
     >
-      <div className="flex h-12 w-full max-w-5xl items-center justify-between rounded-lg border border-border bg-sidebar px-3 shadow-sm">
+      <div className="flex h-12 w-full max-w-5xl items-center justify-between rounded-xl bg-white dark:bg-card px-3 shadow-lg">
         {/* Left section - Personal / Workflow name / Tags */}
         <div className="flex items-center gap-2">
           {/* Personal indicator */}

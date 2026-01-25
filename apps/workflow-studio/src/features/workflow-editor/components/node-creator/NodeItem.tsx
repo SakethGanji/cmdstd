@@ -1,6 +1,8 @@
+import type { DragEvent } from 'react';
 import type { NodeDefinition } from '../../types/workflow';
 import { getNodeGroupFromType, getNodeStyles, type NodeGroup } from '../../lib/nodeStyles';
 import { getIconForNode } from '../../lib/nodeIcons';
+import { useWorkflowStore } from '../../stores/workflowStore';
 
 interface NodeItemProps {
   node: NodeDefinition & { group?: NodeGroup };
@@ -9,15 +11,33 @@ interface NodeItemProps {
 
 export default function NodeItem({ node, onClick }: NodeItemProps) {
   const IconComponent = getIconForNode(node.icon, node.type);
+  const setDraggedNodeType = useWorkflowStore((s) => s.setDraggedNodeType);
 
   // Get group-based styling to match canvas nodes
   const nodeGroup = getNodeGroupFromType(node.type, node.group ? [node.group] : (node.category ? [node.category] : undefined));
   const styles = getNodeStyles(nodeGroup);
 
+  const handleDragStart = (e: DragEvent<HTMLButtonElement>) => {
+    // Set the dragged node data
+    e.dataTransfer.setData('application/reactflow-node', JSON.stringify(node));
+    e.dataTransfer.effectAllowed = 'move';
+
+    // Update store to track what's being dragged
+    setDraggedNodeType(node.type);
+  };
+
+  const handleDragEnd = () => {
+    // Clear the dragged state
+    setDraggedNodeType(null);
+  };
+
   return (
     <button
       onClick={onClick}
-      className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left transition-all hover:border-border hover:bg-accent/50 hover:shadow-sm"
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-3 text-left transition-all hover:border-border hover:bg-accent/50 hover:shadow-sm cursor-grab active:cursor-grabbing"
     >
       <div
         className={`

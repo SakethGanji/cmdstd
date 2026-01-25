@@ -67,35 +67,36 @@
   --subnode-tool-icon-bg: rgba(71, 85, 105, 0.12);
 
   --card: #ffffff;
-  --card-foreground: #18181b;
+  --card-foreground: #1f2937;
   --popover: #ffffff;
-  --popover-foreground: #18181b;
-  --primary: #2563eb;
+  --popover-foreground: #1f2937;
+  --primary: #6b7280;
   --primary-foreground: #ffffff;
-  --secondary: #f4f4f5;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f5;
-  --muted-foreground: #52525b;
-  --accent: #e4e4e7;
-  --accent-foreground: #18181b;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #374151;
+  --muted: #f3f4f6;
+  --muted-foreground: #6b7280;
+  --accent: #e5e7eb;
+  --accent-foreground: #374151;
   --destructive: #dc2626;
   --destructive-foreground: #ffffff;
-  --border: #d4d4d8;
-  --input: #f4f4f5;
-  --ring: #2563eb;
-  --chart-1: #2563eb;
-  --chart-2: #3b82f6;
-  --chart-3: #60a5fa;
-  --chart-4: #93c5fd;
-  --chart-5: #1d4ed8;
-  --sidebar: #fafafa;
-  --sidebar-foreground: #18181b;
-  --sidebar-primary: #2563eb;
+  --border: #e5e7eb;
+  --input: #f3f4f6;
+  --ring: #6b7280;
+  --chart-1: #6b7280;
+  --chart-2: #4b5563;
+  --chart-3: #374151;
+  --chart-4: #9ca3af;
+  --chart-5: #d1d5db;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #1f2937;
+  --sidebar-primary: #6b7280;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e4e4e7;
-  --sidebar-accent-foreground: #18181b;
-  --sidebar-border: #e4e4e7;
-  --sidebar-ring: #2563eb;
+  --sidebar-accent: #f3f4f6;
+  --sidebar-accent-foreground: #374151;
+  --sidebar-border: #e5e7eb;
+  --sidebar-ring: #6b7280;
+
   --font-sans: "Inter", sans-serif;
   --font-serif: "PT Serif", serif;
   --font-mono: "Fira Mono", monospace;
@@ -106,113 +107,113 @@
   --shadow-spread: 0px;
   --shadow-opacity: 0.1;
   --shadow-color: #000000;
-  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
-  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
-  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.06);
+  --shadow-xs: 0 1px 3px 0 rgb(0 0 0 / 0.08);
+  --shadow-sm: 0 2px 4px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+  --shadow: 0 2px 8px 0 rgb(0 0 0 / 0.08), 0 1px 3px -1px rgb(0 0 0 / 0.06);
+  --shadow-md: 0 4px 16px -2px rgb(0 0 0 / 0.1), 0 2px 6px -2px rgb(0 0 0 / 0.06);
+  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.12), 0 4px 10px -4px rgb(0 0 0 / 0.08);
+  --shadow-xl: 0 20px 40px -8px rgb(0 0 0 / 0.14), 0 8px 16px -6px rgb(0 0 0 / 0.08);
+  --shadow-2xl: 0 28px 60px -12px rgb(0 0 0 / 0.2);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
 }
 
 .dark {
-  /* Neutral dark grays - no blue/purple tint */
-  --background: #121212;
-  --foreground: #e5e5e5;
+  /* Lighter dark grays - easier on the eyes */
+  --background: #1e1e20;
+  --foreground: #ececec;
 
-  /* Node Group Colors - Dark Mode (Brighter backgrounds for visibility) */
+  /* Node Group Colors - Dark Mode (Adjusted for lighter background) */
   /* Trigger: Warm orange */
   --node-trigger: #fb923c;
-  --node-trigger-light: #292524;
-  --node-trigger-border: #92400e;
+  --node-trigger-light: #332a24;
+  --node-trigger-border: #a3510f;
   --node-trigger-icon-bg: rgba(251, 146, 60, 0.22);
 
   /* Transform: Bright blue */
   --node-transform: #60a5fa;
-  --node-transform-light: #1e293b;
-  --node-transform-border: #1d4ed8;
+  --node-transform-light: #262f3d;
+  --node-transform-border: #2558c5;
   --node-transform-icon-bg: rgba(96, 165, 250, 0.22);
 
   /* Flow: Purple */
   --node-flow: #a78bfa;
-  --node-flow-light: #27242e;
-  --node-flow-border: #6d28d9;
+  --node-flow-light: #2f2a38;
+  --node-flow-border: #7c3aed;
   --node-flow-icon-bg: rgba(167, 139, 250, 0.22);
 
   /* AI: Neutral gray */
-  --node-ai: #a1a1aa;
-  --node-ai-light: #262626;
-  --node-ai-border: #525252;
-  --node-ai-icon-bg: rgba(161, 161, 170, 0.2);
+  --node-ai: #b0b0b8;
+  --node-ai-light: #303033;
+  --node-ai-border: #606065;
+  --node-ai-icon-bg: rgba(176, 176, 184, 0.2);
 
   /* Action: Neutral gray */
-  --node-action: #a1a1aa;
-  --node-action-light: #262626;
-  --node-action-border: #525252;
-  --node-action-icon-bg: rgba(161, 161, 170, 0.2);
+  --node-action: #b0b0b8;
+  --node-action-light: #303033;
+  --node-action-border: #606065;
+  --node-action-icon-bg: rgba(176, 176, 184, 0.2);
 
   /* Output: Cyan */
   --node-output: #22d3ee;
-  --node-output-light: #1a2a2e;
-  --node-output-border: #0e7490;
+  --node-output-light: #233438;
+  --node-output-border: #1585a0;
   --node-output-icon-bg: rgba(34, 211, 238, 0.22);
 
-  /* Node handle - slightly brighter for visibility */
-  --node-handle: #71717a;
+  /* Node handle - brighter for visibility */
+  --node-handle: #88888f;
 
   /* Subnode colors - all gray to match AI nodes */
   /* Model: Gray */
-  --subnode-model: #a1a1aa;
-  --subnode-model-light: #262626;
-  --subnode-model-border: #525252;
-  --subnode-model-icon-bg: rgba(161, 161, 170, 0.2);
+  --subnode-model: #b0b0b8;
+  --subnode-model-light: #303033;
+  --subnode-model-border: #606065;
+  --subnode-model-icon-bg: rgba(176, 176, 184, 0.2);
 
   /* Memory: Gray */
-  --subnode-memory: #a1a1aa;
-  --subnode-memory-light: #262626;
-  --subnode-memory-border: #525252;
-  --subnode-memory-icon-bg: rgba(161, 161, 170, 0.2);
+  --subnode-memory: #b0b0b8;
+  --subnode-memory-light: #303033;
+  --subnode-memory-border: #606065;
+  --subnode-memory-icon-bg: rgba(176, 176, 184, 0.2);
 
   /* Tool: Gray */
-  --subnode-tool: #a1a1aa;
-  --subnode-tool-light: #262626;
-  --subnode-tool-border: #525252;
-  --subnode-tool-icon-bg: rgba(161, 161, 170, 0.2);
+  --subnode-tool: #b0b0b8;
+  --subnode-tool-light: #303033;
+  --subnode-tool-border: #606065;
+  --subnode-tool-icon-bg: rgba(176, 176, 184, 0.2);
 
-  /* Neutral panels and cards */
-  --card: #1e1e1e;
-  --card-foreground: #e5e5e5;
-  --popover: #252525;
-  --popover-foreground: #e5e5e5;
-  --primary: #3b82f6;
-  --primary-foreground: #ffffff;
-  --secondary: #262626;
-  --secondary-foreground: #e5e5e5;
-  --muted: #262626;
-  --muted-foreground: #a3a3a3;
-  --accent: #333333;
-  --accent-foreground: #fafafa;
+  /* Neutral panels and cards - space gray theme */
+  --card: #2a2d31;
+  --card-foreground: #f3f4f6;
+  --popover: #31353a;
+  --popover-foreground: #f3f4f6;
+  --primary: #9ca3af;
+  --primary-foreground: #1f2937;
+  --secondary: #363a3f;
+  --secondary-foreground: #f3f4f6;
+  --muted: #3b4048;
+  --muted-foreground: #9ca3af;
+  --accent: #454b52;
+  --accent-foreground: #f3f4f6;
   --destructive: #ef4444;
   --destructive-foreground: #ffffff;
-  --border: #333333;
-  --input: #262626;
-  --ring: #3b82f6;
-  --chart-1: #3b82f6;
-  --chart-2: #60a5fa;
-  --chart-3: #93c5fd;
-  --chart-4: #bfdbfe;
-  --chart-5: #2563eb;
-  --sidebar: #171717;
-  --sidebar-foreground: #e5e5e5;
-  --sidebar-primary: #3b82f6;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #262626;
-  --sidebar-accent-foreground: #fafafa;
-  --sidebar-border: #2a2a2a;
-  --sidebar-ring: #3b82f6;
+  --border: #454b52;
+  --input: #363a3f;
+  --ring: #9ca3af;
+  --chart-1: #9ca3af;
+  --chart-2: #d1d5db;
+  --chart-3: #6b7280;
+  --chart-4: #4b5563;
+  --chart-5: #374151;
+  --sidebar: #262a2e;
+  --sidebar-foreground: #f3f4f6;
+  --sidebar-primary: #9ca3af;
+  --sidebar-primary-foreground: #1f2937;
+  --sidebar-accent: #3b4048;
+  --sidebar-accent-foreground: #f3f4f6;
+  --sidebar-border: #454b52;
+  --sidebar-ring: #9ca3af;
   --font-sans: "Inter", sans-serif;
   --font-serif: "PT Serif", serif;
   --font-mono: "Fira Mono", monospace;
@@ -223,14 +224,14 @@
   --shadow-spread: 0px;
   --shadow-opacity: 0.3;
   --shadow-color: #000000;
-  --shadow-2xs: 0px 1px 2px 0px hsl(0 0% 0% / 0.3);
-  --shadow-xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.3);
-  --shadow-sm: 0px 2px 4px 0px hsl(0 0% 0% / 0.3), 0px 1px 2px -1px hsl(0 0% 0% / 0.2);
-  --shadow: 0px 4px 6px 0px hsl(0 0% 0% / 0.3), 0px 2px 4px -1px hsl(0 0% 0% / 0.2);
-  --shadow-md: 0px 6px 8px 0px hsl(0 0% 0% / 0.3), 0px 3px 6px -2px hsl(0 0% 0% / 0.2);
-  --shadow-lg: 0px 8px 12px 0px hsl(0 0% 0% / 0.3), 0px 4px 8px -2px hsl(0 0% 0% / 0.2);
-  --shadow-xl: 0px 12px 16px 0px hsl(0 0% 0% / 0.35), 0px 6px 12px -3px hsl(0 0% 0% / 0.2);
-  --shadow-2xl: 0px 16px 24px 0px hsl(0 0% 0% / 0.45);
+  --shadow-2xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.35);
+  --shadow-xs: 0px 2px 4px 0px hsl(0 0% 0% / 0.35);
+  --shadow-sm: 0px 2px 6px 0px hsl(0 0% 0% / 0.35), 0px 1px 3px -1px hsl(0 0% 0% / 0.25);
+  --shadow: 0px 4px 10px 0px hsl(0 0% 0% / 0.35), 0px 2px 5px -1px hsl(0 0% 0% / 0.25);
+  --shadow-md: 0px 6px 14px -2px hsl(0 0% 0% / 0.4), 0px 3px 8px -2px hsl(0 0% 0% / 0.25);
+  --shadow-lg: 0px 10px 20px -4px hsl(0 0% 0% / 0.4), 0px 5px 10px -3px hsl(0 0% 0% / 0.25);
+  --shadow-xl: 0px 16px 28px -6px hsl(0 0% 0% / 0.45), 0px 8px 14px -4px hsl(0 0% 0% / 0.25);
+  --shadow-2xl: 0px 24px 40px -8px hsl(0 0% 0% / 0.5);
 }
 
 @theme inline {
@@ -319,6 +320,18 @@
 }
 
 
+
+/* Selection box styling */
+.react-flow__selection {
+  background: rgba(59, 130, 246, 0.08) !important;
+  border: 1px dashed rgba(59, 130, 246, 0.5) !important;
+  border-radius: 4px;
+}
+
+/* Selected node highlight */
+.react-flow__node.selected {
+  outline: none !important;
+}
 
 .react-flow__controls {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;

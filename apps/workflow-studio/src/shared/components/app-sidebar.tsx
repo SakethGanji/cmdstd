@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { Link, useMatchRoute } from "@tanstack/react-router"
-import { Moon, Sun, Sparkles, Workflow, FolderOpen } from "lucide-react"
+import { Moon, Sun, Hexagon, Workflow, FolderOpen } from "lucide-react"
 
 import { Avatar, AvatarFallback } from "@/shared/components/ui/avatar"
 import { useTheme } from "@/shared/components/theme-provider"
@@ -35,13 +35,13 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" tooltip="Command Studio">
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg border-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-950">
-                <Sparkles className="size-4 text-blue-600 dark:text-blue-400" strokeWidth={2.5} />
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-gradient-to-br from-gray-300 via-gray-400 to-gray-500 dark:from-gray-500 dark:via-gray-600 dark:to-gray-700 shadow-sm">
+                <Hexagon className="size-4 text-white dark:text-gray-200" strokeWidth={2.5} fill="currentColor" fillOpacity={0.2} />
               </div>
               <div className="grid flex-1 text-left leading-tight">
                 <div className="flex items-center gap-1">
-                  <span className="text-xs font-semibold tracking-wide uppercase text-blue-600 dark:text-blue-400">Command</span>
-                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-blue-600 dark:bg-blue-500 text-white">Studio</span>
+                  <span className="text-sm font-semibold tracking-tight text-gray-700 dark:text-gray-200">Command</span>
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded bg-gradient-to-r from-gray-500 to-gray-600 dark:from-gray-400 dark:to-gray-500 text-white shadow-sm">Studio</span>
                 </div>
                 <span className="truncate text-[10px] text-muted-foreground/60 italic">by Luna</span>
               </div>

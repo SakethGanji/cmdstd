@@ -147,7 +147,7 @@ export default function NodeDetailsModal() {
       />
 
       {/* Modal */}
-      <div className="relative z-10 flex h-[90vh] w-[95vw] max-w-[1600px] flex-col overflow-hidden rounded-xl bg-card shadow-2xl border border-border">
+      <div className="relative z-10 flex h-[90vh] w-[95vw] max-w-[1600px] flex-col overflow-hidden rounded-xl bg-white dark:bg-card shadow-2xl">
         {/* Consolidated Header - Node identity + controls */}
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           {/* Left: Back button */}

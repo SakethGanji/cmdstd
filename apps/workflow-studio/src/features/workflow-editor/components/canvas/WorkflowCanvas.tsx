@@ -1,30 +1,39 @@
-import { useCallback, useMemo, useEffect } from 'react';
+import { useCallback, useMemo, useEffect, useRef, useState, type DragEvent, type MouseEvent } from 'react';
 import ReactFlow, {
   Background,
   MiniMap,
   type OnConnect,
+  type OnConnectStart,
   type Connection,
+  type Node,
   BackgroundVariant,
   useReactFlow,
+  ConnectionLineType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Square, Plus, Minus } from 'lucide-react';
+import { Square, Plus, Minus, Undo2, Redo2 } from 'lucide-react';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useSaveWorkflow } from '../../hooks/useWorkflowApi';
 import { useExecutionStream } from '../../hooks/useExecutionStream';
+import { getNodeIcon } from '../../hooks/useNodeTypes';
 import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
 import SubnodeNode from './nodes/SubnodeNode';
 import WorkflowEdge from './edges/WorkflowEdge';
 import SubnodeEdge from './edges/SubnodeEdge';
 import StickyNote from './nodes/StickyNote';
+import NodeContextMenu from './NodeContextMenu';
 import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
 import TestInputPanel from '../TestInputPanel';
-import { getNodeGroupFromType, getMiniMapColor } from '../../lib/nodeStyles';
+import { getNodeGroupFromType, getMiniMapColor, calculateNodeDimensions, type NodeGroup } from '../../lib/nodeStyles';
+import { generateNodeName, getExistingNodeNames } from '../../lib/workflowTransform';
+import { isTriggerType } from '../../lib/nodeConfig';
 import { cn } from '@/shared/lib/utils';
+import type { WorkflowNodeData, SubnodeSlotDefinition, OutputStrategy } from '../../types/workflow';
+import type { NodeIO } from '../../lib/nodeStyles';
 
 // Define custom node types - use 'any' to work around React 19 type incompatibility
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -42,6 +51,36 @@ const edgeTypes: any = {
   subnodeEdge: SubnodeEdge,
 };
 
+// Distance threshold for detecting drop near a node (in pixels)
+const DROP_PROXIMITY_THRESHOLD = 100;
+
+// Property definition from API (matching NodeCreatorPanel)
+interface ApiProperty {
+  name: string;
+  displayName: string;
+  type: string;
+  default?: unknown;
+  [key: string]: unknown;
+}
+
+// Extended node definition for drag data
+interface DraggedNodeData {
+  type: string;
+  name: string;
+  displayName: string;
+  description: string;
+  icon?: string;
+  category?: string;
+  group?: NodeGroup;
+  inputCount?: number;
+  outputCount?: number;
+  inputs?: NodeIO[];
+  outputs?: NodeIO[];
+  subnodeSlots?: SubnodeSlotDefinition[];
+  outputStrategy?: OutputStrategy;
+  properties?: ApiProperty[];
+}
+
 export default function WorkflowCanvas() {
   const {
     nodes,
@@ -49,12 +88,28 @@ export default function WorkflowCanvas() {
     onNodesChange,
     onEdgesChange,
     onConnect,
+    addNode,
     setSelectedNode,
     isValidConnection,
+    isInputConnected,
+    setDraggedNodeType,
+    clearDropTarget,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useWorkflowStore();
 
   const openPanel = useNodeCreatorStore((s) => s.openPanel);
-  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  const closePanel = useNodeCreatorStore((s) => s.closePanel);
+  const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
+  const { fitView, zoomIn, zoomOut, screenToFlowPosition, getNodes } = useReactFlow();
+
+  // Track the current connection being dragged
+  const connectingRef = useRef<{ nodeId: string; handleId: string | null } | null>(null);
+
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
 
   const { saveWorkflow } = useSaveWorkflow();
   const { executeWorkflow, isExecuting, cancelExecution } = useExecutionStream();
@@ -85,6 +140,44 @@ export default function WorkflowCanvas() {
     [onConnect]
   );
 
+  // Track when a connection drag starts
+  const handleConnectStart: OnConnectStart = useCallback(
+    (_, { nodeId, handleId }) => {
+      connectingRef.current = { nodeId: nodeId || '', handleId };
+    },
+    []
+  );
+
+  // Handle when a connection drag ends (either connected or dropped in empty space)
+  const handleConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      const connecting = connectingRef.current;
+      connectingRef.current = null;
+
+      if (!connecting) return;
+
+      // Check if we dropped on a valid target (ReactFlow handles this)
+      // We need to check if the drop was on the pane (empty space)
+      const target = event.target as HTMLElement;
+      const isPane = target.classList.contains('react-flow__pane');
+
+      if (isPane) {
+        // Dropped in empty space - open node creator at this position
+        const clientX = 'clientX' in event ? event.clientX : event.touches[0].clientX;
+        const clientY = 'clientY' in event ? event.clientY : event.touches[0].clientY;
+
+        const dropPosition = screenToFlowPosition({
+          x: clientX,
+          y: clientY,
+        });
+
+        // Open node creator with connection context and drop position
+        openForConnection(connecting.nodeId, connecting.handleId || 'output-0', dropPosition);
+      }
+    },
+    [screenToFlowPosition, openForConnection]
+  );
+
   // Connection validation callback for ReactFlow
   const handleIsValidConnection = useCallback(
     (connection: Connection) => {
@@ -106,7 +199,267 @@ export default function WorkflowCanvas() {
 
   const handlePaneClick = useCallback(() => {
     setSelectedNode(null);
+    setContextMenu(null);
   }, [setSelectedNode]);
+
+  // Handle right-click on nodes
+  const handleNodeContextMenu = useCallback(
+    (event: React.MouseEvent, node: Node) => {
+      event.preventDefault();
+      // Don't show context menu for placeholder or sticky notes
+      if (node.type === 'addNodes' || node.type === 'stickyNote') return;
+
+      setContextMenu({
+        nodeId: node.id,
+        x: event.clientX,
+        y: event.clientY,
+      });
+    },
+    []
+  );
+
+  // Find the nearest node to a drop position that can accept an input connection
+  const findNearestConnectableNode = useCallback(
+    (dropPosition: { x: number; y: number }) => {
+      const flowNodes = getNodes();
+      let nearestNode = null;
+      let nearestDistance = DROP_PROXIMITY_THRESHOLD;
+
+      for (const node of flowNodes) {
+        // Skip placeholder, sticky notes, and subnodes
+        if (node.type !== 'workflowNode') continue;
+
+        // Skip trigger nodes (they have no inputs)
+        if (isTriggerType(node.data?.type || '')) continue;
+
+        // Skip nodes that already have an input connection
+        if (isInputConnected(node.id)) continue;
+
+        // Calculate node dimensions
+        const nodeData = node.data as WorkflowNodeData;
+        const inputCount = Math.max(1, nodeData.inputCount ?? nodeData.inputs?.length ?? 1);
+        const outputCount = Math.max(1, nodeData.outputCount ?? nodeData.outputs?.length ?? 1);
+        const subnodeSlotCount = nodeData.subnodeSlots?.length ?? 0;
+        const dimensions = calculateNodeDimensions(inputCount, outputCount, subnodeSlotCount);
+
+        // Calculate distance to the left edge of the node (where inputs are)
+        const nodeLeftX = node.position.x;
+        const nodeCenterY = node.position.y + dimensions.height / 2;
+
+        const distance = Math.sqrt(
+          Math.pow(dropPosition.x - nodeLeftX, 2) +
+          Math.pow(dropPosition.y - nodeCenterY, 2)
+        );
+
+        // Only consider if drop is to the left of the node (input side)
+        if (dropPosition.x < nodeLeftX + 20 && distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestNode = node;
+        }
+      }
+
+      return nearestNode;
+    },
+    [getNodes, isInputConnected]
+  );
+
+  // Find the nearest edge to a drop position (for inserting between nodes)
+  const findNearestEdge = useCallback(
+    (dropPosition: { x: number; y: number }) => {
+      let nearestEdge = null;
+      let nearestDistance = DROP_PROXIMITY_THRESHOLD;
+
+      for (const edge of edges) {
+        // Skip subnode edges
+        if (edge.data?.isSubnodeEdge) continue;
+
+        // Get source and target nodes
+        const sourceNode = nodes.find((n) => n.id === edge.source);
+        const targetNode = nodes.find((n) => n.id === edge.target);
+
+        if (!sourceNode || !targetNode) continue;
+
+        // Calculate midpoint of the edge (approximation)
+        const midX = (sourceNode.position.x + targetNode.position.x) / 2;
+        const midY = (sourceNode.position.y + targetNode.position.y) / 2;
+
+        const distance = Math.sqrt(
+          Math.pow(dropPosition.x - midX, 2) +
+          Math.pow(dropPosition.y - midY, 2)
+        );
+
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestEdge = edge;
+        }
+      }
+
+      return nearestEdge;
+    },
+    [edges, nodes]
+  );
+
+  // Handle drag over canvas
+  const handleDragOver = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  }, []);
+
+  // Handle drop on canvas
+  const handleDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      event.preventDefault();
+
+      const nodeDataStr = event.dataTransfer.getData('application/reactflow-node');
+      if (!nodeDataStr) return;
+
+      let draggedNode: DraggedNodeData;
+      try {
+        draggedNode = JSON.parse(nodeDataStr);
+      } catch {
+        return;
+      }
+
+      // Convert screen coordinates to flow coordinates
+      const position = screenToFlowPosition({
+        x: event.clientX,
+        y: event.clientY,
+      });
+
+      // Check if dropping near an unconnected node input
+      const nearNode = findNearestConnectableNode(position);
+
+      // Check if dropping on an edge
+      const nearEdge = findNearestEdge(position);
+
+      // Create the new node
+      const newNodeId = `node-${Date.now()}`;
+      const existingNames = getExistingNodeNames(nodes as Node<WorkflowNodeData>[]);
+      const nodeName = generateNodeName(draggedNode.name, existingNames);
+
+      // Extract defaults from properties
+      const defaultParams: Record<string, unknown> = {};
+      if (draggedNode.properties) {
+        for (const prop of draggedNode.properties) {
+          if (prop.default !== undefined) {
+            defaultParams[prop.name] = prop.default;
+          }
+        }
+      }
+
+      const isTrigger = isTriggerType(draggedNode.type);
+      const inputCount = isTrigger ? 0 : Math.max(1, draggedNode.inputCount ?? draggedNode.inputs?.length ?? 1);
+      const outputCount = Math.max(1, draggedNode.outputCount ?? draggedNode.outputs?.length ?? 1);
+
+      const nodeData: WorkflowNodeData = {
+        name: nodeName,
+        label: draggedNode.displayName,
+        type: draggedNode.type,
+        icon: getNodeIcon(draggedNode.type, draggedNode.icon),
+        description: draggedNode.description,
+        parameters: defaultParams,
+        continueOnFail: false,
+        retryOnFail: 0,
+        retryDelay: 1000,
+        group: draggedNode.group,
+        inputCount,
+        outputCount,
+        inputs: draggedNode.inputs,
+        outputs: draggedNode.outputs,
+        outputStrategy: draggedNode.outputStrategy,
+        subnodeSlots: draggedNode.subnodeSlots,
+      };
+
+      // Calculate final position
+      let finalPosition = position;
+
+      // If dropping on an edge, position between the two nodes
+      if (nearEdge && !nearNode) {
+        const sourceNode = nodes.find((n) => n.id === nearEdge.source);
+        const targetNode = nodes.find((n) => n.id === nearEdge.target);
+
+        if (sourceNode && targetNode) {
+          finalPosition = {
+            x: (sourceNode.position.x + targetNode.position.x) / 2,
+            y: (sourceNode.position.y + targetNode.position.y) / 2,
+          };
+        }
+      }
+      // If dropping near a node input, position to the left of that node
+      else if (nearNode) {
+        finalPosition = {
+          x: nearNode.position.x - 200,
+          y: nearNode.position.y,
+        };
+      }
+
+      // Snap to grid
+      finalPosition = {
+        x: Math.round(finalPosition.x / 20) * 20,
+        y: Math.round(finalPosition.y / 20) * 20,
+      };
+
+      const newNode = {
+        id: newNodeId,
+        type: 'workflowNode',
+        position: finalPosition,
+        data: nodeData,
+      };
+
+      addNode(newNode);
+
+      // Auto-connect based on drop target
+      if (nearEdge && !nearNode) {
+        // Dropping on edge: delete old edge and create two new connections
+        // Remove the old edge
+        const newEdges = edges.filter((e) => e.id !== nearEdge.id);
+        useWorkflowStore.getState().setEdges(newEdges);
+
+        // Connect source -> new node
+        if (!isTrigger) {
+          onConnect({
+            source: nearEdge.source,
+            target: newNodeId,
+            sourceHandle: nearEdge.sourceHandle ?? null,
+            targetHandle: null,
+          });
+        }
+
+        // Connect new node -> target
+        onConnect({
+          source: newNodeId,
+          target: nearEdge.target,
+          sourceHandle: draggedNode.outputs?.[0]?.name || 'output-0',
+          targetHandle: nearEdge.targetHandle ?? null,
+        });
+      } else if (nearNode && !isTrigger) {
+        // Dropping near a node input: connect new node to that input
+        onConnect({
+          source: newNodeId,
+          target: nearNode.id,
+          sourceHandle: draggedNode.outputs?.[0]?.name || 'output-0',
+          targetHandle: null,
+        });
+      }
+
+      // Clear drag state and close panel
+      setDraggedNodeType(null);
+      clearDropTarget();
+      closePanel();
+    },
+    [
+      screenToFlowPosition,
+      findNearestConnectableNode,
+      findNearestEdge,
+      nodes,
+      edges,
+      addNode,
+      onConnect,
+      setDraggedNodeType,
+      clearDropTarget,
+      closePanel,
+    ]
+  );
 
   // Check if canvas is empty (only has placeholder)
   const isEmpty = useMemo(
@@ -115,15 +468,18 @@ export default function WorkflowCanvas() {
   );
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full" onDragOver={handleDragOver} onDrop={handleDrop}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        onConnectStart={handleConnectStart}
+        onConnectEnd={handleConnectEnd}
         onSelectionChange={handleSelectionChange}
         onPaneClick={handlePaneClick}
+        onNodeContextMenu={handleNodeContextMenu}
         isValidConnection={handleIsValidConnection}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
@@ -139,10 +495,17 @@ export default function WorkflowCanvas() {
         snapGrid={[20, 20]}
         deleteKeyCode={['Backspace', 'Delete']}
         multiSelectionKeyCode="Shift"
+        connectionLineType={ConnectionLineType.SmoothStep}
+        connectionLineStyle={{
+          stroke: '#9ca3af',
+          strokeWidth: 1.5,
+          strokeDasharray: '6 4',
+        }}
         panOnScroll={false}
         zoomOnScroll
-        panOnDrag={true}
-        selectionOnDrag={false}
+        panOnDrag
+        selectionOnDrag
+        selectionKeyCode="Control"
         nodesDraggable
         nodesConnectable
         elementsSelectable
@@ -192,9 +555,29 @@ export default function WorkflowCanvas() {
 
       </ReactFlow>
 
-      {/* Top-right toolbar - Zoom, Play, and Add buttons */}
+      {/* Top-right toolbar - Undo/Redo, Zoom, Play, and Add buttons */}
       {!isEmpty && (
         <div className="fixed top-4 right-4 z-40 flex items-center gap-1.5">
+          {/* Undo/Redo controls */}
+          <div className="flex flex-row bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 shadow-md overflow-hidden">
+            <button
+              onClick={() => undo()}
+              disabled={!canUndo()}
+              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border-r border-border/50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              title="Undo (Ctrl+Z)"
+            >
+              <Undo2 size={14} strokeWidth={2} />
+            </button>
+            <button
+              onClick={() => redo()}
+              disabled={!canRedo()}
+              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
+              title="Redo (Ctrl+Shift+Z)"
+            >
+              <Redo2 size={14} strokeWidth={2} />
+            </button>
+          </div>
+
           {/* Zoom controls - horizontal */}
           <div className="flex flex-row bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 shadow-md overflow-hidden">
             <button
@@ -249,6 +632,16 @@ export default function WorkflowCanvas() {
         onOpenChange={setIsShortcutsHelpOpen}
         shortcuts={shortcuts}
       />
+
+      {/* Node context menu */}
+      {contextMenu && (
+        <NodeContextMenu
+          nodeId={contextMenu.nodeId}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

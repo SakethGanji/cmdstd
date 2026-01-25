@@ -4,6 +4,7 @@ import { addEdge, applyNodeChanges, applyEdgeChanges } from 'reactflow';
 import type { WorkflowNodeData, NodeExecutionData, StickyNoteData, SubnodeEdgeData, SubnodeType, OutputStrategy } from '../types/workflow';
 import type { NodeIO } from '../lib/nodeStyles';
 import { isTriggerNode } from '../hooks/useNodeTypes';
+import { generateNodeName } from '../lib/workflowTransform';
 
 // Subnode slot names that identify subnode connections
 const SUBNODE_SLOT_NAMES = ['chatModel', 'memory', 'tools'];
@@ -56,6 +57,24 @@ interface ConnectionValidation {
   message?: string;
 }
 
+// Clipboard data for copy/paste
+interface ClipboardData {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+// History entry for undo/redo
+interface HistoryEntry {
+  nodes: Node[];
+  edges: Edge[];
+}
+
+const MAX_HISTORY_SIZE = 50;
+
+// Debounce timestamp to prevent multiple saves in same tick
+let lastHistorySaveTime = 0;
+const HISTORY_DEBOUNCE_MS = 50;
+
 interface WorkflowState {
   // Workflow metadata
   workflowName: string;
@@ -75,6 +94,20 @@ interface WorkflowState {
 
   // Pinned data per node - backend format: { json: {...} }[]
   pinnedData: Record<string, BackendNodeData[]>;
+
+  // Drag-drop state
+  draggedNodeType: string | null;
+  dropTargetNodeId: string | null;
+  dropTargetHandleId: string | null;
+  dropTargetEdgeId: string | null;
+
+  // Clipboard for copy/paste
+  clipboard: ClipboardData | null;
+
+  // History for undo/redo
+  history: HistoryEntry[];
+  historyIndex: number;
+  isUndoRedoAction: boolean; // Flag to prevent saving undo/redo actions to history
 
   // Metadata actions
   setWorkflowName: (name: string) => void;
@@ -130,6 +163,38 @@ interface WorkflowState {
 
   // Reset to empty state
   resetWorkflow: () => void;
+
+  // Drag-drop actions
+  setDraggedNodeType: (type: string | null) => void;
+  setDropTarget: (nodeId: string | null, handleId: string | null) => void;
+  setDropTargetEdge: (edgeId: string | null) => void;
+  clearDropTarget: () => void;
+
+  // Connection helpers
+  isInputConnected: (nodeId: string, handleId?: string) => boolean;
+  isOutputConnected: (nodeId: string, handleId: string) => boolean;
+  getNodeConnections: (nodeId: string) => { inputs: Edge[]; outputs: Edge[] };
+
+  // Clipboard operations
+  copyNodes: (nodeIds: string[]) => void;
+  cutNodes: (nodeIds: string[]) => void;
+  pasteNodes: (position?: { x: number; y: number }) => void;
+  duplicateNodes: (nodeIds: string[]) => void;
+
+  // History operations
+  saveToHistory: () => void;
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
+
+  // Multi-node operations
+  deleteNodes: (nodeIds: string[]) => void;
+  moveNodes: (nodeIds: string[], delta: { x: number; y: number }) => void;
+
+  // Export/Import
+  exportWorkflow: () => string;
+  importWorkflow: (json: string) => boolean;
 }
 
 // Initial "Add first step" node for empty canvas
@@ -154,6 +219,14 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   selectedNodeId: null,
   executionData: {},
   pinnedData: {},
+  draggedNodeType: null,
+  dropTargetNodeId: null,
+  dropTargetHandleId: null,
+  dropTargetEdgeId: null,
+  clipboard: null,
+  history: [],
+  historyIndex: -1,
+  isUndoRedoAction: false,
 
   // Metadata actions
   setWorkflowName: (name) => set({ workflowName: name }),
@@ -165,7 +238,13 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   setEdges: (edges) => set({ edges }),
 
   onNodesChange: (changes) => {
-    const { nodes, edges } = get();
+    const { nodes, edges, isUndoRedoAction, saveToHistory } = get();
+
+    // Save to history if nodes are being removed (for undo support)
+    const hasRemovals = changes.some((c) => c.type === 'remove');
+    if (hasRemovals && !isUndoRedoAction) {
+      saveToHistory();
+    }
 
     // Check for position changes on parent nodes with subnodes
     const positionChanges = changes.filter(
@@ -224,6 +303,12 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   onEdgesChange: (changes) => {
+    // Save to history if edges are being removed (for undo support)
+    const hasRemovals = changes.some((c) => c.type === 'remove');
+    if (hasRemovals && !get().isUndoRedoAction) {
+      get().saveToHistory();
+    }
+
     set({
       edges: applyEdgeChanges(changes, get().edges),
     });
@@ -312,6 +397,22 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return { isValid: false, message: 'Only subnodes can connect to this slot' };
     }
 
+    // Check if target node already has an input connection
+    // Multi-input nodes (like Merge) can accept multiple connections
+    const targetInputCount = (targetNode.data as WorkflowNodeData)?.inputCount ?? 1;
+    const allowsMultipleInputs = targetInputCount > 1 || targetInputCount === Infinity;
+
+    if (!allowsMultipleInputs) {
+      const targetHasInput = edges.some(
+        (e) => e.target === connection.target &&
+               !e.data?.isSubnodeEdge &&
+               !SUBNODE_SLOT_NAMES.includes(e.targetHandle || '')
+      );
+      if (targetHasInput) {
+        return { isValid: false, message: 'Node already has an input connection' };
+      }
+    }
+
     // Check for duplicate connections
     const duplicateConnection = edges.some(
       (e) =>
@@ -324,11 +425,29 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return { isValid: false, message: 'Connection already exists' };
     }
 
-    // Check for cycles (simple check - prevent direct back-connections)
-    const wouldCreateCycle = edges.some(
-      (e) => e.source === connection.target && e.target === connection.source
-    );
-    if (wouldCreateCycle) {
+    // Check for cycles - traverse upstream from source to see if we'd reach target
+    const wouldCreateCycle = (sourceId: string, targetId: string): boolean => {
+      const visited = new Set<string>();
+      const queue = [sourceId];
+
+      while (queue.length > 0) {
+        const currentId = queue.shift()!;
+        if (currentId === targetId) return true;
+        if (visited.has(currentId)) continue;
+        visited.add(currentId);
+
+        // Find all nodes that feed into the current node
+        const upstreamEdges = edges.filter(
+          (e) => e.target === currentId && !e.data?.isSubnodeEdge
+        );
+        for (const edge of upstreamEdges) {
+          queue.push(edge.source);
+        }
+      }
+      return false;
+    };
+
+    if (connection.source && connection.target && wouldCreateCycle(connection.source, connection.target)) {
       return { isValid: false, message: 'Would create a cycle' };
     }
 
@@ -345,7 +464,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return;
     }
 
-    const { nodes } = get();
+    const { nodes, saveToHistory } = get();
+
+    // Save state before adding connection
+    saveToHistory();
     const sourceNode = nodes.find((n) => n.id === connection.source);
 
     // Check if this is a subnode connection
@@ -383,7 +505,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   },
 
   addNode: (node) => {
-    const { nodes } = get();
+    const { nodes, saveToHistory } = get();
+
+    // Save state before adding node
+    saveToHistory();
 
     // Remove the placeholder "add nodes" button if this is the first real node
     const hasOnlyPlaceholder = nodes.length === 1 && nodes[0].type === 'addNodes';
@@ -618,5 +743,489 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       executionData: {},
       pinnedData: {},
       workflowTags: [],
+      draggedNodeType: null,
+      dropTargetNodeId: null,
+      dropTargetHandleId: null,
+      dropTargetEdgeId: null,
     }),
+
+  // Drag-drop actions
+  setDraggedNodeType: (type) => set({ draggedNodeType: type }),
+
+  setDropTarget: (nodeId, handleId) =>
+    set({ dropTargetNodeId: nodeId, dropTargetHandleId: handleId }),
+
+  setDropTargetEdge: (edgeId) => set({ dropTargetEdgeId: edgeId }),
+
+  clearDropTarget: () =>
+    set({
+      dropTargetNodeId: null,
+      dropTargetHandleId: null,
+      dropTargetEdgeId: null,
+    }),
+
+  // Check if a node's input is connected (for drag-drop validation)
+  isInputConnected: (nodeId, handleId) => {
+    const { edges } = get();
+    if (handleId) {
+      // Check specific input handle
+      return edges.some(
+        (e) => e.target === nodeId && e.targetHandle === handleId && !e.data?.isSubnodeEdge
+      );
+    }
+    // Check if node has any input connections (excluding subnode edges)
+    return edges.some(
+      (e) => e.target === nodeId && !e.data?.isSubnodeEdge && !SUBNODE_SLOT_NAMES.includes(e.targetHandle || '')
+    );
+  },
+
+  // Check if a node's output is connected
+  isOutputConnected: (nodeId, handleId) => {
+    const { edges } = get();
+    return edges.some((e) => e.source === nodeId && e.sourceHandle === handleId);
+  },
+
+  // Get all connections for a node
+  getNodeConnections: (nodeId) => {
+    const { edges } = get();
+    return {
+      inputs: edges.filter((e) => e.target === nodeId && !e.data?.isSubnodeEdge),
+      outputs: edges.filter((e) => e.source === nodeId),
+    };
+  },
+
+  // Clipboard operations
+  copyNodes: (nodeIds) => {
+    const { nodes, edges } = get();
+    const nodesToCopy = nodes.filter((n) => nodeIds.includes(n.id) && n.type !== 'addNodes');
+
+    if (nodesToCopy.length === 0) return;
+
+    // Get edges between copied nodes
+    const nodeIdSet = new Set(nodeIds);
+    const edgesToCopy = edges.filter(
+      (e) => nodeIdSet.has(e.source) && nodeIdSet.has(e.target)
+    );
+
+    set({
+      clipboard: {
+        nodes: nodesToCopy,
+        edges: edgesToCopy,
+      },
+    });
+  },
+
+  cutNodes: (nodeIds) => {
+    const { copyNodes, deleteNodes, saveToHistory } = get();
+    saveToHistory();
+    copyNodes(nodeIds);
+    deleteNodes(nodeIds);
+  },
+
+  pasteNodes: (position) => {
+    const { clipboard, nodes, edges, saveToHistory } = get();
+    if (!clipboard || clipboard.nodes.length === 0) return;
+
+    saveToHistory();
+
+    // Calculate offset for pasted nodes
+    const minX = Math.min(...clipboard.nodes.map((n) => n.position.x));
+    const minY = Math.min(...clipboard.nodes.map((n) => n.position.y));
+
+    // Default paste position is offset from original, or use provided position
+    const offsetX = position ? position.x - minX : 50;
+    const offsetY = position ? position.y - minY : 50;
+
+    // Create ID mapping for new nodes
+    const idMap = new Map<string, string>();
+    const nameMap = new Map<string, string>();
+    const timestamp = Date.now();
+
+    // Collect existing names including the ones we're about to create
+    const existingNames = nodes
+      .filter((n) => n.type === 'workflowNode' || n.type === 'subnodeNode')
+      .map((n) => (n.data as WorkflowNodeData)?.name)
+      .filter(Boolean) as string[];
+
+    // Create new nodes with new IDs and unique names
+    const newNodes = clipboard.nodes.map((node, index) => {
+      const newId = `${node.id.split('-')[0]}-${timestamp}-${index}`;
+      idMap.set(node.id, newId);
+
+      // Generate unique name using the same logic as drag-drop
+      const baseName = (node.data as WorkflowNodeData)?.type || 'Node';
+      const newName = generateNodeName(baseName, existingNames);
+      existingNames.push(newName); // Track for subsequent nodes in this paste
+      nameMap.set((node.data as WorkflowNodeData)?.name || '', newName);
+
+      return {
+        ...node,
+        id: newId,
+        position: {
+          x: node.position.x + offsetX,
+          y: node.position.y + offsetY,
+        },
+        selected: true,
+        data: {
+          ...node.data,
+          name: newName,
+        },
+      };
+    });
+
+    // Create new edges with updated IDs
+    const newEdges = clipboard.edges.map((edge) => ({
+      ...edge,
+      id: `${edge.id}-${timestamp}`,
+      source: idMap.get(edge.source) || edge.source,
+      target: idMap.get(edge.target) || edge.target,
+    }));
+
+    // Deselect existing nodes
+    const updatedNodes = nodes.map((n) => ({ ...n, selected: false }));
+
+    set({
+      nodes: [...updatedNodes, ...newNodes],
+      edges: [...edges, ...newEdges],
+    });
+  },
+
+  duplicateNodes: (nodeIds) => {
+    const { nodes, edges, saveToHistory } = get();
+    const nodesToDuplicate = nodes.filter((n) => nodeIds.includes(n.id) && n.type !== 'addNodes');
+
+    if (nodesToDuplicate.length === 0) return;
+
+    saveToHistory();
+
+    // Get edges between duplicated nodes
+    const nodeIdSet = new Set(nodeIds);
+    const edgesToDuplicate = edges.filter(
+      (e) => nodeIdSet.has(e.source) && nodeIdSet.has(e.target)
+    );
+
+    // Create ID mapping for new nodes
+    const idMap = new Map<string, string>();
+    const timestamp = Date.now();
+
+    // Collect existing names including the ones we're about to create
+    const existingNames = nodes
+      .filter((n) => n.type === 'workflowNode' || n.type === 'subnodeNode')
+      .map((n) => (n.data as WorkflowNodeData)?.name)
+      .filter(Boolean) as string[];
+
+    // Create new nodes with offset position and unique names
+    const newNodes = nodesToDuplicate.map((node, index) => {
+      const newId = `${node.id.split('-')[0]}-${timestamp}-${index}`;
+      idMap.set(node.id, newId);
+
+      // Generate unique name using the same logic as drag-drop
+      const baseName = (node.data as WorkflowNodeData)?.type || 'Node';
+      const newName = generateNodeName(baseName, existingNames);
+      existingNames.push(newName); // Track for subsequent nodes in this duplication
+
+      return {
+        ...node,
+        id: newId,
+        position: {
+          x: node.position.x + 50,
+          y: node.position.y + 50,
+        },
+        selected: true,
+        data: {
+          ...node.data,
+          name: newName,
+        },
+      };
+    });
+
+    // Create new edges
+    const newEdges = edgesToDuplicate.map((edge) => ({
+      ...edge,
+      id: `${edge.id}-${timestamp}`,
+      source: idMap.get(edge.source) || edge.source,
+      target: idMap.get(edge.target) || edge.target,
+    }));
+
+    // Deselect existing nodes and add new ones
+    const updatedNodes = nodes.map((n) => ({ ...n, selected: false }));
+
+    set({
+      nodes: [...updatedNodes, ...newNodes],
+      edges: [...edges, ...newEdges],
+    });
+  },
+
+  // History operations
+  saveToHistory: () => {
+    const { nodes, edges, history, historyIndex, isUndoRedoAction } = get();
+
+    // Don't save if this is an undo/redo action
+    if (isUndoRedoAction) return;
+
+    // Debounce: skip if we just saved (prevents double-save when deleting nodes with edges)
+    const now = Date.now();
+    if (now - lastHistorySaveTime < HISTORY_DEBOUNCE_MS) {
+      return;
+    }
+    lastHistorySaveTime = now;
+
+    const newEntry: HistoryEntry = {
+      nodes: JSON.parse(JSON.stringify(nodes)),
+      edges: JSON.parse(JSON.stringify(edges)),
+    };
+
+    // Remove any future history if we're not at the end
+    const newHistory = history.slice(0, historyIndex + 1);
+    newHistory.push(newEntry);
+
+    // Keep history size limited
+    if (newHistory.length > MAX_HISTORY_SIZE) {
+      newHistory.shift();
+    }
+
+    set({
+      history: newHistory,
+      historyIndex: newHistory.length - 1,
+    });
+  },
+
+  undo: () => {
+    const { history, historyIndex } = get();
+
+    if (historyIndex < 0) return;
+
+    // Save current state to history if this is the first undo
+    if (historyIndex === history.length - 1) {
+      const { nodes, edges } = get();
+      const currentEntry: HistoryEntry = {
+        nodes: JSON.parse(JSON.stringify(nodes)),
+        edges: JSON.parse(JSON.stringify(edges)),
+      };
+      const newHistory = [...history, currentEntry];
+      set({ history: newHistory });
+    }
+
+    const previousState = history[historyIndex];
+
+    set({
+      isUndoRedoAction: true,
+      nodes: previousState.nodes,
+      edges: previousState.edges,
+      historyIndex: historyIndex - 1,
+    });
+
+    // Reset flag after state update
+    setTimeout(() => set({ isUndoRedoAction: false }), 0);
+  },
+
+  redo: () => {
+    const { history, historyIndex } = get();
+
+    if (historyIndex >= history.length - 2) return;
+
+    const nextState = history[historyIndex + 2];
+
+    set({
+      isUndoRedoAction: true,
+      nodes: nextState.nodes,
+      edges: nextState.edges,
+      historyIndex: historyIndex + 1,
+    });
+
+    // Reset flag after state update
+    setTimeout(() => set({ isUndoRedoAction: false }), 0);
+  },
+
+  canUndo: () => {
+    const { historyIndex } = get();
+    return historyIndex >= 0;
+  },
+
+  canRedo: () => {
+    const { history, historyIndex } = get();
+    return historyIndex < history.length - 2;
+  },
+
+  // Delete multiple nodes
+  deleteNodes: (nodeIds) => {
+    const { nodes, edges, pinnedData, saveToHistory } = get();
+
+    if (nodeIds.length === 0) return;
+
+    saveToHistory();
+
+    const nodeIdSet = new Set(nodeIds);
+    const remainingNodes = nodes.filter((n) => !nodeIdSet.has(n.id));
+    const hasRealNodes = remainingNodes.some((n) => n.type !== 'addNodes' && n.type !== 'stickyNote');
+
+    // Remove pinned data for deleted nodes
+    const newPinnedData = { ...pinnedData };
+    for (const id of nodeIds) {
+      delete newPinnedData[id];
+    }
+
+    set({
+      nodes: hasRealNodes ? remainingNodes : initialNodes,
+      edges: edges.filter((e) => !nodeIdSet.has(e.source) && !nodeIdSet.has(e.target)),
+      selectedNodeId: nodeIds.includes(get().selectedNodeId || '') ? null : get().selectedNodeId,
+      pinnedData: newPinnedData,
+    });
+  },
+
+  // Move nodes by delta
+  moveNodes: (nodeIds, delta) => {
+    set({
+      nodes: get().nodes.map((node) =>
+        nodeIds.includes(node.id)
+          ? {
+              ...node,
+              position: {
+                x: node.position.x + delta.x,
+                y: node.position.y + delta.y,
+              },
+            }
+          : node
+      ),
+    });
+  },
+
+  // Export workflow as JSON string
+  exportWorkflow: () => {
+    const { nodes, edges, workflowName, workflowTags, isActive } = get();
+
+    // Filter out placeholder nodes
+    const exportNodes = nodes.filter((n) => n.type !== 'addNodes');
+
+    const workflow = {
+      name: workflowName,
+      tags: workflowTags,
+      isActive,
+      nodes: exportNodes,
+      edges,
+      exportedAt: new Date().toISOString(),
+    };
+
+    return JSON.stringify(workflow, null, 2);
+  },
+
+  // Import workflow from JSON string
+  importWorkflow: (json) => {
+    try {
+      const workflow = JSON.parse(json);
+
+      // Validate nodes array exists
+      if (!workflow.nodes || !Array.isArray(workflow.nodes)) {
+        console.error('Invalid workflow: missing nodes array');
+        return false;
+      }
+
+      // Validate edges array if present
+      if (workflow.edges && !Array.isArray(workflow.edges)) {
+        console.error('Invalid workflow: edges must be an array');
+        return false;
+      }
+
+      const edges = workflow.edges || [];
+
+      // Filter to only workflow/subnode nodes for validation
+      const workflowNodes = workflow.nodes.filter(
+        (n: Node) => n.type === 'workflowNode' || n.type === 'subnodeNode'
+      );
+
+      // Validate node names are unique
+      const nodeNames = new Set<string>();
+      for (const node of workflowNodes) {
+        const name = (node.data as WorkflowNodeData)?.name;
+        if (!name) {
+          console.error('Invalid workflow: node missing name', node);
+          return false;
+        }
+        if (nodeNames.has(name)) {
+          console.error('Invalid workflow: duplicate node name', name);
+          return false;
+        }
+        nodeNames.add(name);
+      }
+
+      // Collect all valid node IDs
+      const nodeIds = new Set<string>(
+        (workflow.nodes as Node[]).map((n) => n.id)
+      );
+
+      // Validate edges reference valid nodes
+      for (const edge of edges as Edge[]) {
+        if (!nodeIds.has(edge.source)) {
+          console.error('Invalid workflow: edge references non-existent source node', edge.source);
+          return false;
+        }
+        if (!nodeIds.has(edge.target)) {
+          console.error('Invalid workflow: edge references non-existent target node', edge.target);
+          return false;
+        }
+      }
+
+      // Validate no cycles in the graph (excluding subnode edges)
+      const normalEdges = (edges as Edge[]).filter((e) => !e.data?.isSubnodeEdge);
+      const hasCycle = (() => {
+        const adjacency = new Map<string, string[]>();
+        for (const edge of normalEdges) {
+          if (!adjacency.has(edge.source)) {
+            adjacency.set(edge.source, []);
+          }
+          adjacency.get(edge.source)!.push(edge.target);
+        }
+
+        const visited = new Set<string>();
+        const recursionStack = new Set<string>();
+
+        const dfs = (nodeId: string): boolean => {
+          visited.add(nodeId);
+          recursionStack.add(nodeId);
+
+          const neighbors = adjacency.get(nodeId) || [];
+          for (const neighbor of neighbors) {
+            if (!visited.has(neighbor)) {
+              if (dfs(neighbor)) return true;
+            } else if (recursionStack.has(neighbor)) {
+              return true; // Cycle detected
+            }
+          }
+
+          recursionStack.delete(nodeId);
+          return false;
+        };
+
+        for (const nodeId of nodeIds) {
+          if (!visited.has(nodeId)) {
+            if (dfs(nodeId)) return true;
+          }
+        }
+        return false;
+      })();
+
+      if (hasCycle) {
+        console.error('Invalid workflow: contains a cycle');
+        return false;
+      }
+
+      const { saveToHistory } = get();
+      saveToHistory();
+
+      set({
+        nodes: workflow.nodes.length > 0 ? workflow.nodes : initialNodes,
+        edges,
+        workflowName: workflow.name || 'Imported Workflow',
+        workflowTags: workflow.tags || [],
+        isActive: workflow.isActive || false,
+        selectedNodeId: null,
+        executionData: {},
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to import workflow:', error);
+      return false;
+    }
+  },
 }));

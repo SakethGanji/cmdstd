@@ -1,4 +1,4 @@
-import { memo, useState, useMemo } from 'react';
+import { memo, useState, useMemo, useRef, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { Plus, Play, MoreHorizontal, Check, X } from 'lucide-react';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
@@ -11,7 +11,6 @@ import {
   getNodeShapeConfig,
   calculateHandlePositions,
   calculateNodeDimensions,
-  type NodeGroup,
 } from '../../../lib/nodeStyles';
 import { getIconForNode } from '../../../lib/nodeIcons';
 import { isTriggerType } from '../../../lib/nodeConfig';
@@ -33,12 +32,51 @@ const StatusBadge = ({ status }: { status: 'success' | 'error' }) => {
   );
 };
 
+
 function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const [isHovered, setIsHovered] = useState(false);
+  const [isEditingLabel, setIsEditingLabel] = useState(false);
+  const labelInputRef = useRef<HTMLInputElement>(null);
+
   const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
   const openForSubnode = useNodeCreatorStore((s) => s.openForSubnode);
   const openNDV = useNDVStore((s) => s.openNDV);
   const executionData = useWorkflowStore((s) => s.executionData[id]);
+  const draggedNodeType = useWorkflowStore((s) => s.draggedNodeType);
+  const edges = useWorkflowStore((s) => s.edges);
+  const updateNodeData = useWorkflowStore((s) => s.updateNodeData);
+
+  // Focus input when editing starts
+  useEffect(() => {
+    if (isEditingLabel && labelInputRef.current) {
+      labelInputRef.current.focus();
+      labelInputRef.current.select();
+    }
+  }, [isEditingLabel]);
+
+  const handleLabelDoubleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsEditingLabel(true);
+  };
+
+  const handleLabelSave = () => {
+    const inputValue = labelInputRef.current?.value || '';
+    const trimmedLabel = inputValue.trim();
+    if (trimmedLabel && trimmedLabel !== data.label) {
+      updateNodeData(id, { label: trimmedLabel });
+    }
+    setIsEditingLabel(false);
+  };
+
+  const handleLabelKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleLabelSave();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsEditingLabel(false);
+    }
+  };
 
   const IconComponent = useMemo(
     () => getIconForNode(data.icon, data.type),
@@ -91,6 +129,24 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const isSuccess = executionData?.status === 'success';
   const isError = executionData?.status === 'error';
 
+  // Check if this node's input is already connected (excluding subnode edges)
+  const hasInputConnection = useMemo(() => {
+    const SUBNODE_SLOT_NAMES = ['chatModel', 'memory', 'tools'];
+    return edges.some(
+      (e) => e.target === id && !e.data?.isSubnodeEdge && !SUBNODE_SLOT_NAMES.includes(e.targetHandle || '')
+    );
+  }, [edges, id]);
+
+  // Check if this node can be a drop target (has unconnected input and something is being dragged)
+  const canBeDropTarget = useMemo(() => {
+    if (!draggedNodeType) return false;
+    if (isTrigger) return false; // Triggers have no inputs
+    // Check if the dragged node is a trigger (triggers can't connect to inputs)
+    if (isTriggerType(draggedNodeType)) return false;
+    // Check if this node already has an input connection
+    return !hasInputConnection;
+  }, [draggedNodeType, isTrigger, hasInputConnection]);
+
   // Render input handles (labels shown on edges if needed)
   const renderInputHandles = () => {
     if (isTrigger || inputCount === 0) return null;
@@ -115,49 +171,84 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     });
   };
 
-  // Render output handles with add buttons (labels are shown on edges)
+  // Check if a specific output handle is already connected
+  const isOutputConnected = (handleId: string) => {
+    return edges.some((e) => e.source === id && e.sourceHandle === handleId);
+  };
+
+  // Render output handles - transforms into plus button on hover when not connected
   const renderOutputHandles = () => {
     return outputPositions.map((position, index) => {
       const outputDef = data.outputs?.[index];
       const handleId = outputDef?.name || `output-${index}`;
+      const hasConnection = isOutputConnected(handleId);
+      const canExpand = !hasConnection && showActions;
 
       return (
-        <div key={`output-wrapper-${index}`}>
-          <Handle
-            type="source"
-            position={Position.Right}
-            id={handleId}
-            style={{
-              top: `${position}%`,
-              backgroundColor: styles.handleColor,
-              borderColor: styles.handleColor,
+        <div
+          key={`output-wrapper-${index}`}
+          className="absolute"
+          style={{
+            right: 0,
+            top: `${position}%`,
+            transform: 'translate(50%, -50%)',
+          }}
+        >
+          {/* Clickable wrapper for the plus action - only active when expanded */}
+          <div
+            onClick={(e) => {
+              if (canExpand) {
+                handleAddNode(e, handleId);
+              }
             }}
-            className="!h-1.5 !w-1.5 !border-2"
-          />
-          {/* Add button for this output */}
-          <button
-            onClick={(e) => handleAddNode(e, handleId)}
             className={`
-              nodrag absolute -right-7 flex h-5 w-5 items-center justify-center
-              rounded-full border border-border bg-card shadow-sm transition-all
-              hover:scale-110 hover:bg-accent hover:shadow-md
-              ${showActions ? 'opacity-100' : 'opacity-0'}
+              nodrag relative flex items-center justify-center
+              transition-all duration-200 ease-out
+              ${canExpand
+                ? 'h-5 w-5 cursor-pointer hover:scale-110'
+                : 'h-1.5 w-1.5'
+              }
             `}
-            style={{
-              top: `${position}%`,
-              transform: 'translateY(-50%)',
-              pointerEvents: 'all',
-            }}
+            style={{ pointerEvents: canExpand ? 'all' : 'none' }}
           >
-            <Plus size={12} className="text-muted-foreground" />
-          </button>
+            {/* The actual ReactFlow handle - invisible but functional for dragging */}
+            <Handle
+              type="source"
+              position={Position.Right}
+              id={handleId}
+              className="!absolute !inset-0 !h-full !w-full !transform-none !border-0 !bg-transparent"
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+              }}
+            />
+            {/* Visual representation - dot or plus button */}
+            <div
+              className={`
+                pointer-events-none flex items-center justify-center
+                rounded-full transition-all duration-200 ease-out
+                ${canExpand
+                  ? 'h-5 w-5 border border-border bg-card shadow-sm hover:bg-accent hover:shadow-md'
+                  : 'h-1.5 w-1.5 border-2'
+                }
+              `}
+              style={{
+                backgroundColor: canExpand ? undefined : styles.handleColor,
+                borderColor: canExpand ? undefined : styles.handleColor,
+              }}
+            >
+              {canExpand && (
+                <Plus size={12} className="text-muted-foreground" />
+              )}
+            </div>
+          </div>
         </div>
       );
     });
   };
-
-  // Get edges to check which slots have connections
-  const edges = useWorkflowStore((s) => s.edges);
 
   // Check if a slot can accept more subnodes
   const canSlotAcceptMore = (slotName: string, multiple: boolean) => {
@@ -233,23 +324,35 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Drop zone indicator - shows on the left when node can accept a connection */}
+      {canBeDropTarget && (
+        <div
+          className="absolute -left-8 top-1/2 -translate-y-1/2 w-6 h-6 rounded-full border-2 border-dashed border-emerald-500 bg-emerald-500/20 animate-pulse flex items-center justify-center"
+          style={{ pointerEvents: 'none' }}
+        >
+          <Plus size={12} className="text-emerald-500" />
+        </div>
+      )}
+
       <div
         className={`
           relative cursor-grab border transition-all duration-300 flex items-center justify-center
           ${selected ? 'ring-2 ring-offset-1' : ''}
-          ${data.disabled ? 'opacity-50' : ''}
           ${isRunning ? 'animate-pulse-border' : ''}
+          ${canBeDropTarget ? 'ring-2 ring-emerald-500/50 ring-offset-1' : ''}
         `}
         style={{
           height: dimensions.height,
           width: dimensions.width,
           backgroundColor: styles.bgColor,
-          borderColor: isRunning ? styles.accentColor : (selected ? styles.accentColor : styles.borderColor),
+          borderColor: canBeDropTarget ? '#10b981' : (isRunning ? styles.accentColor : (selected ? styles.accentColor : styles.borderColor)),
           borderWidth: 2,
           borderRadius: shapeConfig.borderRadius,
-          boxShadow: selected ? `0 4px 12px ${styles.accentColor}40` : '0 1px 3px rgba(0,0,0,0.1)',
+          boxShadow: canBeDropTarget
+            ? '0 0 20px rgba(16, 185, 129, 0.4)'
+            : (selected ? `0 4px 12px ${styles.accentColor}40` : '0 1px 3px rgba(0,0,0,0.1)'),
           // @ts-expect-error CSS custom property
-          '--tw-ring-color': styles.accentColor,
+          '--tw-ring-color': canBeDropTarget ? '#10b981' : styles.accentColor,
         }}
         onDoubleClick={handleDoubleClick}
       >
@@ -281,14 +384,27 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
         {renderSubnodeSlotSection()}
       </div>
 
-      {/* Node Label - Below the node */}
-      <span
-        className={`text-center text-xs font-medium text-muted-foreground leading-tight truncate ${subnodeSlotCount > 0 ? 'mt-6' : 'mt-2'}`}
-        style={{ maxWidth: Math.max(120, dimensions.width + 40) }}
-        title={data.label}
-      >
-        {data.label}
-      </span>
+      {/* Node Label - Below the node (double-click to edit) */}
+      {isEditingLabel ? (
+        <input
+          ref={labelInputRef}
+          type="text"
+          defaultValue={data.label}
+          onBlur={handleLabelSave}
+          onKeyDown={handleLabelKeyDown}
+          className={`nodrag text-center text-xs font-medium bg-background border border-border rounded px-1 py-0.5 outline-none focus:ring-1 focus:ring-ring ${subnodeSlotCount > 0 ? 'mt-6' : 'mt-2'}`}
+          style={{ width: Math.max(80, dimensions.width + 20) }}
+        />
+      ) : (
+        <span
+          className={`text-center text-xs font-medium text-muted-foreground leading-tight truncate cursor-text hover:text-foreground ${subnodeSlotCount > 0 ? 'mt-6' : 'mt-2'}`}
+          style={{ maxWidth: Math.max(120, dimensions.width + 40) }}
+          title={`${data.label} (double-click to rename)`}
+          onDoubleClick={handleLabelDoubleClick}
+        >
+          {data.label}
+        </span>
+      )}
 
       {/* Quick Actions - shows on hover or when selected */}
       {showActions && (
