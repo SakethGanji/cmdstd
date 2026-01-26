@@ -397,21 +397,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return { isValid: false, message: 'Only subnodes can connect to this slot' };
     }
 
-    // Check if target node already has an input connection
-    // Multi-input nodes (like Merge) can accept multiple connections
-    const targetInputCount = (targetNode.data as WorkflowNodeData)?.inputCount ?? 1;
-    const allowsMultipleInputs = targetInputCount > 1 || targetInputCount === Infinity;
-
-    if (!allowsMultipleInputs) {
-      const targetHasInput = edges.some(
-        (e) => e.target === connection.target &&
-               !e.data?.isSubnodeEdge &&
-               !SUBNODE_SLOT_NAMES.includes(e.targetHandle || '')
-      );
-      if (targetHasInput) {
-        return { isValid: false, message: 'Node already has an input connection' };
-      }
-    }
+    // All nodes can accept multiple input connections
+    // The workflow runner will handle merging inputs automatically
 
     // Check for duplicate connections
     const duplicateConnection = edges.some(
