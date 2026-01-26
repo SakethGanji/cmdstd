@@ -1,5 +1,5 @@
 import { useMemo, useEffect } from 'react';
-import { MessageSquare, AlertCircle, RotateCcw } from 'lucide-react';
+import { MessageSquare, RotateCcw } from 'lucide-react';
 import { cn } from '@/shared/lib/utils';
 import { Button } from '@/shared/components/ui/button';
 import { useWorkflowStore } from '../../stores/workflowStore';
@@ -8,24 +8,21 @@ import { detectUINodes } from './detectUINodes';
 import { ChatPanel } from './ChatPanel';
 import { ChatInput } from './ChatInput';
 import { HTMLPanel } from './HTMLPanel';
+import { MarkdownPanel } from './MarkdownPanel';
 import type { WorkflowNodeData } from '../../types/workflow';
 import type { Node } from 'reactflow';
 
 export default function UIPreviewPanel() {
   const nodes = useWorkflowStore((s) => s.nodes) as Node<WorkflowNodeData>[];
-  const workflowId = useWorkflowStore((s) => s.workflowId);
   const clearMessages = useUIModeStore((s) => s.clearMessages);
   const addMessage = useUIModeStore((s) => s.addMessage);
 
   const uiConfig = useMemo(() => detectUINodes(nodes), [nodes]);
 
-  // Debug log - remove after testing
-  console.log('[UIPreviewPanel] nodes:', nodes.map(n => ({ id: n.id, type: n.data?.type })));
-  console.log('[UIPreviewPanel] uiConfig:', uiConfig);
-
   // Dynamic layout based on output types
   const hasChat = uiConfig.outputTypes.includes('chat');
   const hasHTML = uiConfig.outputTypes.includes('html');
+  const hasMarkdown = uiConfig.outputTypes.includes('markdown');
 
   // Add welcome message on mount if configured
   useEffect(() => {
@@ -49,9 +46,9 @@ export default function UIPreviewPanel() {
             Add UI nodes to your workflow to enable the test interface:
           </p>
           <ul className="text-sm mt-3 space-y-1">
-            <li><strong>ChatInput</strong> - for chat-based input</li>
-            <li><strong>ChatOutput</strong> - for assistant responses</li>
+            <li><strong>ChatInput</strong> - chat interface (auto-displays last node output)</li>
             <li><strong>HTMLDisplay</strong> - for rich HTML output</li>
+            <li><strong>MarkdownDisplay</strong> - for formatted text</li>
           </ul>
         </div>
       </div>
@@ -79,16 +76,21 @@ export default function UIPreviewPanel() {
           {/* Dynamic output panels */}
           <div className="flex-1 flex gap-4 overflow-hidden min-h-0">
             {hasChat && (
-              <div className={cn('flex-1 min-w-0', hasHTML && 'max-w-[50%]')}>
+              <div className={cn('flex-1 min-w-0', (hasHTML || hasMarkdown) && 'max-w-[50%]')}>
                 <ChatPanel />
               </div>
             )}
             {hasHTML && (
-              <div className={cn('flex-1 min-w-0', hasChat && 'max-w-[50%]')}>
+              <div className={cn('flex-1 min-w-0', (hasChat || hasMarkdown) && 'max-w-[50%]')}>
                 <HTMLPanel />
               </div>
             )}
-            {!hasChat && !hasHTML && (
+            {hasMarkdown && (
+              <div className={cn('flex-1 min-w-0', (hasChat || hasHTML) && 'max-w-[50%]')}>
+                <MarkdownPanel />
+              </div>
+            )}
+            {!hasChat && !hasHTML && !hasMarkdown && (
               <div className="flex-1 rounded-lg border bg-background flex items-center justify-center text-muted-foreground">
                 No output nodes configured
               </div>

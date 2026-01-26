@@ -33,11 +33,14 @@ from .read_file import ReadFileNode
 from .write_file import WriteFileNode
 from .pandas_explore import PandasExploreNode
 from .html_display import HTMLDisplayNode
+from .markdown_display import MarkdownDisplayNode
 from .object_read import ObjectReadNode
 from .object_write import ObjectWriteNode
 from .filter import FilterNode
 from .item_lists import ItemListsNode
 from .respond_to_webhook import RespondToWebhookNode
+from .sample import SampleNode
+from .send_email import SendEmailNode
 
 # AI nodes
 from .llm_chat import LLMChatNode
@@ -45,7 +48,6 @@ from .ai_agent import AIAgentNode
 
 # UI nodes
 from .chat_input import ChatInputNode
-from .chat_output import ChatOutputNode
 
 # Category exports for convenience
 from . import triggers
@@ -78,17 +80,19 @@ __all__ = [
     "WriteFileNode",
     "PandasExploreNode",
     "HTMLDisplayNode",
+    "MarkdownDisplayNode",
     "ObjectReadNode",
     "ObjectWriteNode",
     "FilterNode",
     "ItemListsNode",
     "RespondToWebhookNode",
+    "SampleNode",
+    "SendEmailNode",
     # AI
     "LLMChatNode",
     "AIAgentNode",
     # UI
     "ChatInputNode",
-    "ChatOutputNode",
     # Category modules
     "triggers",
     "flow",

@@ -1,6 +1,7 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useCallback } from 'react'
 import { createRoute } from '@tanstack/react-router'
 import { ReactFlowProvider } from 'reactflow'
+import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels'
 import { Loader2 } from 'lucide-react'
 import { rootRoute } from './__root'
 import { useWorkflowStore } from '@/features/workflow-editor/stores/workflowStore'
@@ -14,7 +15,7 @@ const NodeCreatorPanel = lazy(() => import('@/features/workflow-editor/component
 const NodeDetailsModal = lazy(() => import('@/features/workflow-editor/components/ndv/NodeDetailsModal'))
 const WorkflowNavbar = lazy(() => import('@/features/workflow-editor/components/workflow-navbar/WorkflowNavbar'))
 const ExecutionLogsPanel = lazy(() => import('@/features/workflow-editor/components/execution-logs/ExecutionLogsPanel'))
-const UIPreviewPanel = lazy(() => import('@/features/workflow-editor/components/ui-preview/UIPreviewPanel'))
+const UIPreviewSidePanel = lazy(() => import('@/features/workflow-editor/components/ui-preview/UIPreviewSidePanel'))
 
 function EditorLoadingFallback() {
   return (
@@ -72,23 +73,48 @@ function EditorPage() {
     fetchWorkflow()
   }, [workflowId, currentWorkflowId, loadWorkflow, resetWorkflow])
 
-  const mode = useUIModeStore((s) => s.mode)
+  const isPreviewOpen = useUIModeStore((s) => s.isPreviewOpen)
+  const previewPanelSize = useUIModeStore((s) => s.previewPanelSize)
+  const setPreviewPanelSize = useUIModeStore((s) => s.setPreviewPanelSize)
+
+  const handlePanelResize = useCallback((sizes: number[]) => {
+    // sizes[1] is the preview panel size when it exists
+    if (sizes.length > 1 && sizes[1] !== undefined) {
+      setPreviewPanelSize(sizes[1])
+    }
+  }, [setPreviewPanelSize])
 
   return (
     <ReactFlowProvider>
       <Suspense fallback={<EditorLoadingFallback />}>
         <div className="h-full w-full fixed inset-0">
           <WorkflowNavbar />
-          {mode === 'builder' ? (
-            <>
-              <WorkflowCanvas />
-              <NodeCreatorPanel />
-              <NodeDetailsModal />
-              <ExecutionLogsPanel />
-            </>
-          ) : (
-            <UIPreviewPanel />
-          )}
+          <div className="pt-14 h-full">
+            <PanelGroup
+              direction="horizontal"
+              onLayout={handlePanelResize}
+            >
+              {/* Canvas panel - always visible */}
+              <Panel defaultSize={isPreviewOpen ? 100 - previewPanelSize : 100} minSize={40}>
+                <div className="h-full relative">
+                  <WorkflowCanvas />
+                  <NodeCreatorPanel />
+                  <NodeDetailsModal />
+                  <ExecutionLogsPanel />
+                </div>
+              </Panel>
+
+              {/* UI Preview panel - conditional */}
+              {isPreviewOpen && (
+                <>
+                  <PanelResizeHandle className="w-1 bg-border hover:bg-primary transition-colors" />
+                  <Panel defaultSize={previewPanelSize} minSize={20} maxSize={60}>
+                    <UIPreviewSidePanel />
+                  </Panel>
+                </>
+              )}
+            </PanelGroup>
+          </div>
         </div>
       </Suspense>
     </ReactFlowProvider>

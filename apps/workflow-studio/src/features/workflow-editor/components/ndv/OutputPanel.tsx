@@ -1,9 +1,8 @@
-import { useState, useMemo } from 'react';
-import { Database, Code, Pin, Clock, ArrowUp, Eye } from 'lucide-react';
+import { useState } from 'react';
+import { Database, Code, Pin, Clock, ArrowUp } from 'lucide-react';
 import type { NodeExecutionData } from '../../types/workflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import RunDataDisplay from './RunDataDisplay';
-import HTMLPreviewModal from './HTMLPreviewModal';
 
 interface OutputPanelProps {
   nodeId: string;
@@ -14,7 +13,6 @@ type DisplayMode = 'json' | 'schema';
 
 export default function OutputPanel({ nodeId, executionData }: OutputPanelProps) {
   const [displayMode, setDisplayMode] = useState<DisplayMode>('schema');
-  const [isHtmlModalOpen, setIsHtmlModalOpen] = useState(false);
 
   const hasPinned = useWorkflowStore((s) => s.hasPinnedData(nodeId));
   const getPinnedDataForDisplay = useWorkflowStore((s) => s.getPinnedDataForDisplay);
@@ -44,18 +42,6 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
   const hasData = executionData?.output?.items && executionData.output.items.length > 0;
   const hasError = executionData?.output?.error;
   const itemCount = executionData?.output?.items?.length ?? 0;
-
-  // Check if data contains HTML content (marked with _renderAs: 'html')
-  const htmlContent = useMemo(() => {
-    if (!displayData || displayData.length === 0) return null;
-    const firstItem = displayData[0] as Record<string, unknown>;
-    if (firstItem?._renderAs === 'html' && typeof firstItem?.html === 'string') {
-      return firstItem.html;
-    }
-    return null;
-  }, [displayData]);
-
-  const hasHtmlContent = htmlContent !== null;
 
   // Calculate execution time
   const executionTime = executionData?.startTime && executionData?.endTime
@@ -95,18 +81,6 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
         </div>
 
         <div className="flex items-center gap-2">
-          {/* View HTML button - only shown when HTML content is present */}
-          {hasHtmlContent && (
-            <button
-              onClick={() => setIsHtmlModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
-              title="View HTML"
-            >
-              <Eye size={12} />
-              <span>View HTML</span>
-            </button>
-          )}
-
           {/* Pin button */}
           <button
             onClick={handlePinToggle}
@@ -195,14 +169,6 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
         )}
       </div>
 
-      {/* HTML Preview Modal */}
-      {htmlContent && (
-        <HTMLPreviewModal
-          html={htmlContent}
-          isOpen={isHtmlModalOpen}
-          onClose={() => setIsHtmlModalOpen(false)}
-        />
-      )}
     </div>
   );
 }

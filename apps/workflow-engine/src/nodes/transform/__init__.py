@@ -6,6 +6,7 @@ from ..http_request import HttpRequestNode
 from ..read_file import ReadFileNode
 from ..pandas_explore import PandasExploreNode
 from ..html_display import HTMLDisplayNode
+from ..sample import SampleNode
 
 __all__ = [
     "SetNode",
@@ -14,4 +15,5 @@ __all__ = [
     "ReadFileNode",
     "PandasExploreNode",
     "HTMLDisplayNode",
+    "SampleNode",
 ]

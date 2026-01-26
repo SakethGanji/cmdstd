@@ -7,12 +7,14 @@ from .executions import router as executions_router
 from .nodes import router as nodes_router
 from .webhooks import router as webhooks_router
 from .streaming import router as streaming_router
+from .files import router as files_router
 
 # Main API router
 api_router = APIRouter(prefix="/api")
 api_router.include_router(workflows_router, tags=["Workflows"])
 api_router.include_router(executions_router, tags=["Executions"])
 api_router.include_router(nodes_router, tags=["Nodes"])
+api_router.include_router(files_router, tags=["Files"])
 
 # Non-prefixed routers (for webhooks and streaming)
 webhook_router = webhooks_router

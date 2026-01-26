@@ -2,7 +2,7 @@ import type { Node } from 'reactflow';
 import type { WorkflowNodeData } from '../../types/workflow';
 
 export type InputType = 'chat' | 'form' | null;
-export type OutputType = 'chat' | 'html' | 'text';
+export type OutputType = 'chat' | 'html' | 'markdown' | 'text';
 
 export interface UIConfig {
   inputType: InputType;
@@ -11,6 +11,7 @@ export interface UIConfig {
   outputTypes: OutputType[];
   welcomeMessage?: string;
   placeholder?: string;
+  autoResponse: boolean; // true when ChatInput should auto-display last node's output
 }
 
 // Node types use backend PascalCase format
@@ -19,9 +20,10 @@ const INPUT_NODE_TYPES: Record<string, InputType> = {
   FormInput: 'form',
 };
 
+// Output nodes for explicit display control (ChatInput auto-displays, so no ChatOutput needed)
 const OUTPUT_NODE_TYPES: Record<string, OutputType> = {
-  ChatOutput: 'chat',
   HTMLDisplay: 'html',
+  MarkdownDisplay: 'markdown',
   TextDisplay: 'text',
 };
 
@@ -34,9 +36,16 @@ export function detectUINodes(nodes: Node<WorkflowNodeData>[]): UIConfig {
   const inputNode = nodes.find((n) => INPUT_NODE_TYPES[n.data.type]) ?? null;
   const inputType = inputNode ? INPUT_NODE_TYPES[inputNode.data.type] : null;
 
-  // Find output nodes
+  // Find explicit output nodes (HTMLDisplay, MarkdownDisplay, etc.)
   const outputNodes = nodes.filter((n) => OUTPUT_NODE_TYPES[n.data.type]);
-  const outputTypes = outputNodes.map((n) => OUTPUT_NODE_TYPES[n.data.type]);
+  const outputTypes: OutputType[] = outputNodes.map((n) => OUTPUT_NODE_TYPES[n.data.type]);
+
+  // ChatInput auto-displays last node's output (n8n-style)
+  // Enable chat output when we have ChatInput
+  const autoResponse = inputType === 'chat';
+  if (autoResponse && !outputTypes.includes('chat')) {
+    outputTypes.push('chat');
+  }
 
   // Extract config from input node
   const welcomeMessage = inputNode?.data.parameters?.welcomeMessage as string | undefined;
@@ -49,6 +58,7 @@ export function detectUINodes(nodes: Node<WorkflowNodeData>[]): UIConfig {
     outputTypes,
     welcomeMessage,
     placeholder,
+    autoResponse,
   };
 }
 

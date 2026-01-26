@@ -9,3 +9,4 @@ sse-starlette
 aiosqlite
 pandas
 openpyxl
+# aiosmtplib  # Uncomment if using SMTP for email

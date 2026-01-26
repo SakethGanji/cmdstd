@@ -23,6 +23,184 @@ def generate_workflow_id(name: str) -> str:
 
 EXAMPLE_WORKFLOWS = [
     # ========================================
+    # SAMPLING WORKFLOWS
+    # ========================================
+    {
+        "name": "Sample CSV Data",
+        "description": "Demonstrates sampling from a local CSV file. Uses the Sample node to randomly select rows from test_data.csv",
+        "active": False,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Start",
+                    "type": "Start",
+                    "parameters": {},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Sample Data",
+                    "type": "Sample",
+                    "parameters": {
+                                                "sourceType": "file",
+                        "fileLocation": "local",
+                        "filePath": "/home/saketh/Projects/cmdstd/apps/analytics-service/test_data.csv",
+                        "method": "random",
+                        "sampleSize": 5,
+                        "seed": 42,
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Format Output",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Format the sampled data for display
+data = node_data["Sample Data"]["json"]
+
+summary = f\"\"\"
+Sampling Results:
+- Original rows: {data['original_count']}
+- Sampled rows: {data['sampled_count']}
+- Method: {data['method']}
+
+Sample Data:
+\"\"\"
+
+for i, row in enumerate(data['data'][:5], 1):
+    summary += f"{i}. {row}\\n"
+
+return {
+    "summary": summary,
+    "data": data['data'],
+    "stats": {
+        "original": data['original_count'],
+        "sampled": data['sampled_count'],
+        "method": data['method']
+    }
+}"""
+                    },
+                    "position": {"x": 600, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Start", "target_node": "Sample Data"},
+                {"source_node": "Sample Data", "target_node": "Format Output"},
+            ],
+            "settings": {},
+        },
+    },
+    {
+        "name": "Stratified Sampling Demo",
+        "description": "Shows stratified sampling by category. Samples proportionally from each category in the dataset.",
+        "active": False,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Start",
+                    "type": "Start",
+                    "parameters": {},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Stratified Sample",
+                    "type": "Sample",
+                    "parameters": {
+                                                "sourceType": "file",
+                        "fileLocation": "local",
+                        "filePath": "/home/saketh/Projects/cmdstd/apps/analytics-service/test_data.csv",
+                        "method": "stratified",
+                        "stratifyColumn": "category",
+                        "sampleSize": 9,
+                        "seed": 42,
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Analyze Categories",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Analyze category distribution in sample
+data = node_data["Stratified Sample"]["json"]
+
+# Count by category
+categories = {}
+for row in data['data']:
+    cat = row.get('category', 'Unknown')
+    categories[cat] = categories.get(cat, 0) + 1
+
+# Build summary
+summary = f\"\"\"Stratified Sampling Results
+============================
+Original rows: {data['original_count']}
+Sampled rows: {data['sampled_count']}
+Stratify column: category
+
+Category Distribution:
+\"\"\"
+
+for cat, count in sorted(categories.items()):
+    pct = (count / data['sampled_count']) * 100
+    summary += f"  {cat}: {count} rows ({pct:.1f}%)\\n"
+
+return {
+    "summary": summary,
+    "category_counts": categories,
+    "data": data['data']
+}"""
+                    },
+                    "position": {"x": 600, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Start", "target_node": "Stratified Sample"},
+                {"source_node": "Stratified Sample", "target_node": "Analyze Categories"},
+            ],
+            "settings": {},
+        },
+    },
+    {
+        "name": "Sample API Response",
+        "description": "Webhook workflow that samples data from an API response. POST with {\"items\": [{\"id\": 1}, {\"id\": 2}, ...]}",
+        "active": True,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "POST"},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Sample Input",
+                    "type": "Sample",
+                    "parameters": {
+                                                "sourceType": "input",
+                        "dataField": "body.items",
+                        "method": "random",
+                        "sampleSize": 3,
+                        "seed": 42,
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Respond",
+                    "type": "RespondToWebhook",
+                    "parameters": {
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "contentType": "application/json",
+                    },
+                    "position": {"x": 600, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Webhook", "target_node": "Sample Input"},
+                {"source_node": "Sample Input", "target_node": "Respond"},
+            ],
+            "settings": {},
+        },
+    },
+    # ========================================
     # 1. APPROVAL ROUTING - Multi-level approval based on amount
     # ========================================
     {
@@ -1264,6 +1442,524 @@ return {"html": html}"""
             "connections": [
                 {"source_node": "Webhook", "target_node": "Generate Report"},
                 {"source_node": "Generate Report", "target_node": "Respond"},
+            ],
+            "settings": {},
+        },
+    },
+    # ========================================
+    # 8. BANK STATEMENT - Customer statement retrieval
+    # ========================================
+    {
+        "name": "Customer Bank Statement",
+        "description": "Retrieves bank statements for a customer account. Demonstrates the Bank Statement node with date range filtering. Run manually to see sample statement data.",
+        "active": False,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Start",
+                    "type": "Start",
+                    "parameters": {},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Get Statement",
+                    "type": "BankStatement",
+                    "parameters": {
+                        "accountNumber": "1234567890",
+                        "accountHolder": "Rajesh Kumar",
+                        "statementType": "full",
+                        "dateRange": "last_month",
+                        "includeRunningBalance": True,
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Format Statement",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Format the statement data for display
+data = node_data["Get Statement"]["json"]
+
+# Build summary
+summary = f\"\"\"
+=====================================
+       BANK STATEMENT
+=====================================
+Account: {data['account_number']}
+Holder:  {data['account_holder']}
+Period:  {data['statement_period']['from']} to {data['statement_period']['to']}
+-------------------------------------
+Opening Balance:  Rs. {data['opening_balance']:>12,.2f}
+Total Credits:    Rs. {data['total_credits']:>12,.2f}
+Total Debits:     Rs. {data['total_debits']:>12,.2f}
+Closing Balance:  Rs. {data['closing_balance']:>12,.2f}
+-------------------------------------
+Transactions: {data['transaction_count']}
+=====================================
+\"\"\"
+
+return {
+    "summary": summary,
+    "statement": data,
+    "transaction_count": data['transaction_count']
+}"""
+                    },
+                    "position": {"x": 600, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Start", "target_node": "Get Statement"},
+                {"source_node": "Get Statement", "target_node": "Format Statement"},
+            ],
+            "settings": {},
+        },
+    },
+    {
+        "name": "Bank Statement API",
+        "description": "Webhook API to retrieve customer bank statements. POST with {\"account_number\": \"1234567890\", \"account_holder\": \"John Doe\", \"date_range\": \"last_month\"}",
+        "active": True,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "POST"},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Get Statement",
+                    "type": "BankStatement",
+                    "parameters": {
+                        "accountNumber": "{{ $json.body.account_number }}",
+                        "accountHolder": "{{ $json.body.account_holder }}",
+                        "statementType": "{{ $json.body.statement_type || 'full' }}",
+                        "dateRange": "{{ $json.body.date_range || 'last_month' }}",
+                        "includeRunningBalance": True,
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Respond",
+                    "type": "RespondToWebhook",
+                    "parameters": {
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "contentType": "application/json",
+                    },
+                    "position": {"x": 600, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Webhook", "target_node": "Get Statement"},
+                {"source_node": "Get Statement", "target_node": "Respond"},
+            ],
+            "settings": {},
+        },
+    },
+    {
+        "name": "Bank Statement Dashboard",
+        "description": "Visual bank statement with HTML dashboard. POST with {\"account_number\": \"1234567890\", \"account_holder\": \"Priya Sharma\"}",
+        "active": True,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Webhook",
+                    "type": "Webhook",
+                    "parameters": {"method": "POST"},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Get Statement",
+                    "type": "BankStatement",
+                    "parameters": {
+                        "accountNumber": "{{ $json.body.account_number }}",
+                        "accountHolder": "{{ $json.body.account_holder }}",
+                        "statementType": "full",
+                        "dateRange": "last_month",
+                        "includeRunningBalance": True,
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Build Dashboard",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Build visual bank statement dashboard
+data = node_data["Get Statement"]["json"]
+
+# Build transactions table rows
+txn_rows = ""
+for t in data.get("transactions", [])[:20]:  # Show max 20 transactions
+    amount_color = "#059669" if t["type"] == "CR" else "#dc2626"
+    amount_prefix = "+" if t["type"] == "CR" else "-"
+    balance_str = "Rs. {:,.2f}".format(t.get("balance", 0)) if "balance" in t else "-"
+    txn_rows += '<tr>'
+    txn_rows += '<td style="padding:12px;border-bottom:1px solid #e5e7eb;">' + t["date"] + '</td>'
+    txn_rows += '<td style="padding:12px;border-bottom:1px solid #e5e7eb;">' + t.get("time", "") + '</td>'
+    txn_rows += '<td style="padding:12px;border-bottom:1px solid #e5e7eb;">' + t["description"] + '</td>'
+    txn_rows += '<td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:right;color:' + amount_color + ';font-weight:600;">' + amount_prefix + 'Rs. {:,.2f}'.format(t["amount"]) + '</td>'
+    txn_rows += '<td style="padding:12px;border-bottom:1px solid #e5e7eb;text-align:right;">' + balance_str + '</td>'
+    txn_rows += '</tr>'
+
+# Calculate net change
+net_change = data["total_credits"] - data["total_debits"]
+net_color = "#059669" if net_change >= 0 else "#dc2626"
+net_prefix = "+" if net_change >= 0 else ""
+
+html = '''<!DOCTYPE html>
+<html>
+<head>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#f1f5f9;padding:32px}
+</style>
+</head>
+<body>
+<div style="max-width:900px;margin:0 auto;">
+
+<!-- Header -->
+<div style="background:linear-gradient(135deg,#065f46,#059669);color:white;padding:32px;border-radius:12px 12px 0 0;">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;">
+<div>
+<div style="font-size:12px;opacity:0.8;text-transform:uppercase;letter-spacing:1px;">Bank Statement</div>
+<div style="font-size:28px;font-weight:700;margin-top:8px;">''' + data["account_holder"] + '''</div>
+<div style="font-size:14px;opacity:0.9;margin-top:4px;">Account: ''' + data["account_number"] + '''</div>
+</div>
+<div style="text-align:right;">
+<div style="font-size:12px;opacity:0.8;">Statement Period</div>
+<div style="font-size:16px;font-weight:500;margin-top:4px;">''' + data["statement_period"]["from"] + ''' to ''' + data["statement_period"]["to"] + '''</div>
+</div>
+</div>
+</div>
+
+<!-- Balance Summary -->
+<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:#e5e7eb;">
+<div style="background:white;padding:24px;text-align:center;">
+<div style="font-size:12px;color:#6b7280;text-transform:uppercase;">Opening Balance</div>
+<div style="font-size:24px;font-weight:700;color:#111827;margin-top:8px;">Rs. ''' + "{:,.2f}".format(data["opening_balance"]) + '''</div>
+</div>
+<div style="background:white;padding:24px;text-align:center;">
+<div style="font-size:12px;color:#6b7280;text-transform:uppercase;">Total Credits</div>
+<div style="font-size:24px;font-weight:700;color:#059669;margin-top:8px;">+Rs. ''' + "{:,.2f}".format(data["total_credits"]) + '''</div>
+</div>
+<div style="background:white;padding:24px;text-align:center;">
+<div style="font-size:12px;color:#6b7280;text-transform:uppercase;">Total Debits</div>
+<div style="font-size:24px;font-weight:700;color:#dc2626;margin-top:8px;">-Rs. ''' + "{:,.2f}".format(data["total_debits"]) + '''</div>
+</div>
+<div style="background:white;padding:24px;text-align:center;">
+<div style="font-size:12px;color:#6b7280;text-transform:uppercase;">Closing Balance</div>
+<div style="font-size:24px;font-weight:700;color:#111827;margin-top:8px;">Rs. ''' + "{:,.2f}".format(data["closing_balance"]) + '''</div>
+</div>
+</div>
+
+<!-- Net Change Banner -->
+<div style="background:white;padding:16px 24px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;">
+<span style="color:#6b7280;">Net Change This Period</span>
+<span style="font-size:20px;font-weight:700;color:''' + net_color + ''';">''' + net_prefix + '''Rs. ''' + "{:,.2f}".format(abs(net_change)) + '''</span>
+</div>
+
+<!-- Transactions Table -->
+<div style="background:white;border-radius:0 0 12px 12px;overflow:hidden;">
+<div style="padding:20px 24px;border-bottom:1px solid #e5e7eb;">
+<div style="font-size:16px;font-weight:600;color:#111827;">Transaction History</div>
+<div style="font-size:12px;color:#6b7280;margin-top:4px;">''' + str(data["transaction_count"]) + ''' transactions</div>
+</div>
+<div style="overflow-x:auto;">
+<table style="width:100%;border-collapse:collapse;min-width:600px;">
+<thead>
+<tr style="background:#f9fafb;">
+<th style="padding:12px;text-align:left;font-weight:500;color:#6b7280;font-size:12px;text-transform:uppercase;">Date</th>
+<th style="padding:12px;text-align:left;font-weight:500;color:#6b7280;font-size:12px;text-transform:uppercase;">Time</th>
+<th style="padding:12px;text-align:left;font-weight:500;color:#6b7280;font-size:12px;text-transform:uppercase;">Description</th>
+<th style="padding:12px;text-align:right;font-weight:500;color:#6b7280;font-size:12px;text-transform:uppercase;">Amount</th>
+<th style="padding:12px;text-align:right;font-weight:500;color:#6b7280;font-size:12px;text-transform:uppercase;">Balance</th>
+</tr>
+</thead>
+<tbody>
+''' + txn_rows + '''
+</tbody>
+</table>
+</div>
+</div>
+
+<!-- Footer -->
+<div style="text-align:center;margin-top:24px;padding:16px;color:#6b7280;font-size:12px;">
+Generated by Workflow Engine | This is a demo statement with mock data
+</div>
+
+</div>
+</body>
+</html>'''
+
+return {"html": html}"""
+                    },
+                    "position": {"x": 600, "y": 200},
+                },
+                {
+                    "name": "Display",
+                    "type": "HTMLDisplay",
+                    "parameters": {"htmlField": "html"},
+                    "position": {"x": 850, "y": 200},
+                },
+                {
+                    "name": "Respond",
+                    "type": "RespondToWebhook",
+                    "parameters": {
+                        "statusCode": "200",
+                        "responseMode": "lastNode",
+                        "responseField": "html",
+                        "contentType": "text/html",
+                        "wrapResponse": False,
+                    },
+                    "position": {"x": 1100, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Webhook", "target_node": "Get Statement"},
+                {"source_node": "Get Statement", "target_node": "Build Dashboard"},
+                {"source_node": "Build Dashboard", "target_node": "Display"},
+                {"source_node": "Display", "target_node": "Respond"},
+            ],
+            "settings": {},
+        },
+    },
+    # ========================================
+    # 9. OUTPUT NODE DEMOS - HTML and Markdown display
+    # ========================================
+    {
+        "name": "HTML Output Demo",
+        "description": "Demonstrates the HTML Display node rendering inline in the output panel. Run manually to see a styled card.",
+        "active": False,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Start",
+                    "type": "Start",
+                    "parameters": {},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Generate HTML",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Generate a sample HTML card
+html = '''<!DOCTYPE html>
+<html>
+<head>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.card { background: white; border-radius: 16px; padding: 32px; max-width: 400px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.25); }
+.badge { display: inline-block; background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-bottom: 16px; }
+h1 { font-size: 24px; color: #1f2937; margin-bottom: 8px; }
+p { color: #6b7280; line-height: 1.6; margin-bottom: 16px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb; }
+.stat { text-align: center; }
+.stat-value { font-size: 24px; font-weight: 700; color: #3b82f6; }
+.stat-label { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+</style>
+</head>
+<body>
+<div class="card">
+<span class="badge">Live Demo</span>
+<h1>HTML Output Node</h1>
+<p>This card is rendered directly in the output panel using the HTMLDisplay node. No modal needed!</p>
+<div class="stats">
+<div class="stat">
+<div class="stat-value">42</div>
+<div class="stat-label">Workflows</div>
+</div>
+<div class="stat">
+<div class="stat-value">128</div>
+<div class="stat-label">Executions</div>
+</div>
+<div class="stat">
+<div class="stat-value">99%</div>
+<div class="stat-label">Success</div>
+</div>
+</div>
+</div>
+</body>
+</html>'''
+
+return {"html": html}"""
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Display HTML",
+                    "type": "HTMLDisplay",
+                    "parameters": {"htmlField": "html"},
+                    "position": {"x": 600, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Start", "target_node": "Generate HTML"},
+                {"source_node": "Generate HTML", "target_node": "Display HTML"},
+            ],
+            "settings": {},
+        },
+    },
+    {
+        "name": "Markdown Output Demo",
+        "description": "Demonstrates the Markdown Display node rendering formatted text inline. Run manually to see styled markdown.",
+        "active": False,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Start",
+                    "type": "Start",
+                    "parameters": {},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Generate Markdown",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Generate sample markdown content
+markdown = '''# Workflow Execution Report
+
+## Summary
+The workflow completed successfully with **3 nodes** executed.
+
+## Results
+
+| Metric | Value |
+|--------|-------|
+| Total Items | 42 |
+| Processed | 40 |
+| Errors | 2 |
+| Duration | 1.23s |
+
+## Details
+
+### Node 1: Data Fetch
+- Status: *Completed*
+- Items retrieved: 42
+
+### Node 2: Transform
+- Applied filters
+- Removed duplicates
+- **40 items** remaining
+
+### Node 3: Output
+- Saved to database
+- Sent notifications
+
+---
+
+> This report was generated automatically by the workflow engine.
+
+For more information, see the [documentation](#).
+'''
+
+return {"markdown": markdown}"""
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Display Markdown",
+                    "type": "MarkdownDisplay",
+                    "parameters": {"markdownField": "markdown"},
+                    "position": {"x": 600, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Start", "target_node": "Generate Markdown"},
+                {"source_node": "Generate Markdown", "target_node": "Display Markdown"},
+            ],
+            "settings": {},
+        },
+    },
+    {
+        "name": "AI Summary with Markdown",
+        "description": "Uses LLM to generate a markdown-formatted summary. Great for demo! Run manually.",
+        "active": False,
+        "definition": {
+            "nodes": [
+                {
+                    "name": "Start",
+                    "type": "Start",
+                    "parameters": {},
+                    "position": {"x": 100, "y": 200},
+                },
+                {
+                    "name": "Sample Data",
+                    "type": "Set",
+                    "parameters": {
+                        "mode": "manual",
+                        "fields": [
+                            {"name": "company", "value": "Acme Bank"},
+                            {"name": "quarter", "value": "Q4 2025"},
+                            {"name": "revenue", "value": "2.4M"},
+                            {"name": "customers", "value": "15,000"},
+                            {"name": "growth", "value": "23%"},
+                        ],
+                    },
+                    "position": {"x": 350, "y": 200},
+                },
+                {
+                    "name": "Generate Summary",
+                    "type": "LLMChat",
+                    "parameters": {
+                        "model": "mock",
+                        "systemPrompt": "You are a business analyst. Generate a brief markdown-formatted quarterly summary report. Use headers, bullet points, and bold text for emphasis. Keep it concise.",
+                        "userMessage": "Generate a Q4 summary for {{ $json.company }} with revenue {{ $json.revenue }}, {{ $json.customers }} customers, and {{ $json.growth }} growth.",
+                        "temperature": 0.7,
+                        "maxTokens": 500,
+                    },
+                    "position": {"x": 600, "y": 200},
+                },
+                {
+                    "name": "Format Output",
+                    "type": "Code",
+                    "parameters": {
+                        "code": """# Get LLM response and format as markdown
+response = node_data["Generate Summary"]["json"].get("response", "")
+
+# If mock response is generic, create a nice one
+if not response or len(response) < 50:
+    data = node_data["Sample Data"]["json"]
+    response = f'''# {data.get("company", "Company")} - {data.get("quarter", "Q4")} Report
+
+## Key Highlights
+
+- **Revenue**: {data.get("revenue", "N/A")}
+- **Customer Base**: {data.get("customers", "N/A")}
+- **YoY Growth**: {data.get("growth", "N/A")}
+
+## Performance Summary
+
+The quarter showed **strong performance** across all metrics:
+
+1. Customer acquisition exceeded targets
+2. Revenue growth remained consistent
+3. Operational efficiency improved
+
+## Outlook
+
+> The company is well-positioned for continued growth in the coming year.
+
+---
+*Report generated automatically*
+'''
+
+return {"markdown": response}"""
+                    },
+                    "position": {"x": 850, "y": 200},
+                },
+                {
+                    "name": "Display",
+                    "type": "MarkdownDisplay",
+                    "parameters": {"markdownField": "markdown"},
+                    "position": {"x": 1100, "y": 200},
+                },
+            ],
+            "connections": [
+                {"source_node": "Start", "target_node": "Sample Data"},
+                {"source_node": "Sample Data", "target_node": "Generate Summary"},
+                {"source_node": "Generate Summary", "target_node": "Format Output"},
+                {"source_node": "Format Output", "target_node": "Display"},
             ],
             "settings": {},
         },

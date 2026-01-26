@@ -7,6 +7,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useWorkflowStore } from '../stores/workflowStore';
+import { useUIModeStore } from '../stores/uiModeStore';
 import { toBackendWorkflow } from '../lib/workflowTransform';
 import { backends } from '@/shared/lib/config';
 import { toast } from 'sonner';
@@ -55,6 +56,9 @@ export function useExecutionStream(): UseExecutionStreamResult {
     setNodeExecutionData,
     clearExecutionData,
   } = useWorkflowStore();
+
+  const setHtmlContent = useUIModeStore((s) => s.setHtmlContent);
+  const setMarkdownContent = useUIModeStore((s) => s.setMarkdownContent);
 
   const [isExecuting, setIsExecuting] = useState(false);
   const [progress, setProgress] = useState<{ completed: number; total: number } | null>(null);
@@ -242,6 +246,17 @@ export function useExecutionStream(): UseExecutionStreamResult {
             // Store output for later use as input to downstream nodes
             if (event.data) {
               nodeOutputs[event.nodeName] = event.data;
+
+              // Check for UI output content (HTML/Markdown)
+              for (const item of event.data) {
+                const data = item.json;
+                if (data._renderAs === 'html' && data.html) {
+                  setHtmlContent(String(data.html));
+                }
+                if (data._renderAs === 'markdown' && data.markdown) {
+                  setMarkdownContent(String(data.markdown));
+                }
+              }
             }
 
             // Find input from upstream node
@@ -311,6 +326,8 @@ export function useExecutionStream(): UseExecutionStreamResult {
     clearExecutionData,
     buildNameToIdMap,
     findInputNodeName,
+    setHtmlContent,
+    setMarkdownContent,
   ]);
 
   return {

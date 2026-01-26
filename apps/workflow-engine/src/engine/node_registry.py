@@ -233,17 +233,19 @@ def register_all_nodes() -> None:
         WriteFileNode,
         PandasExploreNode,
         HTMLDisplayNode,
+        MarkdownDisplayNode,
         ObjectReadNode,
         ObjectWriteNode,
         FilterNode,
         ItemListsNode,
         RespondToWebhookNode,
+        SampleNode,
+        SendEmailNode,
         # AI
         LLMChatNode,
         AIAgentNode,
         # UI
         ChatInputNode,
-        ChatOutputNode,
     )
 
     # Import subnode types
@@ -280,17 +282,19 @@ def register_all_nodes() -> None:
         WriteFileNode,
         PandasExploreNode,
         HTMLDisplayNode,
+        MarkdownDisplayNode,
         ObjectReadNode,
         ObjectWriteNode,
         FilterNode,
         ItemListsNode,
         RespondToWebhookNode,
+        SampleNode,
+        SendEmailNode,
         # AI
         LLMChatNode,
         AIAgentNode,
         # UI
         ChatInputNode,
-        ChatOutputNode,
         # Subnodes
         GeminiModelNode,
         SimpleMemoryNode,

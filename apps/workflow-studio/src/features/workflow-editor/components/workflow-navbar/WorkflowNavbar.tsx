@@ -12,7 +12,6 @@ import {
   Upload,
   Trash2,
   Loader2,
-  Workflow,
   Play,
 } from 'lucide-react';
 import { useWorkflowStore } from '../../stores/workflowStore';
@@ -266,31 +265,20 @@ export default function WorkflowNavbar() {
 }
 
 function ModeToggle() {
-  const mode = useUIModeStore((s) => s.mode);
-  const setMode = useUIModeStore((s) => s.setMode);
+  const isPreviewOpen = useUIModeStore((s) => s.isPreviewOpen);
+  const togglePreview = useUIModeStore((s) => s.togglePreview);
 
   return (
-    <div className="glass-toggle-group flex items-center">
-      <button
-        onClick={() => setMode('builder')}
-        className={`glass-toggle-item flex items-center gap-2 ${mode === 'builder'
+    <button
+      onClick={togglePreview}
+      className={`glass-toggle-item flex items-center gap-2 ${
+        isPreviewOpen
           ? 'active'
           : 'text-muted-foreground hover:text-foreground'
-          }`}
-      >
-        <Workflow size={14} />
-        Builder
-      </button>
-      <button
-        onClick={() => setMode('ui')}
-        className={`glass-toggle-item flex items-center gap-2 ${mode === 'ui'
-          ? 'active'
-          : 'text-muted-foreground hover:text-foreground'
-          }`}
-      >
-        <Play size={14} />
-        UI
-      </button>
-    </div>
+      }`}
+    >
+      <Play size={14} />
+      Test UI
+    </button>
   );
 }

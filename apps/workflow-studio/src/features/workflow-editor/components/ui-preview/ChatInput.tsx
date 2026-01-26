@@ -23,6 +23,7 @@ export function ChatInput({ config }: ChatInputProps) {
   const isExecuting = useUIModeStore((s) => s.isExecuting);
   const setIsExecuting = useUIModeStore((s) => s.setExecuting);
   const setHtmlContent = useUIModeStore((s) => s.setHtmlContent);
+  const setMarkdownContent = useUIModeStore((s) => s.setMarkdownContent);
 
   const handleSend = useCallback(async () => {
     if (!input.trim() || isExecuting) return;
@@ -72,8 +73,9 @@ export function ChatInput({ config }: ChatInputProps) {
 
       const result = await response.json();
 
-      // Process results - find ChatOutput and HTMLDisplay outputs
+      // Process results
       if (result.data) {
+        // First pass: handle explicit display nodes (HTML, Markdown)
         for (const [_nodeName, nodeData] of Object.entries(result.data)) {
           const items = nodeData as Array<{ json: Record<string, unknown> }>;
           if (!items || !items.length) continue;
@@ -81,18 +83,65 @@ export function ChatInput({ config }: ChatInputProps) {
           for (const item of items) {
             const data = item.json;
 
-            // Handle chat output
-            if (data._uiType === 'chat') {
-              addMessage({
-                type: (data._messageType as 'assistant' | 'system') || 'assistant',
-                content: String(data.message || ''),
-                format: data._format as 'text' | 'markdown',
-              });
+            // Handle HTML output
+            if (data._renderAs === 'html' && data.html) {
+              setHtmlContent(String(data.html));
             }
 
-            // Handle HTML output
-            if (data._renderAs === 'html' || data.html) {
-              setHtmlContent(String(data.html || ''));
+            // Handle Markdown output
+            if (data._renderAs === 'markdown' && data.markdown) {
+              setMarkdownContent(String(data.markdown));
+            }
+          }
+        }
+
+        // Auto-response: extract message from last node's output (n8n-style)
+        if (config.autoResponse) {
+          const nodeNames = Object.keys(result.data);
+          // Skip the ChatInput node itself, get the last actual output
+          const lastNodeName = nodeNames[nodeNames.length - 1];
+          const lastNodeData = result.data[lastNodeName] as Array<{ json: Record<string, unknown> }>;
+
+          if (lastNodeData?.length > 0) {
+            const lastOutput = lastNodeData[lastNodeData.length - 1].json;
+
+            // Extract message from common field names
+            const messageFields = ['message', 'output', 'text', 'content', 'response', 'result'];
+            let messageContent: string | null = null;
+
+            for (const field of messageFields) {
+              if (lastOutput[field] && typeof lastOutput[field] === 'string') {
+                messageContent = lastOutput[field] as string;
+                break;
+              }
+            }
+
+            // Fallback: format as JSON code block if no string field found
+            if (!messageContent) {
+              // Filter out internal fields starting with _
+              const cleanOutput: Record<string, unknown> = {};
+              for (const [key, value] of Object.entries(lastOutput)) {
+                if (!key.startsWith('_')) {
+                  cleanOutput[key] = value;
+                }
+              }
+
+              const keys = Object.keys(cleanOutput);
+              if (keys.length === 1 && typeof cleanOutput[keys[0]] === 'string') {
+                // Single string field - use it directly
+                messageContent = cleanOutput[keys[0]] as string;
+              } else if (keys.length > 0) {
+                // Multiple fields or non-string - format as JSON code block
+                messageContent = '```json\n' + JSON.stringify(cleanOutput, null, 2) + '\n```';
+              }
+            }
+
+            if (messageContent) {
+              addMessage({
+                type: 'assistant',
+                content: messageContent,
+                format: messageContent.startsWith('```') ? 'markdown' : 'text',
+              });
             }
           }
         }
@@ -106,7 +155,7 @@ export function ChatInput({ config }: ChatInputProps) {
     } finally {
       setIsExecuting(false);
     }
-  }, [input, workflowId, workflowName, nodes, edges, addMessage, setIsExecuting, setHtmlContent, isExecuting]);
+  }, [input, workflowId, workflowName, nodes, edges, addMessage, setIsExecuting, setHtmlContent, setMarkdownContent, isExecuting]);
 
   const placeholder = config.placeholder || 'Type a message...';
 
