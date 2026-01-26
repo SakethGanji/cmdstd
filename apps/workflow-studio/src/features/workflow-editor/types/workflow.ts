@@ -67,6 +67,8 @@ export interface WorkflowNodeData {
 export interface StickyNoteData {
   content: string;
   color: 'yellow' | 'blue' | 'green' | 'pink' | 'purple';
+  width?: number;
+  height?: number;
 }
 
 // Node definition for the node creator panel

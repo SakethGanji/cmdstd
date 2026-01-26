@@ -367,57 +367,57 @@ export default function NodeCreatorPanel() {
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-background/80 backdrop-blur-sm"
+        className="fixed inset-0 z-40 bg-background/60"
         onClick={closePanel}
       />
 
       {/* Panel */}
-      <div className="fixed right-2 top-2 bottom-2 z-50 flex w-[400px] flex-col rounded-xl overflow-hidden bg-white dark:bg-card shadow-2xl">
+      <div className="fixed right-4 top-4 bottom-4 z-50 flex w-[420px] flex-col rounded-2xl overflow-hidden glass-card">
         {/* Header */}
-        <div className="border-b border-border px-4 py-4">
+        <div className="border-b border-border px-5 py-5 bg-[var(--card-gradient)]">
           <div className="flex items-center justify-between">
             {view !== 'trigger' && view !== 'subnode' && (
               <button
                 onClick={() => setView('trigger')}
-                className="mr-2 rounded-md p-1 hover:bg-accent"
+                className="mr-3 rounded-xl p-2 hover:bg-accent transition-colors"
               >
-                <ArrowLeft size={20} className="text-muted-foreground" />
+                <ArrowLeft size={18} className="text-muted-foreground" />
               </button>
             )}
             {view === 'subnode' && (
               <button
                 onClick={closePanel}
-                className="mr-2 rounded-md p-1 hover:bg-accent"
+                className="mr-3 rounded-xl p-2 hover:bg-accent transition-colors"
               >
-                <ArrowLeft size={20} className="text-muted-foreground" />
+                <ArrowLeft size={18} className="text-muted-foreground" />
               </button>
             )}
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="text-lg font-bold text-foreground">
                 {title}
               </h2>
-              <p className="text-sm text-muted-foreground">{subtitle}</p>
+              <p className="text-sm text-muted-foreground mt-0.5">{subtitle}</p>
             </div>
             <button
               onClick={closePanel}
-              className="rounded-md p-1 hover:bg-accent"
+              className="rounded-xl p-2 hover:bg-accent transition-colors"
             >
-              <X size={20} className="text-muted-foreground" />
+              <X size={18} className="text-muted-foreground" />
             </button>
           </div>
 
           {/* Search */}
           <div className="relative mt-4">
             <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+              size={16}
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
             />
             <input
               type="text"
               placeholder="Search nodes..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full rounded-lg border border-input bg-secondary py-2 pl-10 pr-4 text-sm outline-none focus:border-ring focus:ring-1 focus:ring-ring"
+              className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input)] py-2.5 pl-11 pr-4 text-sm outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
               autoFocus
             />
           </div>
@@ -460,7 +460,7 @@ export default function NodeCreatorPanel() {
                 // Trigger view - flat list with sections
                 <>
                   <div className="space-y-2">
-                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h3 className="label-caps">
                       Popular
                     </h3>
                     {triggerNodes.slice(0, 3).map((node) => (
@@ -473,7 +473,7 @@ export default function NodeCreatorPanel() {
                   </div>
                   {triggerNodes.length > 3 && (
                     <div className="space-y-2">
-                      <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      <h3 className="label-caps">
                         Other Triggers
                       </h3>
                       {triggerNodes.slice(3).map((node) => (
@@ -490,9 +490,9 @@ export default function NodeCreatorPanel() {
                 // Regular view - grouped by category
                 Object.entries(groupedNodes).map(([category, categoryNodes]) => (
                   <div key={category} className="space-y-2">
-                    <h3 className="flex items-center text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    <h3 className="flex items-center label-caps">
                       {category}
-                      <ChevronRight size={14} className="ml-1" />
+                      <ChevronRight size={12} className="ml-1" />
                     </h3>
                     {categoryNodes.map((node) => (
                       <NodeItem
@@ -509,9 +509,9 @@ export default function NodeCreatorPanel() {
         </div>
 
         {/* Footer */}
-        <div className="border-t border-border px-4 py-3">
+        <div className="border-t border-border px-5 py-4 bg-[var(--card-gradient)]">
           <p className="text-xs text-muted-foreground">
-            Press <kbd className="rounded-md bg-muted px-1 py-0.5 font-mono">Esc</kbd> to close
+            Press <kbd className="glass-badge text-[9px] px-2 py-0.5 font-mono">Esc</kbd> to close
           </p>
         </div>
       </div>

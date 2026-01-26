@@ -31,31 +31,31 @@ function WorkflowsPage() {
   );
 
   return (
-    <div className="h-full w-full flex flex-col bg-background">
+    <div className="h-full w-full flex flex-col">
       {/* Header */}
-      <header className="border-b px-6 py-4">
+      <header className="glass-panel m-6 mb-0 p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Workflows</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">
+            <h1 className="text-2xl font-black tracking-tight">Workflows</h1>
+            <p className="text-sm text-muted-foreground mt-1">
               Manage and run your automation workflows
             </p>
           </div>
-          <Button onClick={handleNewWorkflow}>
-            <Plus className="h-4 w-4 mr-2" />
+          <Button onClick={handleNewWorkflow} variant="glass" className="gap-2">
+            <Plus className="h-4 w-4" />
             New Workflow
           </Button>
         </div>
 
         {/* Search */}
-        <div className="mt-4 max-w-md">
+        <div className="mt-5 max-w-md">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               placeholder="Search workflows..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9"
+              className="pl-11"
             />
           </div>
         </div>
@@ -65,35 +65,40 @@ function WorkflowsPage() {
       <main className="flex-1 overflow-auto p-6">
         {isLoading ? (
           <div className="flex items-center justify-center h-64">
-            <div className="flex flex-col items-center gap-3">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              <p className="text-sm text-muted-foreground">Loading workflows...</p>
+            <div className="flex flex-col items-center gap-4">
+              <div className="h-10 w-10 animate-spin rounded-full border-2 border-muted border-t-primary" />
+              <p className="text-sm font-medium text-muted-foreground">Loading workflows...</p>
             </div>
           </div>
         ) : error ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <p className="text-sm text-destructive">Failed to load workflows</p>
-              <p className="text-xs text-muted-foreground mt-1">{String(error)}</p>
+            <div className="glass-card p-8 text-center">
+              <p className="text-sm font-semibold text-destructive">Failed to load workflows</p>
+              <p className="text-xs text-muted-foreground mt-2">{String(error)}</p>
             </div>
           </div>
         ) : filteredWorkflows?.length === 0 ? (
           <div className="flex items-center justify-center h-64">
-            <div className="text-center">
-              <FolderOpen className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">
+            <div className="glass-card p-10 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                <FolderOpen className="h-8 w-8 text-muted-foreground/50" />
+              </div>
+              <p className="text-sm font-semibold text-foreground mb-1">
                 {searchQuery ? 'No workflows match your search' : 'No workflows yet'}
               </p>
+              <p className="text-xs text-muted-foreground mb-4">
+                {searchQuery ? 'Try a different search term' : 'Get started by creating your first workflow'}
+              </p>
               {!searchQuery && (
-                <Button variant="outline" className="mt-3" onClick={handleNewWorkflow}>
-                  <Plus className="h-4 w-4 mr-2" />
+                <Button variant="glass" onClick={handleNewWorkflow} className="gap-2">
+                  <Plus className="h-4 w-4" />
                   Create your first workflow
                 </Button>
               )}
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {filteredWorkflows?.map((workflow) => (
               <WorkflowCard key={workflow.id} workflow={workflow} />
             ))}

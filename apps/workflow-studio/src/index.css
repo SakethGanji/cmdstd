@@ -4,236 +4,327 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  --background: #ffffff;
-  --foreground: #18181b;
+  /* ═══════════════════════════════════════════════════════════════════════════
+     GLASS DESIGN SYSTEM - LIGHT MODE (Sky)
+     Performance-optimized frosted glass without backdrop-filter
+     ═══════════════════════════════════════════════════════════════════════════ */
 
-  /* Node Group Colors - Light Mode (Vibrant, distinct colors) */
-  /* Trigger: Warm orange - starting points */
-  --node-trigger: #ea580c;
+  /* Page Background - Neutral gray */
+  --background: #f8fafc;
+  --background-gradient: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  --foreground: #0f172a;
+
+  /* Glass Card Surface - More opaque for readability */
+  --card: rgba(255, 255, 255, 0.9);
+  --card-solid: #ffffff;
+  --card-foreground: #1e293b;
+  --card-gradient: linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.88) 100%);
+  --card-border: rgba(255, 255, 255, 0.8);
+  --card-shadow: 0 15px 35px -10px rgba(0, 0, 0, 0.1), 0 5px 15px -5px rgba(0, 0, 0, 0.05);
+  --card-inset: inset 0 1px 1px rgba(255, 255, 255, 1);
+
+  /* Glass Popover/Dropdown */
+  --popover: rgba(255, 255, 255, 0.97);
+  --popover-foreground: #1e293b;
+
+  /* Primary Action - Blue */
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+
+  /* Secondary - Subtle glass */
+  --secondary: rgba(255, 255, 255, 0.8);
+  --secondary-foreground: #475569;
+
+  /* Muted - Very subtle */
+  --muted: rgba(148, 163, 184, 0.15);
+  --muted-foreground: #64748b;
+
+  /* Accent - Hover states */
+  --accent: rgba(59, 130, 246, 0.1);
+  --accent-foreground: #1e40af;
+
+  /* Destructive */
+  --destructive: #f43f5e;
+  --destructive-foreground: #ffffff;
+
+  /* Success */
+  --success: #10b981;
+  --success-foreground: #ffffff;
+
+  /* Borders */
+  --border: rgba(148, 163, 184, 0.25);
+  --border-strong: rgba(148, 163, 184, 0.4);
+
+  /* Input fields */
+  --input: rgba(255, 255, 255, 0.85);
+  --input-border: rgba(148, 163, 184, 0.35);
+
+  /* Focus ring */
+  --ring: #3b82f6;
+
+  /* Chart colors (vibrant) */
+  --chart-1: #3b82f6;
+  --chart-2: #8b5cf6;
+  --chart-3: #06b6d4;
+  --chart-4: #10b981;
+  --chart-5: #f59e0b;
+
+  /* Sidebar */
+  --sidebar: rgba(255, 255, 255, 0.92);
+  --sidebar-foreground: #1e293b;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(59, 130, 246, 0.1);
+  --sidebar-accent-foreground: #1e40af;
+  --sidebar-border: rgba(148, 163, 184, 0.2);
+  --sidebar-ring: #3b82f6;
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     NODE GROUP COLORS - Light Mode (Harmonized Palette)
+     ═══════════════════════════════════════════════════════════════════════════ */
+
+  /* Trigger: Warm orange - entry points */
+  --node-trigger: #f97316;
   --node-trigger-light: #fff7ed;
-  --node-trigger-border: #fed7aa;
-  --node-trigger-icon-bg: rgba(234, 88, 12, 0.15);
+  --node-trigger-border: #fdba74;
+  --node-trigger-icon-bg: #fed7aa;
 
   /* Transform: Cool blue - data processing */
-  --node-transform: #2563eb;
-  --node-transform-light: #eff6ff;
-  --node-transform-border: #bfdbfe;
-  --node-transform-icon-bg: rgba(37, 99, 235, 0.12);
+  --node-transform: #3b82f6;
+  --node-transform-light: #dbeafe;
+  --node-transform-border: #93c5fd;
+  --node-transform-icon-bg: #bfdbfe;
 
-  /* Flow: Deep purple - control flow/branching */
-  --node-flow: #7c3aed;
-  --node-flow-light: #f5f3ff;
-  --node-flow-border: #ddd6fe;
-  --node-flow-icon-bg: rgba(124, 58, 237, 0.12);
+  /* Flow: Deep purple - control flow */
+  --node-flow: #8b5cf6;
+  --node-flow-light: #ede9fe;
+  --node-flow-border: #c4b5fd;
+  --node-flow-icon-bg: #ddd6fe;
 
-  /* AI: Neutral gray - intelligence */
+  /* AI: Slate with shimmer - intelligence */
   --node-ai: #475569;
-  --node-ai-light: #f8fafc;
+  --node-ai-light: #f1f5f9;
   --node-ai-border: #cbd5e1;
-  --node-ai-icon-bg: rgba(71, 85, 105, 0.12);
+  --node-ai-icon-bg: #e2e8f0;
 
-  /* Action: Slate gray - generic actions */
-  --node-action: #475569;
-  --node-action-light: #f8fafc;
-  --node-action-border: #cbd5e1;
-  --node-action-icon-bg: rgba(71, 85, 105, 0.12);
+  /* Action: Emerald green - execution */
+  --node-action: #10b981;
+  --node-action-light: #d1fae5;
+  --node-action-border: #6ee7b7;
+  --node-action-icon-bg: #a7f3d0;
 
-  /* Output: Cyan/teal - display/output */
-  --node-output: #0891b2;
-  --node-output-light: #ecfeff;
-  --node-output-border: #a5f3fc;
-  --node-output-icon-bg: rgba(8, 145, 178, 0.12);
+  /* Output: Cyan - exit points */
+  --node-output: #06b6d4;
+  --node-output-light: #cffafe;
+  --node-output-border: #67e8f9;
+  --node-output-icon-bg: #a5f3fc;
 
-  /* Neutral node handle color */
-  --node-handle: #71717a;
+  /* Node handle */
+  --node-handle: #94a3b8;
 
-  /* Subnode colors - Light Mode (all gray to match AI nodes) */
-  /* Model: Gray */
+  /* Subnode colors (match AI style) */
   --subnode-model: #475569;
-  --subnode-model-light: #f8fafc;
+  --subnode-model-light: #f1f5f9;
   --subnode-model-border: #cbd5e1;
-  --subnode-model-icon-bg: rgba(71, 85, 105, 0.12);
+  --subnode-model-icon-bg: #e2e8f0;
 
-  /* Memory: Gray */
   --subnode-memory: #475569;
-  --subnode-memory-light: #f8fafc;
+  --subnode-memory-light: #f1f5f9;
   --subnode-memory-border: #cbd5e1;
-  --subnode-memory-icon-bg: rgba(71, 85, 105, 0.12);
+  --subnode-memory-icon-bg: #e2e8f0;
 
-  /* Tool: Gray */
   --subnode-tool: #475569;
-  --subnode-tool-light: #f8fafc;
+  --subnode-tool-light: #f1f5f9;
   --subnode-tool-border: #cbd5e1;
-  --subnode-tool-icon-bg: rgba(71, 85, 105, 0.12);
+  --subnode-tool-icon-bg: #e2e8f0;
 
-  --card: #ffffff;
-  --card-foreground: #1f2937;
-  --popover: #ffffff;
-  --popover-foreground: #1f2937;
-  --primary: #6b7280;
-  --primary-foreground: #ffffff;
-  --secondary: #f3f4f6;
-  --secondary-foreground: #374151;
-  --muted: #f3f4f6;
-  --muted-foreground: #6b7280;
-  --accent: #e5e7eb;
-  --accent-foreground: #374151;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --border: #e5e7eb;
-  --input: #f3f4f6;
-  --ring: #6b7280;
-  --chart-1: #6b7280;
-  --chart-2: #4b5563;
-  --chart-3: #374151;
-  --chart-4: #9ca3af;
-  --chart-5: #d1d5db;
-  --sidebar: #ffffff;
-  --sidebar-foreground: #1f2937;
-  --sidebar-primary: #6b7280;
-  --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #f3f4f6;
-  --sidebar-accent-foreground: #374151;
-  --sidebar-border: #e5e7eb;
-  --sidebar-ring: #6b7280;
+  /* ═══════════════════════════════════════════════════════════════════════════
+     TYPOGRAPHY
+     ═══════════════════════════════════════════════════════════════════════════ */
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-serif: "PT Serif", Georgia, serif;
+  --font-mono: "Fira Mono", "SF Mono", monospace;
 
-  --font-sans: "Inter", sans-serif;
-  --font-serif: "PT Serif", serif;
-  --font-mono: "Fira Mono", monospace;
-  --radius: 0.5rem;
-  --shadow-x: 0px;
-  --shadow-y: 2px;
-  --shadow-blur: 10px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.1;
-  --shadow-color: #000000;
-  --shadow-2xs: 0 1px 2px 0 rgb(0 0 0 / 0.06);
-  --shadow-xs: 0 1px 3px 0 rgb(0 0 0 / 0.08);
-  --shadow-sm: 0 2px 4px 0 rgb(0 0 0 / 0.06), 0 1px 2px -1px rgb(0 0 0 / 0.06);
-  --shadow: 0 2px 8px 0 rgb(0 0 0 / 0.08), 0 1px 3px -1px rgb(0 0 0 / 0.06);
-  --shadow-md: 0 4px 16px -2px rgb(0 0 0 / 0.1), 0 2px 6px -2px rgb(0 0 0 / 0.06);
-  --shadow-lg: 0 12px 28px -6px rgb(0 0 0 / 0.12), 0 4px 10px -4px rgb(0 0 0 / 0.08);
-  --shadow-xl: 0 20px 40px -8px rgb(0 0 0 / 0.14), 0 8px 16px -6px rgb(0 0 0 / 0.08);
-  --shadow-2xl: 0 28px 60px -12px rgb(0 0 0 / 0.2);
-  --tracking-normal: 0em;
-  --spacing: 0.25rem;
+  /* ═══════════════════════════════════════════════════════════════════════════
+     SPACING & RADIUS (Glass-friendly large radius)
+     ═══════════════════════════════════════════════════════════════════════════ */
+  --radius: 1rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+  --radius-full: 9999px;
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     SHADOWS (Light mode - soft and diffuse)
+     ═══════════════════════════════════════════════════════════════════════════ */
+  --shadow-2xs: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 2px 8px -2px rgba(0, 0, 0, 0.06);
+  --shadow: 0 4px 12px -3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 8px 20px -5px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 15px 35px -10px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 25px 50px -12px rgba(0, 0, 0, 0.12);
+  --shadow-2xl: 0 35px 60px -15px rgba(0, 0, 0, 0.15);
+
+  /* Glass-specific shadows */
+  --shadow-glass: 0 15px 35px -10px rgba(0, 0, 0, 0.08), 0 5px 15px -5px rgba(0, 0, 0, 0.04);
+  --shadow-glass-hover: 0 20px 40px -10px rgba(0, 0, 0, 0.12), 0 8px 20px -5px rgba(0, 0, 0, 0.06);
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   DARK MODE - Deep Slate / OLED-friendly
+   ═════════════════════════════════════════════════════════════════════════════ */
 .dark {
-  /* Lighter dark grays - easier on the eyes */
-  --background: #1e1e20;
-  --foreground: #ececec;
+  /* Page Background - Space gray */
+  --background: #1c1c1e;
+  --background-gradient: #1c1c1e;
+  --foreground: #f5f5f7;
 
-  /* Node Group Colors - Dark Mode (Adjusted for lighter background) */
+  /* Glass Card Surface - Space gray */
+  --card: rgba(44, 44, 46, 0.95);
+  --card-solid: #2c2c2e;
+  --card-foreground: #f5f5f7;
+  --card-gradient: linear-gradient(180deg, rgba(58, 58, 60, 0.97) 0%, rgba(44, 44, 46, 0.95) 100%);
+  --card-border: rgba(255, 255, 255, 0.1);
+  --card-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --card-inset: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+
+  /* Glass Popover */
+  --popover: rgba(44, 44, 46, 0.98);
+  --popover-foreground: #f5f5f7;
+
+  /* Primary Action */
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+
+  /* Secondary */
+  --secondary: rgba(255, 255, 255, 0.08);
+  --secondary-foreground: #d1d1d6;
+
+  /* Muted */
+  --muted: rgba(255, 255, 255, 0.06);
+  --muted-foreground: #98989d;
+
+  /* Accent */
+  --accent: rgba(59, 130, 246, 0.15);
+  --accent-foreground: #93c5fd;
+
+  /* Destructive */
+  --destructive: #f43f5e;
+  --destructive-foreground: #ffffff;
+
+  /* Success */
+  --success: #10b981;
+  --success-foreground: #ffffff;
+
+  /* Borders */
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
+
+  /* Input */
+  --input: rgba(255, 255, 255, 0.06);
+  --input-border: rgba(255, 255, 255, 0.1);
+
+  /* Focus ring */
+  --ring: #3b82f6;
+
+  /* Charts */
+  --chart-1: #60a5fa;
+  --chart-2: #a78bfa;
+  --chart-3: #22d3ee;
+  --chart-4: #34d399;
+  --chart-5: #fbbf24;
+
+  /* Sidebar */
+  --sidebar: rgba(44, 44, 46, 0.95);
+  --sidebar-foreground: #f5f5f7;
+  --sidebar-primary: #3b82f6;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgba(59, 130, 246, 0.15);
+  --sidebar-accent-foreground: #93c5fd;
+  --sidebar-border: rgba(255, 255, 255, 0.06);
+  --sidebar-ring: #3b82f6;
+
+  /* ═══════════════════════════════════════════════════════════════════════════
+     NODE GROUP COLORS - Dark Mode (Solid colors for visibility)
+     ═══════════════════════════════════════════════════════════════════════════ */
+
   /* Trigger: Warm orange */
   --node-trigger: #fb923c;
-  --node-trigger-light: #332a24;
-  --node-trigger-border: #a3510f;
-  --node-trigger-icon-bg: rgba(251, 146, 60, 0.22);
+  --node-trigger-light: #431407;
+  --node-trigger-border: #c2410c;
+  --node-trigger-icon-bg: #9a3412;
 
   /* Transform: Bright blue */
   --node-transform: #60a5fa;
-  --node-transform-light: #262f3d;
-  --node-transform-border: #2558c5;
-  --node-transform-icon-bg: rgba(96, 165, 250, 0.22);
+  --node-transform-light: #172554;
+  --node-transform-border: #1e40af;
+  --node-transform-icon-bg: #1e3a8a;
 
   /* Flow: Purple */
   --node-flow: #a78bfa;
-  --node-flow-light: #2f2a38;
-  --node-flow-border: #7c3aed;
-  --node-flow-icon-bg: rgba(167, 139, 250, 0.22);
+  --node-flow-light: #2e1065;
+  --node-flow-border: #6d28d9;
+  --node-flow-icon-bg: #5b21b6;
 
-  /* AI: Neutral gray */
-  --node-ai: #b0b0b8;
-  --node-ai-light: #303033;
-  --node-ai-border: #606065;
-  --node-ai-icon-bg: rgba(176, 176, 184, 0.2);
+  /* AI: Light slate */
+  --node-ai: #94a3b8;
+  --node-ai-light: #1e293b;
+  --node-ai-border: #475569;
+  --node-ai-icon-bg: #334155;
 
-  /* Action: Neutral gray */
-  --node-action: #b0b0b8;
-  --node-action-light: #303033;
-  --node-action-border: #606065;
-  --node-action-icon-bg: rgba(176, 176, 184, 0.2);
+  /* Action: Emerald */
+  --node-action: #34d399;
+  --node-action-light: #022c22;
+  --node-action-border: #047857;
+  --node-action-icon-bg: #065f46;
 
   /* Output: Cyan */
   --node-output: #22d3ee;
-  --node-output-light: #233438;
-  --node-output-border: #1585a0;
-  --node-output-icon-bg: rgba(34, 211, 238, 0.22);
+  --node-output-light: #083344;
+  --node-output-border: #0891b2;
+  --node-output-icon-bg: #0e7490;
 
-  /* Node handle - brighter for visibility */
-  --node-handle: #88888f;
+  /* Node handle */
+  --node-handle: #64748b;
 
-  /* Subnode colors - all gray to match AI nodes */
-  /* Model: Gray */
-  --subnode-model: #b0b0b8;
-  --subnode-model-light: #303033;
-  --subnode-model-border: #606065;
-  --subnode-model-icon-bg: rgba(176, 176, 184, 0.2);
+  /* Subnodes */
+  --subnode-model: #94a3b8;
+  --subnode-model-light: #1e293b;
+  --subnode-model-border: #475569;
+  --subnode-model-icon-bg: #334155;
 
-  /* Memory: Gray */
-  --subnode-memory: #b0b0b8;
-  --subnode-memory-light: #303033;
-  --subnode-memory-border: #606065;
-  --subnode-memory-icon-bg: rgba(176, 176, 184, 0.2);
+  --subnode-memory: #94a3b8;
+  --subnode-memory-light: #1e293b;
+  --subnode-memory-border: #475569;
+  --subnode-memory-icon-bg: #334155;
 
-  /* Tool: Gray */
-  --subnode-tool: #b0b0b8;
-  --subnode-tool-light: #303033;
-  --subnode-tool-border: #606065;
-  --subnode-tool-icon-bg: rgba(176, 176, 184, 0.2);
+  --subnode-tool: #94a3b8;
+  --subnode-tool-light: #1e293b;
+  --subnode-tool-border: #475569;
+  --subnode-tool-icon-bg: #334155;
 
-  /* Neutral panels and cards - space gray theme */
-  --card: #2a2d31;
-  --card-foreground: #f3f4f6;
-  --popover: #31353a;
-  --popover-foreground: #f3f4f6;
-  --primary: #9ca3af;
-  --primary-foreground: #1f2937;
-  --secondary: #363a3f;
-  --secondary-foreground: #f3f4f6;
-  --muted: #3b4048;
-  --muted-foreground: #9ca3af;
-  --accent: #454b52;
-  --accent-foreground: #f3f4f6;
-  --destructive: #ef4444;
-  --destructive-foreground: #ffffff;
-  --border: #454b52;
-  --input: #363a3f;
-  --ring: #9ca3af;
-  --chart-1: #9ca3af;
-  --chart-2: #d1d5db;
-  --chart-3: #6b7280;
-  --chart-4: #4b5563;
-  --chart-5: #374151;
-  --sidebar: #262a2e;
-  --sidebar-foreground: #f3f4f6;
-  --sidebar-primary: #9ca3af;
-  --sidebar-primary-foreground: #1f2937;
-  --sidebar-accent: #3b4048;
-  --sidebar-accent-foreground: #f3f4f6;
-  --sidebar-border: #454b52;
-  --sidebar-ring: #9ca3af;
-  --font-sans: "Inter", sans-serif;
-  --font-serif: "PT Serif", serif;
-  --font-mono: "Fira Mono", monospace;
-  --radius: 0.5rem;
-  --shadow-x: 0px;
-  --shadow-y: 4px;
-  --shadow-blur: 12px;
-  --shadow-spread: 0px;
-  --shadow-opacity: 0.3;
-  --shadow-color: #000000;
-  --shadow-2xs: 0px 1px 3px 0px hsl(0 0% 0% / 0.35);
-  --shadow-xs: 0px 2px 4px 0px hsl(0 0% 0% / 0.35);
-  --shadow-sm: 0px 2px 6px 0px hsl(0 0% 0% / 0.35), 0px 1px 3px -1px hsl(0 0% 0% / 0.25);
-  --shadow: 0px 4px 10px 0px hsl(0 0% 0% / 0.35), 0px 2px 5px -1px hsl(0 0% 0% / 0.25);
-  --shadow-md: 0px 6px 14px -2px hsl(0 0% 0% / 0.4), 0px 3px 8px -2px hsl(0 0% 0% / 0.25);
-  --shadow-lg: 0px 10px 20px -4px hsl(0 0% 0% / 0.4), 0px 5px 10px -3px hsl(0 0% 0% / 0.25);
-  --shadow-xl: 0px 16px 28px -6px hsl(0 0% 0% / 0.45), 0px 8px 14px -4px hsl(0 0% 0% / 0.25);
-  --shadow-2xl: 0px 24px 40px -8px hsl(0 0% 0% / 0.5);
+  /* ═══════════════════════════════════════════════════════════════════════════
+     SHADOWS - Dark Mode (Stronger depth)
+     ═══════════════════════════════════════════════════════════════════════════ */
+  --shadow-2xs: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-xs: 0 2px 4px rgba(0, 0, 0, 0.35);
+  --shadow-sm: 0 4px 8px -2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.45);
+  --shadow-md: 0 12px 24px -6px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 20px 40px -10px rgba(0, 0, 0, 0.55);
+  --shadow-xl: 0 30px 60px -15px rgba(0, 0, 0, 0.6);
+  --shadow-2xl: 0 40px 80px -20px rgba(0, 0, 0, 0.65);
+
+  --shadow-glass: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  --shadow-glass-hover: 0 30px 60px -12px rgba(0, 0, 0, 0.6);
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   TAILWIND THEME INTEGRATION
+   ═════════════════════════════════════════════════════════════════════════════ */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -272,10 +363,10 @@
   --font-mono: var(--font-mono);
   --font-serif: var(--font-serif);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
 
   --shadow-2xs: var(--shadow-2xs);
   --shadow-xs: var(--shadow-xs);
@@ -287,13 +378,19 @@
   --shadow-2xl: var(--shadow-2xl);
 }
 
+/* ═════════════════════════════════════════════════════════════════════════════
+   BASE STYLES
+   ═════════════════════════════════════════════════════════════════════════════ */
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply text-foreground antialiased;
+    background: var(--background-gradient);
+    background-color: var(--background);
+    min-height: 100vh;
   }
 
   html,
@@ -306,7 +403,141 @@
   }
 }
 
-/* React Flow overrides */
+/* ═════════════════════════════════════════════════════════════════════════════
+   GLASS COMPONENT CLASSES
+   ═════════════════════════════════════════════════════════════════════════════ */
+@layer components {
+  /* Primary glass card - use for main containers */
+  .glass-card {
+    background: var(--card-gradient);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--card-shadow), var(--card-inset);
+    border-radius: var(--radius-2xl);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .glass-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: var(--card-inset);
+    pointer-events: none;
+  }
+
+  /* Glass card hover effect */
+  .glass-card-hover {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .glass-card-hover:hover {
+    box-shadow: var(--shadow-glass-hover), var(--card-inset);
+    border-color: var(--border-strong);
+  }
+
+  /* Compact glass panel - for toolbars, navbars */
+  .glass-panel {
+    background: var(--card-gradient);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow-lg);
+    border-radius: var(--radius-xl);
+  }
+
+  /* Glass input field */
+  .glass-input {
+    background: var(--input);
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius-lg);
+    transition: all 0.2s;
+  }
+
+  .glass-input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+  }
+
+  /* Glass button variants */
+  .glass-button {
+    background: var(--card-gradient);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s;
+  }
+
+  .glass-button:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--border-strong);
+  }
+
+  /* Primary glass button */
+  .glass-button-primary {
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: white;
+    border-radius: var(--radius-xl);
+    box-shadow: var(--shadow-md), inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  }
+
+  .glass-button-primary:hover {
+    background: linear-gradient(180deg, #60a5fa 0%, #3b82f6 100%);
+  }
+
+  /* Glass badge */
+  .glass-badge {
+    background: var(--muted);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.25rem 0.75rem;
+  }
+
+  /* Glass toggle group */
+  .glass-toggle-group {
+    background: var(--muted);
+    border-radius: var(--radius-xl);
+    padding: 0.25rem;
+  }
+
+  .glass-toggle-item {
+    border-radius: var(--radius-lg);
+    padding: 0.5rem 1rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+
+  .glass-toggle-item[data-state="on"],
+  .glass-toggle-item.active {
+    background: var(--card-solid);
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* Label typography style */
+  .label-caps {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted-foreground);
+  }
+
+  /* Heading typography */
+  .heading-caps {
+    font-size: 0.75rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+}
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   REACT FLOW OVERRIDES
+   ═════════════════════════════════════════════════════════════════════════════ */
 .react-flow__node {
   cursor: pointer;
 }
@@ -319,13 +550,11 @@
   cursor: pointer;
 }
 
-
-
 /* Selection box styling */
 .react-flow__selection {
-  background: rgba(59, 130, 246, 0.08) !important;
+  background: rgba(59, 130, 246, 0.1) !important;
   border: 1px dashed rgba(59, 130, 246, 0.5) !important;
-  border-radius: 4px;
+  border-radius: var(--radius-lg);
 }
 
 /* Selected node highlight */
@@ -334,17 +563,25 @@
 }
 
 .react-flow__controls {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border-radius: var(--radius-xl) !important;
+  overflow: hidden;
 }
 
 .react-flow__minimap {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+  box-shadow: var(--shadow-lg) !important;
+  border-radius: var(--radius-xl) !important;
+  overflow: hidden;
 }
 
 /* Ensure pointer events work on custom nodes */
 .react-flow__node-addNodes {
   pointer-events: all !important;
 }
+
+/* ═════════════════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═════════════════════════════════════════════════════════════════════════════ */
 
 /* Pulsing border animation for running nodes */
 @keyframes pulse-border {
@@ -379,7 +616,7 @@
   animation: badge-pop 0.3s ease-out forwards;
 }
 
-/* AI node shimmer effect on icon background */
+/* AI node shimmer effect */
 .node-ai-shimmer {
   background: linear-gradient(
     135deg,
@@ -395,7 +632,7 @@
   background: linear-gradient(
     135deg,
     var(--node-ai-icon-bg) 0%,
-    rgba(161, 161, 170, 0.3) 50%,
+    rgba(148, 163, 184, 0.25) 50%,
     var(--node-ai-icon-bg) 100%
   );
   background-size: 200% 200%;
@@ -408,4 +645,34 @@
   50% {
     background-position: 100% 50%;
   }
+}
+
+/* Glass card entrance animation */
+@keyframes glass-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-glass-appear {
+  animation: glass-appear 0.5s ease-out forwards;
+}
+
+/* Subtle glow for active states */
+@keyframes subtle-glow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+  }
+}
+
+.animate-subtle-glow {
+  animation: subtle-glow 2s ease-in-out infinite;
 }

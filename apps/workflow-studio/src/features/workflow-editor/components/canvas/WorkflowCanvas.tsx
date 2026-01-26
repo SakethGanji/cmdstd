@@ -526,9 +526,10 @@ export default function WorkflowCanvas() {
           className="text-border/40 [&>pattern>path]:stroke-current"
         />
 
-        {/* MiniMap - colored by node group */}
+        {/* MiniMap - colored by node group, positioned to avoid sidebar */}
         <MiniMap
           position="bottom-left"
+          style={{ marginBottom: 20, marginLeft: 100 }}
           nodeColor={(node) => {
             if (node.type === 'addNodes') return 'var(--muted)';
             if (node.type === 'stickyNote') {

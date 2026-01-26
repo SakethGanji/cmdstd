@@ -90,19 +90,21 @@ export default function WorkflowNavbar() {
 
   return (
     <div
-      className="fixed top-2 right-2 z-30 flex justify-center transition-[left] duration-200 ease-linear"
-      style={{ left: isCollapsed ? 'calc(var(--sidebar-width-icon) + 1rem)' : 'calc(var(--sidebar-width) + 1rem)' }}
+      className="fixed top-4 right-4 z-30 flex justify-center transition-[left] duration-200 ease-linear"
+      style={{ left: isCollapsed ? 'calc(var(--sidebar-width-icon) + 1.5rem)' : 'calc(var(--sidebar-width) + 1.5rem)' }}
     >
-      <div className="flex h-12 w-full max-w-5xl items-center justify-between rounded-xl bg-white dark:bg-card px-3 shadow-lg">
+      <div className="glass-panel flex h-14 w-full max-w-5xl items-center justify-between px-4">
         {/* Left section - Personal / Workflow name / Tags */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           {/* Personal indicator */}
-          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-            <User size={14} />
-            <span>Personal</span>
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">
+              <User size={14} className="text-primary" />
+            </div>
+            <span className="font-medium">Personal</span>
           </div>
 
-          <span className="text-muted-foreground/50">/</span>
+          <span className="text-muted-foreground/30">/</span>
 
           {/* Workflow name (editable) */}
           {isEditingName ? (
@@ -119,7 +121,7 @@ export default function WorkflowNavbar() {
                   setIsEditingName(false);
                 }
               }}
-              className="h-7 w-40 rounded border border-border bg-background px-2 text-sm font-medium text-foreground outline-none focus:border-primary"
+              className="h-8 w-44 rounded-xl border border-[var(--input-border)] bg-[var(--input)] px-3 text-sm font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
             />
           ) : (
             <button
@@ -127,25 +129,25 @@ export default function WorkflowNavbar() {
                 setEditedName(workflowName);
                 setIsEditingName(true);
               }}
-              className="rounded px-1.5 py-0.5 text-sm font-medium text-foreground hover:bg-accent"
+              className="rounded-xl px-2 py-1 text-sm font-semibold text-foreground hover:bg-accent transition-colors"
             >
               {workflowName}
             </button>
           )}
 
           {/* Tags */}
-          <div className="flex items-center gap-1.5 ml-1">
+          <div className="flex items-center gap-2 ml-2">
             {workflowTags.map((tag) => (
               <span
                 key={tag}
-                className="group flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground"
+                className="group glass-badge flex items-center gap-1.5"
               >
                 {tag}
                 <button
                   onClick={() => removeTag(tag)}
                   className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
                 >
-                  <X size={12} />
+                  <X size={10} />
                 </button>
               </span>
             ))}
@@ -165,13 +167,13 @@ export default function WorkflowNavbar() {
                     setIsAddingTag(false);
                   }
                 }}
-                placeholder="Tag name"
-                className="h-6 w-20 rounded border border-border bg-background px-2 text-xs outline-none focus:border-primary"
+                placeholder="Tag"
+                className="h-7 w-20 rounded-lg border border-[var(--input-border)] bg-[var(--input)] px-2 text-xs outline-none focus:border-primary"
               />
             ) : (
               <button
                 onClick={() => setIsAddingTag(true)}
-                className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
               >
                 <Plus size={12} />
                 Add tag
@@ -180,26 +182,24 @@ export default function WorkflowNavbar() {
           </div>
         </div>
 
-        {/* Center section - Mode toggle and Navigation tabs */}
+        {/* Center section - Mode toggle */}
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-          {/* Builder / UI Mode Toggle */}
           <ModeToggle />
-
         </div>
 
         {/* Right section - Active toggle, Share, Save, History, More */}
         <div className="flex items-center gap-2">
 
           {/* Active toggle */}
-          <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-muted/50">
-            <span className={`text-xs font-medium ${isActive ? 'text-emerald-500' : 'text-muted-foreground'}`}>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/50">
+            <span className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-[var(--success)]' : 'text-muted-foreground'}`}>
               {isActive ? 'Active' : 'Inactive'}
             </span>
             <Switch
               checked={isActive}
               onCheckedChange={(checked) => toggleActive(checked)}
               disabled={isToggling || !workflowId}
-              className="data-[state=checked]:bg-emerald-500"
+              className="data-[state=checked]:bg-[var(--success)]"
             />
           </div>
 
@@ -270,11 +270,11 @@ function ModeToggle() {
   const setMode = useUIModeStore((s) => s.setMode);
 
   return (
-    <div className="flex items-center rounded-lg bg-muted p-1">
+    <div className="glass-toggle-group flex items-center">
       <button
         onClick={() => setMode('builder')}
-        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${mode === 'builder'
-          ? 'bg-background text-foreground shadow-sm'
+        className={`glass-toggle-item flex items-center gap-2 ${mode === 'builder'
+          ? 'active'
           : 'text-muted-foreground hover:text-foreground'
           }`}
       >
@@ -283,8 +283,8 @@ function ModeToggle() {
       </button>
       <button
         onClick={() => setMode('ui')}
-        className={`flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors ${mode === 'ui'
-          ? 'bg-background text-foreground shadow-sm'
+        className={`glass-toggle-item flex items-center gap-2 ${mode === 'ui'
+          ? 'active'
           : 'text-muted-foreground hover:text-foreground'
           }`}
       >

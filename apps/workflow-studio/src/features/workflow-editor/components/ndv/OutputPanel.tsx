@@ -63,41 +63,43 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
     : null;
 
   return (
-    <div className="flex h-full flex-col bg-muted/50">
-      {/* Compact Header */}
-      <div className="flex items-center justify-between border-b border-border bg-card px-3 py-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <ArrowUp size={14} className="text-muted-foreground flex-shrink-0" />
-          <span className="text-sm font-medium text-foreground">Output</span>
+    <div className="flex h-full flex-col">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border bg-[var(--card-gradient)] px-4 py-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-[var(--success)]/10 flex items-center justify-center">
+            <ArrowUp size={14} className="text-[var(--success)]" />
+          </div>
+          <span className="text-sm font-bold text-foreground">Output</span>
           {hasData && (
-            <span className="flex-shrink-0 rounded bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 text-xs text-emerald-700 dark:text-emerald-400">
-              {itemCount}
+            <span className="glass-badge bg-[var(--success)]/10 text-[var(--success)] border-[var(--success)]/20">
+              {itemCount} items
             </span>
           )}
           {hasError && (
-            <span className="flex-shrink-0 rounded bg-destructive/10 px-1.5 py-0.5 text-xs text-destructive">
+            <span className="glass-badge bg-destructive/10 text-destructive border-destructive/20">
               Error
             </span>
           )}
           {executionTime && (
-            <span className="flex-shrink-0 flex items-center gap-0.5 text-xs text-muted-foreground">
-              <Clock size={10} />
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <Clock size={12} />
               {executionTime}
             </span>
           )}
           {isPinned && (
-            <span className="flex-shrink-0 rounded bg-amber-100 dark:bg-amber-950 px-1.5 py-0.5 text-xs text-amber-700 dark:text-amber-400">
+            <span className="glass-badge bg-amber-500/10 text-amber-500 border-amber-500/20">
               Pinned
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
           {/* View HTML button - only shown when HTML content is present */}
           {hasHtmlContent && (
             <button
               onClick={() => setIsHtmlModalOpen(true)}
-              className="flex items-center gap-1 rounded-md bg-primary px-2 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-colors shadow-sm"
               title="View HTML"
             >
               <Eye size={12} />
@@ -109,9 +111,9 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
           <button
             onClick={handlePinToggle}
             disabled={!hasData && !isPinned}
-            className={`rounded p-1 transition-colors ${
+            className={`rounded-xl p-2 transition-all ${
               isPinned
-                ? 'bg-amber-100 text-amber-600 dark:bg-amber-950 dark:text-amber-400'
+                ? 'bg-amber-500/10 text-amber-500'
                 : 'text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed'
             }`}
             title={isPinned ? 'Unpin data' : 'Pin data'}
@@ -119,13 +121,13 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
             <Pin size={14} />
           </button>
 
-          {/* Display mode toggle - compact */}
-          <div className="flex items-center gap-0.5 rounded-md bg-muted p-0.5">
+          {/* Display mode toggle */}
+          <div className="glass-toggle-group flex items-center">
             <button
               onClick={() => setDisplayMode('schema')}
-              className={`rounded p-1 transition-colors ${
+              className={`rounded-lg p-2 transition-all ${
                 displayMode === 'schema'
-                  ? 'bg-card shadow-sm text-foreground'
+                  ? 'bg-[var(--card-solid)] shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title="Schema view"
@@ -134,9 +136,9 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
             </button>
             <button
               onClick={() => setDisplayMode('json')}
-              className={`rounded p-1 transition-colors ${
+              className={`rounded-lg p-2 transition-all ${
                 displayMode === 'json'
-                  ? 'bg-card shadow-sm text-foreground'
+                  ? 'bg-[var(--card-solid)] shadow-sm text-foreground'
                   : 'text-muted-foreground hover:text-foreground'
               }`}
               title="JSON view"
@@ -148,23 +150,28 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
       </div>
 
       {/* Data display */}
-      <div className="flex-1 overflow-auto p-2">
+      <div className="flex-1 overflow-auto p-3">
         {!executionData ? (
-          <div className="flex h-full flex-col items-center justify-center text-center px-4">
-            <Database size={32} className="mb-2 text-muted-foreground/40" />
-            <p className="text-xs text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center text-center px-6">
+            <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+              <Database size={24} className="text-muted-foreground/50" />
+            </div>
+            <p className="text-sm font-semibold text-foreground mb-1">
               No output data yet
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Run the workflow to see results
             </p>
           </div>
         ) : executionData.status === 'running' ? (
           <div className="flex h-full flex-col items-center justify-center">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-border border-t-primary" />
-            <p className="mt-2 text-xs text-muted-foreground">Executing...</p>
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-muted border-t-primary" />
+            <p className="mt-3 text-sm font-medium text-foreground">Executing...</p>
           </div>
         ) : hasError ? (
-          <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
-            <p className="text-sm font-medium text-destructive">Error</p>
-            <p className="mt-1 text-xs text-destructive/80">
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+            <p className="text-sm font-bold text-destructive">Error</p>
+            <p className="mt-2 text-xs text-destructive/80">
               {executionData.output?.error}
             </p>
           </div>
@@ -174,10 +181,15 @@ export default function OutputPanel({ nodeId, executionData }: OutputPanelProps)
             mode={displayMode}
           />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center text-center px-4">
-            <Database size={32} className="mb-2 text-muted-foreground/40" />
-            <p className="text-xs text-muted-foreground">
+          <div className="flex h-full flex-col items-center justify-center text-center px-6">
+            <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mb-4">
+              <Database size={24} className="text-muted-foreground/50" />
+            </div>
+            <p className="text-sm font-semibold text-foreground mb-1">
               No output items
+            </p>
+            <p className="text-xs text-muted-foreground">
+              The node executed but returned no data
             </p>
           </div>
         )}

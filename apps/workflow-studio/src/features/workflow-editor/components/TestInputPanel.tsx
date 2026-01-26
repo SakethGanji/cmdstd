@@ -45,15 +45,15 @@ export default function TestInputPanel({ onExecute, isExecuting }: TestInputPane
         <button
           disabled={isExecuting}
           className={cn(
-            'flex items-center gap-1 h-9 pl-3 pr-2 rounded-lg shadow-md transition-all',
-            'bg-emerald-500 text-white hover:bg-emerald-600',
+            'flex items-center gap-2 h-10 pl-4 pr-3 rounded-xl shadow-lg transition-all duration-200',
+            'bg-[var(--success)] text-white hover:brightness-110',
             'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
           title="Run workflow"
         >
           <Play size={14} fill="currentColor" />
-          <span className="text-sm font-medium">Run</span>
-          <ChevronDown size={14} className="ml-0.5" />
+          <span className="text-sm font-semibold">Run</span>
+          <ChevronDown size={14} />
         </button>
       </PopoverTrigger>
 
@@ -61,41 +61,47 @@ export default function TestInputPanel({ onExecute, isExecuting }: TestInputPane
         align="end"
         side="bottom"
         sideOffset={8}
-        className="w-96 p-0"
+        className="w-[400px] p-0 overflow-hidden"
       >
-        <div className="p-3 border-b border-border">
-          <div className="flex items-center gap-2 text-sm font-medium">
-            <FlaskConical size={16} className="text-muted-foreground" />
-            Test Workflow
+        <div className="p-4 border-b border-border bg-[var(--card-gradient)]">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-[var(--success)]/10 flex items-center justify-center">
+              <FlaskConical size={16} className="text-[var(--success)]" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold">Test Workflow</h3>
+              <p className="text-xs text-muted-foreground">
+                Enter JSON input to simulate webhook data
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Enter JSON input data to test your workflow. This simulates webhook body data.
-          </p>
         </div>
 
-        <div className="p-3">
-          <label className="text-xs font-medium text-muted-foreground mb-2 block">
+        <div className="p-4">
+          <label className="label-caps mb-2 block">
             Input Data (JSON)
           </label>
-          <CodeEditor
-            value={inputJson}
-            onChange={setInputJson}
-            language="json"
-            placeholder='{"key": "value"}'
-            minHeight="120px"
-            maxHeight="200px"
-          />
+          <div className="rounded-xl overflow-hidden border border-[var(--input-border)]">
+            <CodeEditor
+              value={inputJson}
+              onChange={setInputJson}
+              language="json"
+              placeholder='{"key": "value"}'
+              minHeight="120px"
+              maxHeight="200px"
+            />
+          </div>
           {error && (
-            <p className="text-xs text-destructive mt-2">{error}</p>
+            <p className="text-xs text-destructive mt-2 font-medium">{error}</p>
           )}
         </div>
 
-        <div className="p-3 pt-0 flex gap-2">
+        <div className="p-4 pt-0 flex gap-3">
           <button
             onClick={handleRunWithoutInput}
             className={cn(
-              'flex-1 h-9 px-3 rounded-md text-sm font-medium transition-colors',
-              'bg-secondary text-secondary-foreground hover:bg-secondary/80'
+              'flex-1 h-10 px-4 rounded-xl text-sm font-semibold transition-all duration-200',
+              'glass-button'
             )}
           >
             Run Empty
@@ -103,9 +109,9 @@ export default function TestInputPanel({ onExecute, isExecuting }: TestInputPane
           <button
             onClick={handleRunWithInput}
             className={cn(
-              'flex-1 h-9 px-3 rounded-md text-sm font-medium transition-colors',
-              'bg-emerald-500 text-white hover:bg-emerald-600',
-              'flex items-center justify-center gap-1.5'
+              'flex-1 h-10 px-4 rounded-xl text-sm font-semibold transition-all duration-200',
+              'bg-[var(--success)] text-white hover:brightness-110 shadow-md',
+              'flex items-center justify-center gap-2'
             )}
           >
             <Play size={14} fill="currentColor" />
@@ -113,9 +119,9 @@ export default function TestInputPanel({ onExecute, isExecuting }: TestInputPane
           </button>
         </div>
 
-        <div className="px-3 pb-3">
+        <div className="px-4 pb-4">
           <p className="text-xs text-muted-foreground">
-            Access in nodes via: <code className="bg-muted px-1 rounded">{'{{ $json.body.key }}'}</code>
+            Access in nodes via: <code className="glass-badge text-[9px] px-2 py-0.5">{'{{ $json.body.key }}'}</code>
           </p>
         </div>
       </PopoverContent>

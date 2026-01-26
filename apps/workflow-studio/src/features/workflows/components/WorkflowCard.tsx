@@ -127,16 +127,19 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
 
   return (
     <Card
-      className="group cursor-pointer transition-all hover:shadow-lg hover:border-primary/50"
+      className="group cursor-pointer glass-card-hover"
       onClick={handleOpen}
     >
-      <CardHeader className="p-3 pb-0">
+      <CardHeader className="p-4 pb-0">
         <div className="flex items-start justify-between gap-2">
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-sm truncate">{workflow.name}</h3>
+            <h3 className="font-bold text-sm truncate">{workflow.name}</h3>
           </div>
-          <div className="flex items-center gap-1">
-            <Badge variant={workflow.active ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0">
+          <div className="flex items-center gap-2">
+            <Badge
+              variant={workflow.active ? 'success' : 'glass'}
+              className="text-[9px]"
+            >
               {workflow.active ? 'Active' : 'Inactive'}
             </Badge>
             <DropdownMenu>
@@ -144,9 +147,9 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-7 w-7 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                 >
-                  <MoreHorizontal className="h-3.5 w-3.5" />
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
@@ -171,23 +174,23 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
         </div>
       </CardHeader>
 
-      <CardContent className="p-3">
+      <CardContent className="p-4">
         <ReactFlowProvider>
           <WorkflowThumbnail
             definition={workflow.definition}
-            className="h-32 w-full rounded-md overflow-hidden border"
+            className="h-36 w-full rounded-xl overflow-hidden border border-[var(--card-border)]"
           />
         </ReactFlowProvider>
       </CardContent>
 
-      <CardFooter className="p-3 pt-0">
-        <div className="flex items-center justify-between w-full text-[10px] text-muted-foreground">
-          <div className="flex items-center gap-3">
-            <span className="flex items-center gap-1">
+      <CardFooter className="p-4 pt-0">
+        <div className="flex items-center justify-between w-full">
+          <div className="flex items-center gap-4">
+            <span className="flex items-center gap-1.5 label-caps">
               <GitBranch className="h-3 w-3" />
               {workflow.nodeCount} nodes
             </span>
-            <span className="flex items-center gap-1">
+            <span className="flex items-center gap-1.5 label-caps">
               <Calendar className="h-3 w-3" />
               {formatDate(workflow.updatedAt)}
             </span>
@@ -195,14 +198,14 @@ export function WorkflowCard({ workflow }: WorkflowCardProps) {
           <Button
             variant="ghost"
             size="icon"
-            className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+            className="h-8 w-8 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-[var(--success)]/10 hover:text-[var(--success)]"
             onClick={handleRun}
             disabled={isRunning}
           >
             {isRunning ? (
-              <Loader2 className="h-3 w-3 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
-              <Play className="h-3 w-3" />
+              <Play className="h-4 w-4" />
             )}
           </Button>
         </div>

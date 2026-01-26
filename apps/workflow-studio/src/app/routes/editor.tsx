@@ -77,7 +77,7 @@ function EditorPage() {
   return (
     <ReactFlowProvider>
       <Suspense fallback={<EditorLoadingFallback />}>
-        <div className="h-full w-full absolute inset-0">
+        <div className="h-full w-full fixed inset-0">
           <WorkflowNavbar />
           {mode === 'builder' ? (
             <>
