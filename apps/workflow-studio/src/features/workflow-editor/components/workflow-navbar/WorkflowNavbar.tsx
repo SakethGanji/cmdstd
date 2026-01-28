@@ -1,11 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import {
-  User,
-  Plus,
-  X,
-  Share2,
   Save,
-  History,
   MoreHorizontal,
   Copy,
   Download,
@@ -13,11 +8,21 @@ import {
   Trash2,
   Loader2,
   Play,
+  Undo2,
+  Redo2,
+  ZoomIn,
+  ZoomOut,
+  Plus,
+  Square,
+  PanelRight,
 } from 'lucide-react';
+import { useReactFlow } from 'reactflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useUIModeStore } from '../../stores/uiModeStore';
-import { useSidebar } from '@/shared/components/ui/sidebar';
-import { Button } from '@/shared/components/ui/button';
+import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
+import { useExecutionStream } from '../../hooks/useExecutionStream';
+import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
+import CodeEditor from '@/shared/components/ui/code-editor';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,30 +39,54 @@ import type { Node } from 'reactflow';
 export default function WorkflowNavbar() {
   const {
     workflowName,
-    workflowTags,
     workflowId,
     nodes,
     edges,
     isActive,
     setWorkflowName,
-    addTag,
-    removeTag,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
   } = useWorkflowStore();
 
   const { saveWorkflow, isSaving } = useSaveWorkflow();
   const { toggleActive, isToggling } = useToggleWorkflowActive();
   const { importWorkflow } = useImportWorkflow();
+  const { executeWorkflow, isExecuting, cancelExecution } = useExecutionStream();
 
-  const { state } = useSidebar();
-  const isCollapsed = state === 'collapsed';
+  const isPreviewOpen = useUIModeStore((s) => s.isPreviewOpen);
+  const togglePreview = useUIModeStore((s) => s.togglePreview);
+  const openPanel = useNodeCreatorStore((s) => s.openPanel);
+
+  const { zoomIn, zoomOut } = useReactFlow();
 
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(workflowName);
-  const [isAddingTag, setIsAddingTag] = useState(false);
-  const [newTag, setNewTag] = useState('');
+  const [isRunOpen, setIsRunOpen] = useState(false);
+  const [testInput, setTestInput] = useState(`{
+  "message": "Hello world",
+  "count": 42
+}`);
   const nameInputRef = useRef<HTMLInputElement>(null);
-  const tagInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRunWithPayload = () => {
+    try {
+      const parsed = JSON.parse(testInput);
+      setIsRunOpen(false);
+      executeWorkflow(parsed);
+    } catch {
+      // If JSON is invalid, just run without payload
+      setIsRunOpen(false);
+      executeWorkflow({});
+    }
+  };
+
+  const handleRunWithoutPayload = () => {
+    setIsRunOpen(false);
+    executeWorkflow({});
+  };
 
   useEffect(() => {
     if (isEditingName && nameInputRef.current) {
@@ -66,12 +95,6 @@ export default function WorkflowNavbar() {
     }
   }, [isEditingName]);
 
-  useEffect(() => {
-    if (isAddingTag && tagInputRef.current) {
-      tagInputRef.current.focus();
-    }
-  }, [isAddingTag]);
-
   const handleNameSubmit = () => {
     if (editedName.trim()) {
       setWorkflowName(editedName.trim());
@@ -79,14 +102,6 @@ export default function WorkflowNavbar() {
       setEditedName(workflowName);
     }
     setIsEditingName(false);
-  };
-
-  const handleTagSubmit = () => {
-    if (newTag.trim() && !workflowTags.includes(newTag.trim())) {
-      addTag(newTag.trim());
-    }
-    setNewTag('');
-    setIsAddingTag(false);
   };
 
   const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,186 +120,204 @@ export default function WorkflowNavbar() {
     event.target.value = '';
   };
 
+  const btnClass = "h-8 w-8 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed";
+  const dividerClass = "w-px h-5 bg-border";
+
   return (
-    <div
-      className="fixed top-4 right-4 z-30 flex justify-center transition-[left] duration-200 ease-linear"
-      style={{ left: isCollapsed ? 'calc(var(--sidebar-width-icon) + 1.5rem)' : 'calc(var(--sidebar-width) + 1.5rem)' }}
-    >
-      <div className="glass-panel flex h-14 w-full max-w-5xl items-center justify-between px-4">
-        {/* Left section - Personal / Workflow name / Tags */}
-        <div className="flex items-center gap-3">
-          {/* Personal indicator */}
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10">
-              <User size={14} className="text-primary" />
-            </div>
-            <span className="font-medium">Personal</span>
-          </div>
-
-          <span className="text-muted-foreground/30">/</span>
-
-          {/* Workflow name (editable) */}
-          {isEditingName ? (
-            <input
-              ref={nameInputRef}
-              type="text"
-              value={editedName}
-              onChange={(e) => setEditedName(e.target.value)}
-              onBlur={handleNameSubmit}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleNameSubmit();
-                if (e.key === 'Escape') {
-                  setEditedName(workflowName);
-                  setIsEditingName(false);
-                }
-              }}
-              className="h-8 w-44 rounded-xl border border-[var(--input-border)] bg-[var(--input)] px-3 text-sm font-semibold text-foreground outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-            />
-          ) : (
-            <button
-              onClick={() => {
+    <>
+      {/* Unified floating toolbar */}
+      <div className="absolute top-4 right-4 z-30 flex items-center h-9 bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+        {/* Workflow name */}
+        {isEditingName ? (
+          <input
+            ref={nameInputRef}
+            type="text"
+            value={editedName}
+            onChange={(e) => setEditedName(e.target.value)}
+            onBlur={handleNameSubmit}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleNameSubmit();
+              if (e.key === 'Escape') {
                 setEditedName(workflowName);
-                setIsEditingName(true);
-              }}
-              className="rounded-xl px-2 py-1 text-sm font-semibold text-foreground hover:bg-accent transition-colors"
-            >
-              {workflowName}
-            </button>
-          )}
+                setIsEditingName(false);
+              }
+            }}
+            className="h-full w-32 px-3 text-sm font-medium text-foreground bg-transparent outline-none border-r border-border"
+          />
+        ) : (
+          <button
+            onClick={() => {
+              setEditedName(workflowName);
+              setIsEditingName(true);
+            }}
+            className="h-full px-3 text-sm font-medium text-foreground hover:bg-accent transition-colors truncate max-w-36 border-r border-border"
+            title="Click to rename"
+          >
+            {workflowName}
+          </button>
+        )}
 
-          {/* Tags */}
-          <div className="flex items-center gap-2 ml-2">
-            {workflowTags.map((tag) => (
-              <span
-                key={tag}
-                className="group glass-badge flex items-center gap-1.5"
-              >
-                {tag}
-                <button
-                  onClick={() => removeTag(tag)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity hover:text-foreground"
-                >
-                  <X size={10} />
-                </button>
-              </span>
-            ))}
+        {/* Undo/Redo */}
+        <button onClick={() => undo()} disabled={!canUndo()} className={btnClass} title="Undo">
+          <Undo2 size={14} />
+        </button>
+        <button onClick={() => redo()} disabled={!canRedo()} className={btnClass} title="Redo">
+          <Redo2 size={14} />
+        </button>
 
-            {/* Add tag */}
-            {isAddingTag ? (
-              <input
-                ref={tagInputRef}
-                type="text"
-                value={newTag}
-                onChange={(e) => setNewTag(e.target.value)}
-                onBlur={handleTagSubmit}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleTagSubmit();
-                  if (e.key === 'Escape') {
-                    setNewTag('');
-                    setIsAddingTag(false);
-                  }
-                }}
-                placeholder="Tag"
-                className="h-7 w-20 rounded-lg border border-[var(--input-border)] bg-[var(--input)] px-2 text-xs outline-none focus:border-primary"
-              />
-            ) : (
+        <div className={dividerClass} />
+
+        {/* Zoom */}
+        <button onClick={() => zoomOut()} className={btnClass} title="Zoom out">
+          <ZoomOut size={14} />
+        </button>
+        <button onClick={() => zoomIn()} className={btnClass} title="Zoom in">
+          <ZoomIn size={14} />
+        </button>
+
+        <div className={dividerClass} />
+
+        {/* UI Preview toggle */}
+        <button
+          onClick={togglePreview}
+          className={btnClass + ` px-2 gap-1 ${isPreviewOpen ? '!text-primary' : ''}`}
+          title="Toggle UI preview"
+        >
+          <PanelRight size={14} />
+        </button>
+
+        {/* Run/Stop */}
+        {isExecuting ? (
+          <button
+            onClick={cancelExecution}
+            className={btnClass + ' !text-destructive'}
+            title="Stop"
+          >
+            <Square size={14} fill="currentColor" />
+          </button>
+        ) : (
+          <Popover open={isRunOpen} onOpenChange={setIsRunOpen}>
+            <PopoverTrigger asChild>
               <button
-                onClick={() => setIsAddingTag(true)}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+                className={btnClass + ' !text-emerald-600'}
+                title="Run workflow"
               >
-                <Plus size={12} />
-                Add tag
+                <Play size={16} fill="currentColor" />
               </button>
-            )}
-          </div>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-0 overflow-hidden">
+              {/* Quick run */}
+              <button
+                onClick={handleRunWithoutPayload}
+                className="w-full px-3 py-2.5 text-sm text-left hover:bg-accent flex items-center gap-2 border-b border-border"
+              >
+                <Play size={14} className="text-emerald-600" fill="currentColor" />
+                Run without payload
+              </button>
+              {/* With payload */}
+              <div className="p-3">
+                <div className="text-xs font-medium text-muted-foreground mb-2">Or run with payload:</div>
+                <div className="rounded-lg border border-border overflow-hidden mb-3">
+                  <CodeEditor
+                    value={testInput}
+                    onChange={setTestInput}
+                    language="json"
+                    height="100px"
+                  />
+                </div>
+                <button
+                  onClick={handleRunWithPayload}
+                  className="w-full h-8 rounded-lg bg-emerald-600 text-white text-xs font-medium hover:bg-emerald-700 flex items-center justify-center gap-1.5"
+                >
+                  <Play size={12} fill="currentColor" />
+                  Run with Payload
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
+        )}
+
+        <div className={dividerClass} />
+
+        {/* Add node */}
+        <button
+          onClick={() => openPanel('regular')}
+          className="h-full px-2 text-primary hover:bg-accent transition-colors"
+          title="Add node"
+        >
+          <Plus size={16} strokeWidth={2.5} />
+        </button>
+
+        <div className={dividerClass} />
+
+        {/* Active toggle */}
+        <div className="h-full px-2 flex items-center">
+          <Switch
+            checked={isActive}
+            onCheckedChange={(checked) => toggleActive(checked)}
+            disabled={isToggling || !workflowId}
+            className="data-[state=checked]:bg-[var(--success)]"
+          />
         </div>
 
-        {/* Center section - Mode toggle */}
-        <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-3">
-          <ModeToggle />
-        </div>
+        {/* Save */}
+        <button
+          onClick={() => saveWorkflow()}
+          disabled={isSaving}
+          className={btnClass}
+          title="Save"
+        >
+          {isSaving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+        </button>
 
-        {/* Right section - Active toggle, Share, Save, History, More */}
-        <div className="flex items-center gap-2">
-
-          {/* Active toggle */}
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-muted/50">
-            <span className={`text-[10px] font-bold uppercase tracking-widest ${isActive ? 'text-[var(--success)]' : 'text-muted-foreground'}`}>
-              {isActive ? 'Active' : 'Inactive'}
-            </span>
-            <Switch
-              checked={isActive}
-              onCheckedChange={(checked) => toggleActive(checked)}
-              disabled={isToggling || !workflowId}
-              className="data-[state=checked]:bg-[var(--success)]"
-            />
-          </div>
-
-          {/* Share button */}
-          <Button variant="outline" size="icon-sm">
-            <Share2 size={16} />
-          </Button>
-
-          {/* Save button */}
-          <Button size="icon-sm" onClick={() => saveWorkflow()} disabled={isSaving}>
-            {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          </Button>
-
-          {/* History button */}
-          <Button variant="ghost" size="icon-sm">
-            <History size={16} />
-          </Button>
-
-          {/* More options dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm">
-                <MoreHorizontal size={16} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>
-                <Copy size={14} className="mr-2" />
-                Duplicate workflow
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => {
-                const backendWorkflow = toBackendWorkflow(
-                  nodes as Node<WorkflowNodeData>[],
-                  edges,
-                  workflowName,
-                  workflowId
-                );
-                // Export in backend format (seed.py accepts this directly)
-                const exportData = {
-                  name: workflowName,
-                  description: '',
-                  active: isActive,
-                  nodes: backendWorkflow.nodes,
-                  connections: backendWorkflow.connections,
-                };
-                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `${workflowName.replace(/\s+/g, '-').toLowerCase()}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-              }}>
-                <Download size={14} className="mr-2" />
-                Export workflow
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
-                <Upload size={14} className="mr-2" />
-                Import workflow
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem className="text-destructive focus:text-destructive">
-                <Trash2 size={14} className="mr-2" />
-                Delete workflow
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+        {/* More options */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className={btnClass}>
+              <MoreHorizontal size={14} />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem>
+              <Copy size={14} className="mr-2" />
+              Duplicate
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              const backendWorkflow = toBackendWorkflow(
+                nodes as Node<WorkflowNodeData>[],
+                edges,
+                workflowName,
+                workflowId
+              );
+              const exportData = {
+                name: workflowName,
+                description: '',
+                active: isActive,
+                nodes: backendWorkflow.nodes,
+                connections: backendWorkflow.connections,
+              };
+              const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `${workflowName.replace(/\s+/g, '-').toLowerCase()}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}>
+              <Download size={14} className="mr-2" />
+              Export
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
+              <Upload size={14} className="mr-2" />
+              Import
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem className="text-destructive focus:text-destructive">
+              <Trash2 size={14} className="mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Hidden file input for import */}
@@ -295,25 +328,6 @@ export default function WorkflowNavbar() {
         className="hidden"
         onChange={handleImport}
       />
-    </div>
-  );
-}
-
-function ModeToggle() {
-  const isPreviewOpen = useUIModeStore((s) => s.isPreviewOpen);
-  const togglePreview = useUIModeStore((s) => s.togglePreview);
-
-  return (
-    <button
-      onClick={togglePreview}
-      className={`glass-toggle-item flex items-center gap-2 ${
-        isPreviewOpen
-          ? 'active'
-          : 'text-muted-foreground hover:text-foreground'
-      }`}
-    >
-      <Play size={14} />
-      Test UI
-    </button>
+    </>
   );
 }

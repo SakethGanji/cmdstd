@@ -37,8 +37,8 @@ const subnodeTypeIcons: Record<SubnodeType, typeof Bot> = {
 
 // Accent colors for subnode types
 const subnodeTypeColors: Record<SubnodeType, string> = {
-  model: '#a855f7',   // purple
-  memory: '#3b82f6',  // blue
+  model: '#8b5cf6',   // violet
+  memory: '#6366f1',  // indigo
   tool: '#f59e0b',    // amber
 };
 

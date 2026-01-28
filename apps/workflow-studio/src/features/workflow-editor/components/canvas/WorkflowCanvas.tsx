@@ -11,13 +11,11 @@ import ReactFlow, {
   ConnectionLineType,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { Square, Plus, Minus, Undo2, Redo2 } from 'lucide-react';
 
 import { useWorkflowStore } from '../../stores/workflowStore';
 import { useNodeCreatorStore } from '../../stores/nodeCreatorStore';
 import { useKeyboardShortcuts } from '../../hooks/useKeyboardShortcuts';
 import { useSaveWorkflow } from '../../hooks/useWorkflowApi';
-import { useExecutionStream } from '../../hooks/useExecutionStream';
 import { getNodeIcon } from '../../hooks/useNodeTypes';
 import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
@@ -27,11 +25,9 @@ import SubnodeEdge from './edges/SubnodeEdge';
 import StickyNote from './nodes/StickyNote';
 import NodeContextMenu from './NodeContextMenu';
 import { KeyboardShortcutsHelp } from '../KeyboardShortcutsHelp';
-import TestInputPanel from '../TestInputPanel';
 import { getNodeGroupFromType, getMiniMapColor, calculateNodeDimensions, type NodeGroup } from '../../lib/nodeStyles';
 import { generateNodeName, getExistingNodeNames } from '../../lib/workflowTransform';
 import { isTriggerType } from '../../lib/nodeConfig';
-import { cn } from '@/shared/lib/utils';
 import type { WorkflowNodeData, SubnodeSlotDefinition, OutputStrategy } from '../../types/workflow';
 import type { NodeIO } from '../../lib/nodeStyles';
 
@@ -94,16 +90,11 @@ export default function WorkflowCanvas() {
     isInputConnected,
     setDraggedNodeType,
     clearDropTarget,
-    undo,
-    redo,
-    canUndo,
-    canRedo,
   } = useWorkflowStore();
 
-  const openPanel = useNodeCreatorStore((s) => s.openPanel);
   const closePanel = useNodeCreatorStore((s) => s.closePanel);
   const openForConnection = useNodeCreatorStore((s) => s.openForConnection);
-  const { fitView, zoomIn, zoomOut, screenToFlowPosition, getNodes } = useReactFlow();
+  const { fitView, screenToFlowPosition, getNodes } = useReactFlow();
 
   // Track the current connection being dragged
   const connectingRef = useRef<{ nodeId: string; handleId: string | null } | null>(null);
@@ -112,7 +103,6 @@ export default function WorkflowCanvas() {
   const [contextMenu, setContextMenu] = useState<{ nodeId: string; x: number; y: number } | null>(null);
 
   const { saveWorkflow } = useSaveWorkflow();
-  const { executeWorkflow, isExecuting, cancelExecution } = useExecutionStream();
 
   // Initialize keyboard shortcuts
   const { shortcuts, isShortcutsHelpOpen, setIsShortcutsHelpOpen } = useKeyboardShortcuts({
@@ -556,76 +546,6 @@ export default function WorkflowCanvas() {
 
       </ReactFlow>
 
-      {/* Top-right toolbar - Undo/Redo, Zoom, Play, and Add buttons */}
-      {!isEmpty && (
-        <div className="fixed top-4 right-4 z-40 flex items-center gap-1.5">
-          {/* Undo/Redo controls */}
-          <div className="flex flex-row bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 shadow-md overflow-hidden">
-            <button
-              onClick={() => undo()}
-              disabled={!canUndo()}
-              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border-r border-border/50 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-              title="Undo (Ctrl+Z)"
-            >
-              <Undo2 size={14} strokeWidth={2} />
-            </button>
-            <button
-              onClick={() => redo()}
-              disabled={!canRedo()}
-              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
-              title="Redo (Ctrl+Shift+Z)"
-            >
-              <Redo2 size={14} strokeWidth={2} />
-            </button>
-          </div>
-
-          {/* Zoom controls - horizontal */}
-          <div className="flex flex-row bg-card/80 backdrop-blur-sm rounded-lg border border-border/50 shadow-md overflow-hidden">
-            <button
-              onClick={() => zoomOut()}
-              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors border-r border-border/50"
-              title="Zoom out"
-            >
-              <Minus size={14} strokeWidth={2} />
-            </button>
-            <button
-              onClick={() => zoomIn()}
-              className="flex items-center justify-center h-9 w-7 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Zoom in"
-            >
-              <Plus size={14} strokeWidth={2} />
-            </button>
-          </div>
-
-          {/* Play/Stop button */}
-          {isExecuting ? (
-            <button
-              onClick={cancelExecution}
-              className={cn(
-                "flex items-center justify-center size-9 rounded-lg shadow-md transition-all",
-                "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              )}
-              title="Stop execution"
-            >
-              <Square size={16} fill="currentColor" />
-            </button>
-          ) : (
-            <TestInputPanel
-              onExecute={executeWorkflow}
-              isExecuting={isExecuting}
-            />
-          )}
-
-          {/* Add node button */}
-          <button
-            onClick={() => openPanel('regular')}
-            className="flex items-center justify-center size-9 rounded-lg bg-primary text-primary-foreground shadow-md transition-colors hover:bg-primary/90"
-            title="Add node"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-          </button>
-        </div>
-      )}
 
       {/* Keyboard shortcuts help modal */}
       <KeyboardShortcutsHelp

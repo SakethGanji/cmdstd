@@ -87,9 +87,9 @@ function EditorPage() {
   return (
     <ReactFlowProvider>
       <Suspense fallback={<EditorLoadingFallback />}>
-        <div className="h-full w-full fixed inset-0">
+        <div className="h-full w-full relative">
           <WorkflowNavbar />
-          <div className="pt-14 h-full">
+          <div className="h-full">
             <PanelGroup
               direction="horizontal"
               onLayout={handlePanelResize}

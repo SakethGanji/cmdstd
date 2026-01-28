@@ -27,7 +27,7 @@ export default function UIPreviewSidePanel() {
   // Show helpful state if no UI nodes configured
   if (!uiConfig.inputNode && uiConfig.outputNodes.length === 0) {
     return (
-      <div className="h-full flex flex-col border-l bg-background">
+      <div className="h-full flex flex-col border-l bg-background pt-14">
         {/* Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b">
           <h2 className="text-sm font-medium">Test Interface</h2>
@@ -56,7 +56,7 @@ export default function UIPreviewSidePanel() {
   }
 
   return (
-    <div className="h-full flex flex-col border-l bg-background">
+    <div className="h-full flex flex-col border-l bg-background pt-14">
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b">
         <h2 className="text-sm font-medium">Test Interface</h2>

@@ -232,7 +232,7 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex h-full w-full flex-col glass-card group-data-[variant=floating]:rounded-2xl group-data-[variant=floating]:shadow-2xl group-data-[variant=sidebar]:rounded-none group-data-[variant=sidebar]:border-r group-data-[variant=sidebar]:border-l-0 group-data-[variant=sidebar]:border-y-0"
+          className="flex h-full w-full flex-col glass-card group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-md group-data-[variant=sidebar]:rounded-none group-data-[variant=sidebar]:border-r group-data-[variant=sidebar]:border-l-0 group-data-[variant=sidebar]:border-y-0"
         >
           {children}
         </div>
