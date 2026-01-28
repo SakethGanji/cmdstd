@@ -10,6 +10,7 @@ class NodeDefinitionSchema(BaseModel):
 
     name: str = Field(..., description="Unique name for this node in the workflow")
     type: str = Field(..., description="Node type identifier")
+    label: str | None = Field(None, description="Display label for the node")
     parameters: dict[str, Any] = Field(default_factory=dict, description="Node parameters")
     position: dict[str, float] | None = Field(None, description="UI position {x, y}")
     retry_on_fail: int = Field(0, ge=0, description="Number of retries on failure")

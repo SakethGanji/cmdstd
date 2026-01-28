@@ -211,7 +211,7 @@ class LLMChatNode(BaseNode):
     ) -> dict[str, Any]:
         """Call Google Gemini API."""
         # Hardcoded for POC - move to config/env in production
-        api_key = os.environ.get("GEMINI_API_KEY") or "AIzaSyCrI3ot-M-7GfKRNIhUFhD_R5VjQqieJaE"
+        api_key = os.environ.get("GEMINI_API_KEY") or ""
 
         base_url = "https://generativelanguage.googleapis.com/v1beta"
 

@@ -2,11 +2,12 @@
  * TestInputPanel - Panel for entering test input data before executing a workflow
  */
 
-import { useState, useCallback } from 'react';
-import { Play, ChevronDown, FlaskConical } from 'lucide-react';
+import { useState, useCallback, useEffect } from 'react';
+import { Play, ChevronDown, FlaskConical, RotateCcw } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/shared/components/ui/popover';
 import CodeEditor from '@/shared/components/ui/code-editor';
 import { cn } from '@/shared/lib/utils';
+import { useWorkflowStore } from '../stores/workflowStore';
 
 interface TestInputPanelProps {
   onExecute: (inputData?: Record<string, unknown>) => void;
@@ -18,10 +19,44 @@ const DEFAULT_INPUT = `{
   "number": 123
 }`;
 
+const STORAGE_KEY_PREFIX = 'workflow-test-input-';
+
 export default function TestInputPanel({ onExecute, isExecuting }: TestInputPanelProps) {
+  const workflowId = useWorkflowStore((s) => s.workflowId);
+  const workflowName = useWorkflowStore((s) => s.workflowName);
+
+  // Use workflowId if saved, otherwise use workflowName as key
+  const storageKey = `${STORAGE_KEY_PREFIX}${workflowId || workflowName || 'default'}`;
+
   const [isOpen, setIsOpen] = useState(false);
-  const [inputJson, setInputJson] = useState(DEFAULT_INPUT);
+  const [inputJson, setInputJson] = useState(() => {
+    // Load from localStorage on initial mount
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) return saved;
+    }
+    return DEFAULT_INPUT;
+  });
   const [error, setError] = useState<string | null>(null);
+
+  // Update localStorage when input changes
+  useEffect(() => {
+    if (typeof window !== 'undefined' && inputJson !== DEFAULT_INPUT) {
+      localStorage.setItem(storageKey, inputJson);
+    }
+  }, [inputJson, storageKey]);
+
+  // Load saved input when workflow changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        setInputJson(saved);
+      } else {
+        setInputJson(DEFAULT_INPUT);
+      }
+    }
+  }, [storageKey]);
 
   const handleRunWithInput = useCallback(() => {
     try {
@@ -38,6 +73,14 @@ export default function TestInputPanel({ onExecute, isExecuting }: TestInputPane
     setIsOpen(false);
     onExecute();
   }, [onExecute]);
+
+  const handleReset = useCallback(() => {
+    setInputJson(DEFAULT_INPUT);
+    setError(null);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(storageKey);
+    }
+  }, [storageKey]);
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -78,9 +121,19 @@ export default function TestInputPanel({ onExecute, isExecuting }: TestInputPane
         </div>
 
         <div className="p-4">
-          <label className="label-caps mb-2 block">
-            Input Data (JSON)
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label className="label-caps">
+              Input Data (JSON)
+            </label>
+            <button
+              onClick={handleReset}
+              className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+              title="Reset to default"
+            >
+              <RotateCcw size={12} />
+              Reset
+            </button>
+          </div>
           <div className="rounded-xl overflow-hidden border border-[var(--input-border)]">
             <CodeEditor
               value={inputJson}

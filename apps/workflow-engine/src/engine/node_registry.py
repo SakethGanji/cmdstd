@@ -223,6 +223,7 @@ def register_all_nodes() -> None:
         MergeNode,
         WaitNode,
         SplitInBatchesNode,
+        LoopNode,
         ExecuteWorkflowNode,
         StopAndErrorNode,
         # Transform
@@ -272,6 +273,7 @@ def register_all_nodes() -> None:
         MergeNode,
         WaitNode,
         SplitInBatchesNode,
+        LoopNode,
         ExecuteWorkflowNode,
         StopAndErrorNode,
         # Transform

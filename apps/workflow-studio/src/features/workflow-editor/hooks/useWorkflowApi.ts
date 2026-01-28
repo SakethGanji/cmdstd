@@ -11,6 +11,7 @@ import { workflowsApi } from '@/shared/lib/api';
 import { useWorkflowStore } from '../stores/workflowStore';
 import {
   toBackendWorkflow,
+  fromBackendWorkflow,
   type BackendWorkflow,
 } from '../lib/workflowTransform';
 import { toast } from 'sonner';
@@ -97,6 +98,79 @@ export function useSaveWorkflow() {
 }
 
 /**
+ * Hook for importing workflows from JSON files
+ * Uses backend to create and enrich the workflow, then loads it
+ */
+export function useImportWorkflow() {
+  const loadWorkflow = useWorkflowStore((s) => s.loadWorkflow);
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const createMutation = useMutation({
+    mutationFn: (workflow: BackendWorkflow) => workflowsApi.create(workflow),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['workflows'] });
+    },
+  });
+
+  const importWorkflow = async (jsonContent: string): Promise<boolean> => {
+    try {
+      // Parse the JSON file
+      const data = JSON.parse(jsonContent);
+
+      // Validate basic structure
+      if (!data.nodes || !Array.isArray(data.nodes)) {
+        toast.error('Invalid workflow file', {
+          description: 'Missing nodes array',
+        });
+        return false;
+      }
+
+      // Build the backend workflow format
+      const backendWorkflow: BackendWorkflow = {
+        name: data.name || 'Imported Workflow',
+        nodes: data.nodes,
+        connections: data.connections || [],
+      };
+
+      // Create workflow on backend (this enriches the nodes)
+      const created = await createMutation.mutateAsync(backendWorkflow);
+
+      // Fetch the full enriched workflow
+      const enriched = await workflowsApi.get(created.id);
+
+      // Transform and load into store
+      const transformed = fromBackendWorkflow(enriched);
+      loadWorkflow(transformed);
+
+      // Navigate to the editor with the new workflow
+      navigate({
+        to: '/editor',
+        search: { workflowId: created.id },
+        replace: true,
+      });
+
+      toast.success('Workflow imported', {
+        description: `"${created.name}" has been created.`,
+      });
+
+      return true;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      toast.error('Failed to import workflow', {
+        description: message,
+      });
+      return false;
+    }
+  };
+
+  return {
+    importWorkflow,
+    isImporting: createMutation.isPending,
+  };
+}
+
+/**
  * Hook for executing a workflow
  */
 export function useExecuteWorkflow() {
@@ -104,14 +178,9 @@ export function useExecuteWorkflow() {
     nodes,
     edges,
     workflowName,
-    workflowId,
     setNodeExecutionData,
     clearExecutionData,
   } = useWorkflowStore();
-
-  const runMutation = useMutation({
-    mutationFn: (id: string) => workflowsApi.run(id),
-  });
 
   const runAdhocMutation = useMutation({
     mutationFn: (workflow: BackendWorkflow) => workflowsApi.runAdhoc(workflow),
@@ -133,20 +202,13 @@ export function useExecuteWorkflow() {
     });
 
     try {
-      let result;
-
-      if (workflowId) {
-        // Run saved workflow
-        result = await runMutation.mutateAsync(workflowId);
-      } else {
-        // Run ad-hoc (unsaved) workflow
-        const backendWorkflow = toBackendWorkflow(
-          nodes as Node<WorkflowNodeData>[],
-          edges,
-          workflowName
-        );
-        result = await runAdhocMutation.mutateAsync(backendWorkflow);
-      }
+      // Always run with current UI state (adhoc) so edits take effect immediately
+      const backendWorkflow = toBackendWorkflow(
+        nodes as Node<WorkflowNodeData>[],
+        edges,
+        workflowName
+      );
+      const result = await runAdhocMutation.mutateAsync(backendWorkflow);
 
       // Map backend node names to UI node IDs and update execution data
       const nameToId = new Map<string, string>();
@@ -222,7 +284,7 @@ export function useExecuteWorkflow() {
 
   return {
     executeWorkflow,
-    isExecuting: runMutation.isPending || runAdhocMutation.isPending,
+    isExecuting: runAdhocMutation.isPending,
   };
 }
 

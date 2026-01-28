@@ -22,6 +22,7 @@ from .switch import SwitchNode
 from .merge import MergeNode
 from .wait import WaitNode
 from .split_in_batches import SplitInBatchesNode
+from .loop import LoopNode
 from .execute_workflow import ExecuteWorkflowNode
 from .stop_and_error import StopAndErrorNode
 
@@ -70,6 +71,7 @@ __all__ = [
     "MergeNode",
     "WaitNode",
     "SplitInBatchesNode",
+    "LoopNode",
     "ExecuteWorkflowNode",
     "StopAndErrorNode",
     # Transform

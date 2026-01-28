@@ -11,7 +11,7 @@
 
 import type { Node, Edge } from 'reactflow';
 import type { WorkflowNodeData } from '../types/workflow';
-import { getNodeIcon, normalizeNodeGroup } from './nodeConfig';
+import { getNodeIcon, normalizeNodeGroup, isTriggerType } from './nodeConfig';
 
 // Backend types (internal)
 interface BackendNodeData {
@@ -38,6 +38,7 @@ interface BackendConnection {
   target_input: string;
   connection_type?: 'normal' | 'subnode';
   slot_name?: string;
+  waypoints?: Array<{ x: number; y: number }>;  // Manual edge routing
 }
 
 export interface BackendWorkflow {
@@ -174,7 +175,8 @@ export function toBackendWorkflow(
     })
     .map((edge) => {
       const isSubnodeConnection = subnodeIds.has(edge.source);
-      const edgeData = edge.data as { slotName?: string } | undefined;
+      const edgeData = edge.data as { slotName?: string; waypoints?: Array<{ x: number; y: number }> } | undefined;
+      const waypoints = edgeData?.waypoints;
 
       if (isSubnodeConnection) {
         // Subnode connection - source is a subnode, target is a parent node
@@ -186,6 +188,7 @@ export function toBackendWorkflow(
           target_input: slotName || 'main',
           connection_type: 'subnode' as const,
           slot_name: slotName,
+          ...(waypoints && waypoints.length > 0 ? { waypoints } : {}),
         };
       } else {
         // Normal connection between workflow nodes
@@ -194,6 +197,7 @@ export function toBackendWorkflow(
           source_output: edge.sourceHandle || 'main',
           target_node: idToName.get(edge.target)!,
           target_input: edge.targetHandle || 'main',
+          ...(waypoints && waypoints.length > 0 ? { waypoints } : {}),
         };
       }
     });
@@ -257,6 +261,7 @@ interface ApiWorkflowDetail {
       target_input: string;
       connection_type?: 'normal' | 'subnode';
       slot_name?: string;
+      waypoints?: Array<{ x: number; y: number }>;
     }>;
   };
 }
@@ -340,6 +345,36 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
     }
 
     // Create regular workflow node
+    // Default I/O for nodes without enriched data (e.g., imported from file)
+    // Trigger nodes don't have inputs
+    const isTrigger = isTriggerType(node.type);
+    const defaultInputs = isTrigger ? [] : [{ name: 'main', displayName: 'Main' }];
+
+    // Type-specific default outputs
+    const getDefaultOutputs = (nodeType: string) => {
+      switch (nodeType) {
+        case 'If':
+          return [
+            { name: 'true', displayName: 'True' },
+            { name: 'false', displayName: 'False' },
+          ];
+        case 'Switch':
+          return [
+            { name: 'output0', displayName: 'Output 0' },
+            { name: 'output1', displayName: 'Output 1' },
+            { name: 'fallback', displayName: 'Fallback' },
+          ];
+        case 'Loop':
+          return [
+            { name: 'loop', displayName: 'Loop' },
+            { name: 'done', displayName: 'Done' },
+          ];
+        default:
+          return [{ name: 'main', displayName: 'Main' }];
+      }
+    };
+    const defaultOutputs = getDefaultOutputs(node.type);
+
     return {
       id: node.name,
       type: 'workflowNode',
@@ -350,11 +385,11 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
         label: node.label || node.name,
         icon: getNodeIcon(node.type),
         parameters: node.parameters,
-        // Use enriched I/O data from backend
-        inputs: node.inputs?.map((i) => ({ name: i.name, displayName: i.displayName })),
-        inputCount: node.inputCount ?? 1,
-        outputs: node.outputs?.map((o) => ({ name: o.name, displayName: o.displayName })),
-        outputCount: node.outputCount ?? 1,
+        // Use enriched I/O data from backend, or defaults for imported files
+        inputs: node.inputs?.map((i) => ({ name: i.name, displayName: i.displayName })) || defaultInputs,
+        inputCount: node.inputCount ?? (isTrigger ? 0 : 1),
+        outputs: node.outputs?.map((o) => ({ name: o.name, displayName: o.displayName })) || defaultOutputs,
+        outputCount: node.outputCount ?? defaultOutputs.length,
         outputStrategy: node.outputStrategy as WorkflowNodeData['outputStrategy'],
         // Node group for styling (normalized from backend array)
         group: normalizeNodeGroup(node.group),
@@ -363,9 +398,12 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
   });
 
   // Generate unique edge IDs using source-target-handle combination
+  // Sanitize to remove spaces/special chars that break SVG marker URL references
+  const sanitizeId = (str: string) => str.replace(/[^a-zA-Z0-9_-]/g, '_');
+
   const edges: Edge[] = api.definition.connections.map((conn) => {
     const isSubnodeEdge = conn.connection_type === 'subnode';
-    const edgeId = `edge-${conn.source_node}-${conn.source_output}-${conn.target_node}-${conn.target_input}`;
+    const edgeId = `edge-${sanitizeId(conn.source_node)}-${sanitizeId(conn.source_output)}-${sanitizeId(conn.target_node)}-${sanitizeId(conn.target_input)}`;
 
     if (isSubnodeEdge) {
       return {
@@ -382,6 +420,7 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
             api.definition.nodes.find((n) => n.name === conn.source_node)?.type || '',
             true
           ) || 'tool',
+          ...(conn.waypoints ? { waypoints: conn.waypoints } : {}),
         },
       };
     }
@@ -393,6 +432,7 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
       sourceHandle: conn.source_output,
       targetHandle: conn.target_input,
       type: 'workflowEdge',
+      ...(conn.waypoints ? { data: { waypoints: conn.waypoints } } : {}),
     };
   });
 

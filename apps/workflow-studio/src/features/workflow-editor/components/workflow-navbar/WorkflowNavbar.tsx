@@ -25,7 +25,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/shared/components/ui/dropdown-menu';
-import { useSaveWorkflow, useToggleWorkflowActive } from '../../hooks/useWorkflowApi';
+import { useSaveWorkflow, useToggleWorkflowActive, useImportWorkflow } from '../../hooks/useWorkflowApi';
 import { toBackendWorkflow } from '../../lib/workflowTransform';
 import { Switch } from '@/shared/components/ui/switch';
 import type { WorkflowNodeData } from '../../types/workflow';
@@ -46,6 +46,7 @@ export default function WorkflowNavbar() {
 
   const { saveWorkflow, isSaving } = useSaveWorkflow();
   const { toggleActive, isToggling } = useToggleWorkflowActive();
+  const { importWorkflow } = useImportWorkflow();
 
   const { state } = useSidebar();
   const isCollapsed = state === 'collapsed';
@@ -56,6 +57,7 @@ export default function WorkflowNavbar() {
   const [newTag, setNewTag] = useState('');
   const nameInputRef = useRef<HTMLInputElement>(null);
   const tagInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isEditingName && nameInputRef.current) {
@@ -85,6 +87,22 @@ export default function WorkflowNavbar() {
     }
     setNewTag('');
     setIsAddingTag(false);
+  };
+
+  const handleImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const content = e.target?.result as string;
+      // Use the hook which POSTs to backend and loads the enriched result
+      importWorkflow(content);
+    };
+    reader.readAsText(file);
+
+    // Reset input so same file can be imported again
+    event.target.value = '';
   };
 
   return (
@@ -230,13 +248,21 @@ export default function WorkflowNavbar() {
                 Duplicate workflow
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => {
-                const workflow = toBackendWorkflow(
+                const backendWorkflow = toBackendWorkflow(
                   nodes as Node<WorkflowNodeData>[],
                   edges,
                   workflowName,
                   workflowId
                 );
-                const blob = new Blob([JSON.stringify(workflow, null, 2)], { type: 'application/json' });
+                // Export in backend format (seed.py accepts this directly)
+                const exportData = {
+                  name: workflowName,
+                  description: '',
+                  active: isActive,
+                  nodes: backendWorkflow.nodes,
+                  connections: backendWorkflow.connections,
+                };
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -247,7 +273,7 @@ export default function WorkflowNavbar() {
                 <Download size={14} className="mr-2" />
                 Export workflow
               </DropdownMenuItem>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                 <Upload size={14} className="mr-2" />
                 Import workflow
               </DropdownMenuItem>
@@ -260,6 +286,15 @@ export default function WorkflowNavbar() {
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleImport}
+      />
     </div>
   );
 }
