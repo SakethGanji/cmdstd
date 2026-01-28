@@ -52,6 +52,13 @@ class HTMLDisplayNode(BaseNode):
         ],
         properties=[
             NodeProperty(
+                display_name="Content",
+                name="content",
+                type="string",
+                default="",
+                description="HTML content or expression (e.g. {{ $json.html }}). If empty, uses htmlField lookup.",
+            ),
+            NodeProperty(
                 display_name="HTML Field",
                 name="htmlField",
                 type="string",
@@ -76,18 +83,33 @@ class HTMLDisplayNode(BaseNode):
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
         from ..engine.types import NodeData as ND
+        from ..engine.expression_engine import ExpressionEngine, expression_engine
 
+        raw_content = self.get_parameter(node_definition, "content", "")
         html_field = self.get_parameter(node_definition, "htmlField", "html")
 
         results: list[ND] = []
         items = input_data if input_data else [ND(json={})]
 
         for item in items:
-            html = item.json.get(html_field)
+            html: str | None = None
+
+            # 1. Resolve content expression per-item (handles skipped $json)
+            if raw_content and isinstance(raw_content, str) and "{{" in raw_content:
+                expr_ctx = ExpressionEngine.create_context(
+                    [item], context.node_states, context.execution_id,
+                )
+                html = expression_engine.resolve(raw_content, expr_ctx, skip_json=False)
+            elif raw_content:
+                html = raw_content
+
+            # 2. Field lookup from input data
+            if not html:
+                html = item.json.get(html_field)
 
             if not html:
                 raise ValueError(
-                    f'Missing HTML content in field "{html_field}". '
+                    f'Missing HTML content. Tried "content" parameter and field "{html_field}". '
                     "Make sure the upstream node provides this field."
                 )
 

@@ -63,11 +63,12 @@ def get_workflow_service(
     workflow_repo=Depends(get_workflow_repository),
     execution_repo=Depends(get_execution_repository),
     node_service=Depends(get_node_service),
+    node_registry=Depends(get_node_registry),
 ):
     """Get workflow service instance."""
     from ..services.workflow_service import WorkflowService
 
-    return WorkflowService(workflow_repo, execution_repo, node_service)
+    return WorkflowService(workflow_repo, execution_repo, node_service, node_registry)
 
 
 def get_execution_service(
@@ -78,3 +79,18 @@ def get_execution_service(
     from ..services.execution_service import ExecutionService
 
     return ExecutionService(execution_repo, workflow_repo)
+
+
+_ai_chat_service: object | None = None
+
+
+def get_ai_chat_service(
+    node_registry=Depends(get_node_registry),
+):
+    """Get AI chat service instance (cached singleton)."""
+    global _ai_chat_service
+    if _ai_chat_service is None:
+        from ..services.ai_chat_service import AIChatService
+
+        _ai_chat_service = AIChatService(node_registry)
+    return _ai_chat_service

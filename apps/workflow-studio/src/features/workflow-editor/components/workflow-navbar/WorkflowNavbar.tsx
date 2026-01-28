@@ -15,6 +15,7 @@ import {
   Plus,
   Square,
   PanelRight,
+  Sparkles,
 } from 'lucide-react';
 import { useReactFlow } from 'reactflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
@@ -56,8 +57,18 @@ export default function WorkflowNavbar() {
   const { executeWorkflow, isExecuting, cancelExecution } = useExecutionStream();
 
   const isPreviewOpen = useUIModeStore((s) => s.isPreviewOpen);
-  const togglePreview = useUIModeStore((s) => s.togglePreview);
+  const activeTab = useUIModeStore((s) => s.activeTab);
+  const openTab = useUIModeStore((s) => s.openTab);
+  const setPreviewOpen = useUIModeStore((s) => s.setPreviewOpen);
   const openPanel = useNodeCreatorStore((s) => s.openPanel);
+
+  const handleToggleTab = (tab: 'ai' | 'test') => {
+    if (isPreviewOpen && activeTab === tab) {
+      setPreviewOpen(false);
+    } else {
+      openTab(tab);
+    }
+  };
 
   const { zoomIn, zoomOut } = useReactFlow();
 
@@ -126,7 +137,7 @@ export default function WorkflowNavbar() {
   return (
     <>
       {/* Unified floating toolbar */}
-      <div className="absolute top-4 right-4 z-30 flex items-center h-9 bg-card border border-border rounded-lg shadow-sm overflow-hidden">
+      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-30 flex items-center h-9 bg-card border border-border rounded-lg shadow-sm overflow-hidden">
         {/* Workflow name */}
         {isEditingName ? (
           <input
@@ -177,11 +188,20 @@ export default function WorkflowNavbar() {
 
         <div className={dividerClass} />
 
+        {/* AI Chat toggle */}
+        <button
+          onClick={() => handleToggleTab('ai')}
+          className={btnClass + ` px-2 gap-1 ${isPreviewOpen && activeTab === 'ai' ? '!text-primary' : ''}`}
+          title="Toggle AI assistant"
+        >
+          <Sparkles size={14} />
+        </button>
+
         {/* UI Preview toggle */}
         <button
-          onClick={togglePreview}
-          className={btnClass + ` px-2 gap-1 ${isPreviewOpen ? '!text-primary' : ''}`}
-          title="Toggle UI preview"
+          onClick={() => handleToggleTab('test')}
+          className={btnClass + ` px-2 gap-1 ${isPreviewOpen && activeTab === 'test' ? '!text-primary' : ''}`}
+          title="Toggle test interface"
         >
           <PanelRight size={14} />
         </button>

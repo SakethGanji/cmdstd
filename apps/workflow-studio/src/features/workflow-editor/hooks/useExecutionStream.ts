@@ -9,6 +9,7 @@ import { useCallback, useRef, useState } from 'react';
 import { useWorkflowStore } from '../stores/workflowStore';
 import { useUIModeStore } from '../stores/uiModeStore';
 import { toBackendWorkflow } from '../lib/workflowTransform';
+import { consumeSSEStream } from '../lib/sseParser';
 import { backends } from '@/shared/lib/config';
 import { toast } from 'sonner';
 import type { WorkflowNodeData } from '../types/workflow';
@@ -165,31 +166,15 @@ export function useExecutionStream(): UseExecutionStreamResult {
         throw new Error('No response body');
       }
 
-      const decoder = new TextDecoder();
-      let buffer = '';
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        // Parse SSE events from buffer
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || ''; // Keep incomplete line in buffer
-
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            const jsonStr = line.slice(6);
-            try {
-              const event: ExecutionEvent = JSON.parse(jsonStr);
-              handleEvent(event, nameToId, nodeOutputs, findInputNodeName);
-            } catch (e) {
-              console.error('Failed to parse SSE event:', e);
-            }
-          }
+      await consumeSSEStream(reader, (dataStr) => {
+        if (!dataStr.trim()) return;
+        try {
+          const event: ExecutionEvent = JSON.parse(dataStr);
+          handleEvent(event, nameToId, nodeOutputs, findInputNodeName);
+        } catch (e) {
+          console.error('Failed to parse SSE event:', e);
         }
-      }
+      });
 
       setIsExecuting(false);
       setProgress(null);

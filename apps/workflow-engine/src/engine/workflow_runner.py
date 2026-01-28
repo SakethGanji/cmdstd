@@ -128,7 +128,7 @@ class WorkflowRunner:
         max_iterations = workflow.settings.get("max_iterations", 1000)
 
         # Shared HTTP client for all nodes
-        async with httpx.AsyncClient(timeout=30.0) as http_client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as http_client:
             context.http_client = http_client
 
             while queue and iteration < max_iterations:

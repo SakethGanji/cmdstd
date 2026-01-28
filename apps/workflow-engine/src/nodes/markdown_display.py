@@ -52,11 +52,18 @@ class MarkdownDisplayNode(BaseNode):
         ],
         properties=[
             NodeProperty(
+                display_name="Content",
+                name="content",
+                type="string",
+                default="",
+                description="Markdown content or expression (e.g. {{ $json.text }}). If empty, uses field lookup.",
+            ),
+            NodeProperty(
                 display_name="Markdown Field",
                 name="markdownField",
                 type="string",
                 default="markdown",
-                description="Field name in input data containing the Markdown content. Can also use 'text', 'content', 'message', or 'summary'.",
+                description="Field name in input data containing the Markdown content",
             ),
         ],
     )
@@ -76,7 +83,9 @@ class MarkdownDisplayNode(BaseNode):
         input_data: list[NodeData],
     ) -> NodeExecutionResult:
         from ..engine.types import NodeData as ND
+        from ..engine.expression_engine import ExpressionEngine, expression_engine
 
+        raw_content = self.get_parameter(node_definition, "content", "")
         markdown_field = self.get_parameter(node_definition, "markdownField", "markdown")
 
         results: list[ND] = []
@@ -86,10 +95,22 @@ class MarkdownDisplayNode(BaseNode):
         fallback_fields = ["markdown", "text", "content", "message", "summary", "body"]
 
         for item in items:
-            # Try the specified field first
-            markdown = item.json.get(markdown_field)
+            markdown: str | None = None
 
-            # If not found, try fallback fields
+            # 1. Resolve content expression per-item (handles skipped $json)
+            if raw_content and isinstance(raw_content, str) and "{{" in raw_content:
+                expr_ctx = ExpressionEngine.create_context(
+                    [item], context.node_states, context.execution_id,
+                )
+                markdown = expression_engine.resolve(raw_content, expr_ctx, skip_json=False)
+            elif raw_content:
+                markdown = raw_content
+
+            # 2. Field lookup from input data
+            if not markdown:
+                markdown = item.json.get(markdown_field)
+
+            # 3. Try fallback fields
             if not markdown:
                 for field in fallback_fields:
                     if field in item.json and isinstance(item.json[field], str):
@@ -98,7 +119,8 @@ class MarkdownDisplayNode(BaseNode):
 
             if not markdown:
                 raise ValueError(
-                    f'Missing Markdown content. Tried field "{markdown_field}" and fallbacks {fallback_fields}. '
+                    f'Missing Markdown content in field "{markdown_field}" '
+                    f"and fallbacks {fallback_fields}. "
                     "Make sure the upstream node provides text content."
                 )
 

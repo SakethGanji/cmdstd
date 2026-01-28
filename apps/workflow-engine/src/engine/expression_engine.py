@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
-from simpleeval import SimpleEval, DEFAULT_FUNCTIONS, DEFAULT_OPERATORS
+from simpleeval import EvalWithCompoundTypes, DEFAULT_FUNCTIONS, DEFAULT_OPERATORS
 
 from .types import NodeData
 
@@ -46,7 +46,8 @@ class ExpressionEngine:
 
     def _setup_evaluator(self) -> None:
         """Set up the safe evaluator with allowed functions."""
-        self.evaluator = SimpleEval()
+        # Use EvalWithCompoundTypes to support list [...] and dict {...} literals
+        self.evaluator = EvalWithCompoundTypes()
         self.evaluator.operators = DEFAULT_OPERATORS.copy()
 
         # Add safe helper functions
@@ -104,6 +105,17 @@ class ExpressionEngine:
             "keys": lambda d: list(d.keys()) if isinstance(d, dict) else [],
             "values": lambda d: list(d.values()) if isinstance(d, dict) else [],
             "get": lambda d, key, default=None: d.get(key, default) if isinstance(d, dict) else default,
+            # Array manipulation
+            "concat": lambda arr, item: (arr if isinstance(arr, list) else []) + [item],
+            "extend": lambda arr1, arr2: (arr1 if isinstance(arr1, list) else []) + (arr2 if isinstance(arr2, list) else []),
+            "push": lambda arr, item: (arr if isinstance(arr, list) else []) + [item],  # Alias for concat
+            # Object manipulation
+            "merge": lambda a, b: {**a, **b} if isinstance(a, dict) and isinstance(b, dict) else (b if isinstance(b, dict) else a),
+            "omit": lambda d, *keys: {k: v for k, v in d.items() if k not in keys} if isinstance(d, dict) else d,
+            "pick": lambda d, *keys: {k: d[k] for k in keys if k in d} if isinstance(d, dict) else {},
+            # Coalesce / default
+            "coalesce": lambda *args: next((a for a in args if a is not None), None),
+            "default": lambda val, fallback: fallback if val is None else val,
         }
 
     def resolve(self, value: Any, context: ExpressionContext, skip_json: bool = False) -> Any:
@@ -183,25 +195,63 @@ class ExpressionEngine:
         """Transform n8n-style expressions to Python-compatible syntax."""
         result = expression
 
-        # Handle $node["NodeName"].json.field -> node_NodeName["json"]["field"]
+        # Handle JavaScript booleans -> Python booleans
+        # Use word boundaries to avoid replacing inside strings
+        result = re.sub(r'\bfalse\b', 'False', result)
+        result = re.sub(r'\btrue\b', 'True', result)
+        result = re.sub(r'\bnull\b', 'None', result)
+
+        # Handle $node["NodeName"].json.field.nested or $node['NodeName'].json.field
+        # Need to sanitize node names (replace spaces with underscores)
+        def sanitize_node_ref_with_fields(match: re.Match) -> str:
+            node_name = match.group(1)
+            safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", node_name)
+            field_path = match.group(2)  # e.g. "body.text" or "text"
+            # Build chained .get() calls for nested access
+            fields = field_path.split(".")
+            expr = f"node_{safe_name}_json"
+            for f in fields:
+                expr = f'get({expr}, "{f}")'
+            return expr
+
+        def sanitize_node_ref_json(match: re.Match) -> str:
+            node_name = match.group(1)
+            safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", node_name)
+            return f"node_{safe_name}_json"
+
+        def sanitize_node_ref(match: re.Match) -> str:
+            node_name = match.group(1)
+            safe_name = re.sub(r"[^a-zA-Z0-9_]", "_", node_name)
+            return f"node_{safe_name}"
+
+        # Match both single and double quotes: $node["Name"] or $node['Name']
+        # Capture the full dotted field path (e.g. "body.text", "field")
         result = re.sub(
-            r'\$node\["([^"]+)"\]\.json\.(\w+)',
-            r'node_\1_json.get("\2")',
+            r'''\$node\[["']([^"']+)["']\]\.json\.([\w.]+)''',
+            sanitize_node_ref_with_fields,
             result,
         )
         result = re.sub(
-            r'\$node\["([^"]+)"\]\.json',
-            r"node_\1_json",
+            r'''\$node\[["']([^"']+)["']\]\.json''',
+            sanitize_node_ref_json,
             result,
         )
         result = re.sub(
-            r'\$node\["([^"]+)"\]',
-            r"node_\1",
+            r'''\$node\[["']([^"']+)["']\]''',
+            sanitize_node_ref,
             result,
         )
 
-        # Handle $json.field -> json_data.get("field") or json_data["field"]
-        result = re.sub(r"\$json\.(\w+)", r'json_data.get("\1")', result)
+        # Handle $json.field.nested -> chained get() for nested access
+        def expand_json_path(match: re.Match) -> str:
+            field_path = match.group(1)  # e.g. "body.text" or "field"
+            fields = field_path.split(".")
+            expr = "json_data"
+            for f in fields:
+                expr = f'get({expr}, "{f}")'
+            return expr
+
+        result = re.sub(r"\$json\.([\w.]+)", expand_json_path, result)
         result = result.replace("$json", "json_data")
 
         # Handle $input -> input_data

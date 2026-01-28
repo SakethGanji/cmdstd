@@ -91,7 +91,7 @@ export default function ExecutionLogsPanel() {
       <button
         onClick={() => setIsExpanded(true)}
         className={cn(
-          'absolute bottom-4 right-4 z-30',
+          'absolute bottom-4 left-4 z-30',
           'flex items-center gap-2 px-3 py-1.5 rounded-xl',
           'bg-white dark:bg-card shadow-lg text-xs',
           'transition-all hover:shadow-xl cursor-pointer'
@@ -138,7 +138,7 @@ export default function ExecutionLogsPanel() {
   return (
     <div
       className={cn(
-        'absolute bottom-4 right-4 z-30',
+        'absolute bottom-4 left-4 z-30',
         'w-[560px] max-w-[calc(100vw-2rem)] h-72 bg-white dark:bg-card rounded-xl flex flex-col',
         'shadow-2xl'
       )}

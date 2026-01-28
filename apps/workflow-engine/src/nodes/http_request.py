@@ -230,7 +230,7 @@ class HttpRequestNode(BaseNode):
         if hasattr(context, "http_client") and context.http_client:
              await make_requests(context.http_client)
         else:
-             async with httpx.AsyncClient() as client:
+             async with httpx.AsyncClient(follow_redirects=True) as client:
                  await make_requests(client)
 
         return self.output(results)

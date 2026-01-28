@@ -412,32 +412,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return { isValid: false, message: 'Connection already exists' };
     }
 
-    // Check for cycles - traverse upstream from source to see if we'd reach target
-    const wouldCreateCycle = (sourceId: string, targetId: string): boolean => {
-      const visited = new Set<string>();
-      const queue = [sourceId];
-
-      while (queue.length > 0) {
-        const currentId = queue.shift()!;
-        if (currentId === targetId) return true;
-        if (visited.has(currentId)) continue;
-        visited.add(currentId);
-
-        // Find all nodes that feed into the current node
-        const upstreamEdges = edges.filter(
-          (e) => e.target === currentId && !e.data?.isSubnodeEdge
-        );
-        for (const edge of upstreamEdges) {
-          queue.push(edge.source);
-        }
-      }
-      return false;
-    };
-
-    if (connection.source && connection.target && wouldCreateCycle(connection.source, connection.target)) {
-      return { isValid: false, message: 'Would create a cycle' };
-    }
-
+    // Cycles are allowed for iterative/loop workflows
     return { isValid: true };
   },
 

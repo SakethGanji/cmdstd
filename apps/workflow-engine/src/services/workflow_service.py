@@ -41,10 +41,12 @@ class WorkflowService:
         workflow_repo: WorkflowRepository,
         execution_repo: ExecutionRepository,
         node_service: NodeService,
+        node_registry: object | None = None,
     ) -> None:
         self._workflow_repo = workflow_repo
         self._execution_repo = execution_repo
         self._node_service = node_service
+        self._node_registry = node_registry
 
     async def list_workflows(self) -> list[WorkflowListItem]:
         """List all workflows."""
@@ -100,6 +102,9 @@ class WorkflowService:
         existing = await self._workflow_repo.get(workflow_id)
         if not existing:
             raise WorkflowNotFoundError(workflow_id)
+
+        # Validate updated nodes/connections if provided
+        self._validate_update(request, existing)
 
         # Build updated workflow from existing + request
         internal_workflow = Workflow(
@@ -245,18 +250,62 @@ class WorkflowService:
         if len(node_names) != len(set(node_names)):
             raise ValidationError("Node names must be unique", field="nodes")
 
+        # Validate node types exist in registry
+        if self._node_registry is not None:
+            for node in request.nodes:
+                if not self._node_registry.has(node.type):
+                    raise ValidationError(
+                        f'Unknown node type: "{node.type}"',
+                        field="nodes",
+                    )
+
         # Validate connections reference valid nodes
+        node_name_set = set(node_names)
         for conn in request.connections:
-            if conn.source_node not in node_names:
+            if conn.source_node not in node_name_set:
                 raise ValidationError(
                     f"Connection references unknown source node: {conn.source_node}",
                     field="connections",
                 )
-            if conn.target_node not in node_names:
+            if conn.target_node not in node_name_set:
                 raise ValidationError(
                     f"Connection references unknown target node: {conn.target_node}",
                     field="connections",
                 )
+
+    def _validate_update(self, request: WorkflowUpdateRequest, existing: Any) -> None:
+        """Validate workflow update request."""
+        nodes = request.nodes or []
+        connections = request.connections or []
+
+        # Validate node types exist in registry
+        if self._node_registry is not None:
+            for node in nodes:
+                if not self._node_registry.has(node.type):
+                    raise ValidationError(
+                        f'Unknown node type: "{node.type}"',
+                        field="nodes",
+                    )
+
+        # If nodes are being updated, validate names are unique
+        if nodes:
+            node_names = [n.name for n in nodes]
+            if len(node_names) != len(set(node_names)):
+                raise ValidationError("Node names must be unique", field="nodes")
+
+            # Validate connections reference valid nodes
+            node_name_set = set(node_names)
+            for conn in connections:
+                if conn.source_node not in node_name_set:
+                    raise ValidationError(
+                        f"Connection references unknown source node: {conn.source_node}",
+                        field="connections",
+                    )
+                if conn.target_node not in node_name_set:
+                    raise ValidationError(
+                        f"Connection references unknown target node: {conn.target_node}",
+                        field="connections",
+                    )
 
     def _request_to_workflow(self, request: WorkflowCreateRequest) -> Workflow:
         """Convert request to internal Workflow type."""
