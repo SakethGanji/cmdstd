@@ -92,6 +92,9 @@ interface WorkflowState {
   // Execution data per node
   executionData: Record<string, NodeExecutionData>;
 
+  // Subworkflow execution data: parentNodeId → { innerNodeName: NodeExecutionData }
+  subworkflowExecutionData: Record<string, Record<string, NodeExecutionData>>;
+
   // Pinned data per node - backend format: { json: {...} }[]
   pinnedData: Record<string, BackendNodeData[]>;
 
@@ -125,6 +128,8 @@ interface WorkflowState {
   isValidConnection: (connection: Connection) => boolean;
 
   addNode: (node: Node) => void;
+  addSubworkflowNode: (workflowId: string, workflowName: string) => void;
+  copyWorkflowNodes: (workflowName: string, definition: { nodes: Array<{ name: string; type: string; parameters: Record<string, unknown>; position?: { x: number; y: number } }>; connections: Array<{ sourceNode: string; targetNode: string; sourceOutput: string; targetInput: string }> }) => void;
   addSubnode: (parentId: string, slotName: string, subnodeData: {
     type: string;
     label: string;
@@ -141,6 +146,7 @@ interface WorkflowState {
 
   // Execution
   setNodeExecutionData: (nodeId: string, data: NodeExecutionData) => void;
+  setSubworkflowNodeExecutionData: (parentId: string, innerNodeName: string, data: NodeExecutionData) => void;
   clearExecutionData: () => void;
 
   // Pinned data - uses backend format { json: {...} }[]
@@ -218,6 +224,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   edges: [],
   selectedNodeId: null,
   executionData: {},
+  subworkflowExecutionData: {},
   pinnedData: {},
   draggedNodeType: null,
   dropTargetNodeId: null,
@@ -392,6 +399,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       return { isValid: false, message: 'Subnodes can only connect to parent node slots' };
     }
 
+    // subworkflowNode is treated the same as workflowNode for connection validation
+
     // Can't connect normal nodes to subnode slots
     if (SUBNODE_SLOT_NAMES.includes(connection.targetHandle || '')) {
       return { isValid: false, message: 'Only subnodes can connect to this slot' };
@@ -479,6 +488,147 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       nodes: hasOnlyPlaceholder
         ? [node]
         : [...nodes, node],
+    });
+  },
+
+  addSubworkflowNode: (workflowId, workflowName) => {
+    const { nodes, saveToHistory } = get();
+
+    saveToHistory();
+
+    const existingNames = nodes
+      .filter((n) => n.type === 'workflowNode' || n.type === 'subworkflowNode' || n.type === 'subnodeNode')
+      .map((n) => (n.data as WorkflowNodeData)?.name)
+      .filter(Boolean) as string[];
+
+    const nodeName = generateNodeName('ExecuteWorkflow', existingNames);
+
+    // Position to the right of the rightmost node
+    const realNodes = nodes.filter((n) => n.type !== 'addNodes');
+    let position = { x: 250, y: 200 };
+    if (realNodes.length > 0) {
+      const maxX = Math.max(...realNodes.map((n) => n.position.x));
+      const avgY = realNodes.reduce((sum, n) => sum + n.position.y, 0) / realNodes.length;
+      position = { x: maxX + 250, y: avgY };
+    }
+
+    const newNode: Node = {
+      id: `node-${Date.now()}`,
+      type: 'subworkflowNode',
+      position,
+      data: {
+        name: nodeName,
+        label: workflowName,
+        type: 'ExecuteWorkflow',
+        icon: 'git-branch',
+        description: `Execute workflow: ${workflowName}`,
+        parameters: { workflowId },
+        subworkflowId: workflowId,
+        continueOnFail: false,
+        retryOnFail: 0,
+        retryDelay: 1000,
+        inputCount: 1,
+        outputCount: 1,
+        inputs: [{ name: 'main', displayName: 'Main' }],
+        outputs: [{ name: 'main', displayName: 'Main' }],
+      } as WorkflowNodeData,
+    };
+
+    // Remove placeholder if it's the only node
+    const hasOnlyPlaceholder = nodes.length === 1 && nodes[0].type === 'addNodes';
+
+    set({
+      nodes: hasOnlyPlaceholder ? [newNode] : [...nodes, newNode],
+    });
+  },
+
+  copyWorkflowNodes: (workflowName, definition) => {
+    const { nodes, edges, saveToHistory } = get();
+
+    saveToHistory();
+
+    // Collect existing names for uniqueness
+    const existingNames = nodes
+      .filter((n) => n.type === 'workflowNode' || n.type === 'subworkflowNode' || n.type === 'subnodeNode')
+      .map((n) => (n.data as WorkflowNodeData)?.name)
+      .filter(Boolean) as string[];
+
+    // Position offset: place copied nodes to the right of the rightmost existing node
+    const realNodes = nodes.filter((n) => n.type !== 'addNodes');
+    let offsetX = 250;
+    let offsetY = 200;
+    if (realNodes.length > 0) {
+      const maxX = Math.max(...realNodes.map((n) => n.position.x));
+      const avgY = realNodes.reduce((sum, n) => sum + n.position.y, 0) / realNodes.length;
+      offsetX = maxX + 300;
+      offsetY = avgY;
+    }
+
+    // Find the bounding box of the source workflow nodes so we can rebase positions
+    const srcNodes = definition.nodes;
+    const srcMinX = srcNodes.length > 0 ? Math.min(...srcNodes.map((n) => n.position?.x ?? 0)) : 0;
+    const srcMinY = srcNodes.length > 0 ? Math.min(...srcNodes.map((n) => n.position?.y ?? 0)) : 0;
+
+    // Map old node names to new unique names and new IDs
+    const nameMap = new Map<string, string>(); // oldName → newName
+    const timestamp = Date.now();
+
+    const newNodes: Node[] = srcNodes.map((srcNode, index) => {
+      const newName = generateNodeName(srcNode.type, existingNames);
+      existingNames.push(newName);
+      nameMap.set(srcNode.name, newName);
+
+      const position = {
+        x: offsetX + ((srcNode.position?.x ?? 0) - srcMinX),
+        y: offsetY + ((srcNode.position?.y ?? 0) - srcMinY),
+      };
+
+      return {
+        id: `node-${timestamp}-${index}`,
+        type: 'workflowNode',
+        position,
+        data: {
+          name: newName,
+          type: srcNode.type,
+          label: newName,
+          icon: srcNode.type.toLowerCase(),
+          parameters: { ...srcNode.parameters },
+          inputCount: 1,
+          outputCount: 1,
+          inputs: [{ name: 'main', displayName: 'Main' }],
+          outputs: [{ name: 'main', displayName: 'Main' }],
+        } as WorkflowNodeData,
+      };
+    });
+
+    // Build name-to-new-id map for edge creation
+    const nameToId = new Map<string, string>();
+    srcNodes.forEach((srcNode, index) => {
+      const newName = nameMap.get(srcNode.name)!;
+      const newNode = newNodes[index];
+      nameToId.set(srcNode.name, newNode.id);
+      // Also map by new name
+      nameToId.set(newName, newNode.id);
+    });
+
+    // Create edges between copied nodes
+    const newEdges: Edge[] = definition.connections
+      .filter((conn) => nameToId.has(conn.sourceNode) && nameToId.has(conn.targetNode))
+      .map((conn, index) => ({
+        id: `edge-copy-${timestamp}-${index}`,
+        source: nameToId.get(conn.sourceNode)!,
+        target: nameToId.get(conn.targetNode)!,
+        sourceHandle: conn.sourceOutput,
+        targetHandle: conn.targetInput,
+        type: 'workflowEdge',
+      }));
+
+    // Remove placeholder if it's the only node
+    const hasOnlyPlaceholder = nodes.length === 1 && nodes[0].type === 'addNodes';
+
+    set({
+      nodes: hasOnlyPlaceholder ? newNodes : [...nodes, ...newNodes],
+      edges: [...edges, ...newEdges],
     });
   },
 
@@ -589,7 +739,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     // If deleting the last node, restore the placeholder
     const remainingNodes = nodes.filter((n) => n.id !== nodeId);
-    const hasRealNodes = remainingNodes.some((n) => n.type !== 'addNodes' && n.type !== 'stickyNote');
+    const hasRealNodes = remainingNodes.some(
+      (n) => n.type === 'workflowNode' || n.type === 'subworkflowNode' || n.type === 'subnodeNode'
+    );
 
     // Remove pinned data for deleted node
     const newPinnedData = { ...pinnedData };
@@ -618,7 +770,20 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     });
   },
 
-  clearExecutionData: () => set({ executionData: {} }),
+  setSubworkflowNodeExecutionData: (parentId, innerNodeName, data) => {
+    const current = get().subworkflowExecutionData;
+    set({
+      subworkflowExecutionData: {
+        ...current,
+        [parentId]: {
+          ...(current[parentId] || {}),
+          [innerNodeName]: data,
+        },
+      },
+    });
+  },
+
+  clearExecutionData: () => set({ executionData: {}, subworkflowExecutionData: {} }),
 
   // Pinned data methods - uses backend format { json: {...} }[]
   pinNodeData: (nodeId, data) => {
@@ -672,7 +837,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   loadWorkflow: (data) => {
     // Process nodes to compute dynamic outputs for nodes with outputStrategy
     const processedNodes = data.nodes.map((node) => {
-      if (node.type === 'workflow' && node.data) {
+      if ((node.type === 'workflowNode' || node.type === 'subworkflowNode') && node.data) {
         const nodeData = node.data as WorkflowNodeData;
         if (nodeData.outputStrategy) {
           return { ...node, data: computeDynamicOutputs(nodeData) };
@@ -689,6 +854,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       isActive: data.isActive,
       selectedNodeId: null,
       executionData: {},
+      subworkflowExecutionData: {},
       pinnedData: {},
     });
   },
@@ -703,6 +869,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
       isActive: false,
       selectedNodeId: null,
       executionData: {},
+      subworkflowExecutionData: {},
       pinnedData: {},
       workflowTags: [],
       draggedNodeType: null,
@@ -1019,7 +1186,9 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
 
     const nodeIdSet = new Set(nodeIds);
     const remainingNodes = nodes.filter((n) => !nodeIdSet.has(n.id));
-    const hasRealNodes = remainingNodes.some((n) => n.type !== 'addNodes' && n.type !== 'stickyNote');
+    const hasRealNodes = remainingNodes.some(
+      (n) => n.type === 'workflowNode' || n.type === 'subworkflowNode' || n.type === 'subnodeNode'
+    );
 
     // Remove pinned data for deleted nodes
     const newPinnedData = { ...pinnedData };

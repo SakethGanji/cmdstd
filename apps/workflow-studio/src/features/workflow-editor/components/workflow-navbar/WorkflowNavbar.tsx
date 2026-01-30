@@ -16,6 +16,7 @@ import {
   Square,
   PanelRight,
   Sparkles,
+  GitBranch,
 } from 'lucide-react';
 import { useReactFlow } from 'reactflow';
 import { useWorkflowStore } from '../../stores/workflowStore';
@@ -36,6 +37,7 @@ import { toBackendWorkflow } from '../../lib/workflowTransform';
 import { Switch } from '@/shared/components/ui/switch';
 import type { WorkflowNodeData } from '../../types/workflow';
 import type { Node } from 'reactflow';
+import WorkflowPickerDialog from './WorkflowPickerDialog';
 
 export default function WorkflowNavbar() {
   const {
@@ -49,6 +51,8 @@ export default function WorkflowNavbar() {
     redo,
     canUndo,
     canRedo,
+    addSubworkflowNode,
+    copyWorkflowNodes,
   } = useWorkflowStore();
 
   const { saveWorkflow, isSaving } = useSaveWorkflow();
@@ -72,6 +76,7 @@ export default function WorkflowNavbar() {
 
   const { zoomIn, zoomOut } = useReactFlow();
 
+  const [isWorkflowPickerOpen, setIsWorkflowPickerOpen] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(workflowName);
   const [isRunOpen, setIsRunOpen] = useState(false);
@@ -331,6 +336,10 @@ export default function WorkflowNavbar() {
               <Upload size={14} className="mr-2" />
               Import
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setIsWorkflowPickerOpen(true)}>
+              <GitBranch size={14} className="mr-2" />
+              Embed Subworkflow
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-destructive focus:text-destructive">
               <Trash2 size={14} className="mr-2" />
@@ -347,6 +356,15 @@ export default function WorkflowNavbar() {
         accept=".json"
         className="hidden"
         onChange={handleImport}
+      />
+
+      {/* Workflow picker dialog for embedding subworkflows */}
+      <WorkflowPickerDialog
+        open={isWorkflowPickerOpen}
+        onClose={() => setIsWorkflowPickerOpen(false)}
+        onEmbed={(id, name) => addSubworkflowNode(id, name)}
+        onCopy={(name, definition) => copyWorkflowNodes(name, definition)}
+        currentWorkflowId={workflowId}
       />
     </>
   );

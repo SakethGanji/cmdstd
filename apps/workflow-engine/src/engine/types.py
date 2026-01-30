@@ -101,6 +101,9 @@ class ExecutionContext:
     # Subworkflow input data (set by ExecuteWorkflow node)
     subworkflow_input: list[NodeData] | None = None
 
+    # Event callback for real-time streaming (passed through to subworkflows)
+    on_event: ExecutionEventCallback | None = None
+
 
 @dataclass
 class ExecutionError:
@@ -184,6 +187,8 @@ class ExecutionEvent:
     data: list[NodeData] | None = None
     error: str | None = None
     progress: dict[str, int] | None = None
+    subworkflow_parent_node: str | None = None
+    subworkflow_id: str | None = None
 
 
 # Callback type for receiving execution events

@@ -62,6 +62,10 @@ def _event_to_dict(event: ExecutionEvent) -> dict[str, Any]:
         result["error"] = event.error
     if event.progress:
         result["progress"] = event.progress
+    if event.subworkflow_parent_node:
+        result["subworkflowParentNode"] = event.subworkflow_parent_node
+    if event.subworkflow_id:
+        result["subworkflowId"] = event.subworkflow_id
 
     return result
 
@@ -72,6 +76,7 @@ async def _run_workflow_with_events(
     initial_data: list[NodeData],
     mode: str,
     execution_repo: ExecutionRepository,
+    workflow_repo: WorkflowRepository | None = None,
 ) -> AsyncGenerator[str, None]:
     """Run workflow and yield SSE events."""
     event_queue: asyncio.Queue[ExecutionEvent | None] = asyncio.Queue()
@@ -89,6 +94,7 @@ async def _run_workflow_with_events(
                 initial_data,
                 mode,
                 on_event,
+                workflow_repository=workflow_repo,
             )
             await execution_repo.complete(context, workflow.id or "adhoc", workflow.name)
         except Exception as e:
@@ -126,6 +132,7 @@ async def _run_workflow_with_events(
 async def stream_adhoc_execution(
     workflow: AdhocWorkflowRequest,
     execution_repo: Annotated[ExecutionRepository, Depends(get_execution_repository)],
+    workflow_repo: Annotated[WorkflowRepository, Depends(get_workflow_repository)],
 ) -> EventSourceResponse:
     """Stream ad-hoc workflow execution via SSE."""
     internal_workflow = Workflow(
@@ -196,6 +203,7 @@ async def stream_adhoc_execution(
             initial_data,
             mode,
             execution_repo,
+            workflow_repo=workflow_repo,
         ):
             yield event
 
@@ -235,6 +243,7 @@ async def stream_workflow_execution(
             initial_data,
             "manual",
             execution_repo,
+            workflow_repo=workflow_repo,
         ):
             yield event
 
@@ -291,6 +300,7 @@ async def stream_workflow_execution_with_input(
             initial_data,
             mode,
             execution_repo,
+            workflow_repo=workflow_repo,
         ):
             yield event
 

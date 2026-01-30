@@ -62,6 +62,9 @@ export interface WorkflowNodeData {
   providesToSlot?: string;              // Which slot this subnode provides to
   subnodeSlots?: SubnodeSlotDefinition[];  // Slots for subnodes (parent nodes only)
   nodeShape?: 'rectangular' | 'circular';  // Visual shape variant
+
+  // Subworkflow embedding
+  subworkflowId?: string;  // workflow ID being embedded (for ExecuteWorkflow nodes)
 }
 
 export interface StickyNoteData {

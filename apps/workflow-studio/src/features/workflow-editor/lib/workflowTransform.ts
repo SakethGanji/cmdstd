@@ -116,7 +116,7 @@ export function toBackendWorkflow(
 ): BackendWorkflow {
   // Filter to workflow nodes AND subnode nodes (exclude addNodes placeholder and sticky notes)
   const workflowNodes = nodes.filter(
-    (n) => n.type === 'workflowNode'
+    (n) => n.type === 'workflowNode' || n.type === 'subworkflowNode'
   ) as Node<WorkflowNodeData>[];
 
   const subnodeNodes = nodes.filter(
@@ -219,7 +219,7 @@ export function toBackendWorkflow(
  */
 export function getExistingNodeNames(nodes: Node<WorkflowNodeData>[]): string[] {
   return nodes
-    .filter((n) => n.type === 'workflowNode')
+    .filter((n) => n.type === 'workflowNode' || n.type === 'subworkflowNode')
     .map((n) => n.data.name);
 }
 
@@ -340,6 +340,32 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
           isSubnode: true,
           subnodeType: node.subnodeType || subnodeType,
           nodeShape: 'circular',
+        } as WorkflowNodeData,
+      };
+    }
+
+    // Check if this is an ExecuteWorkflow node with a workflowId → render as subworkflowNode
+    if (node.type === 'ExecuteWorkflow' && node.parameters?.workflowId) {
+      const isTrigger = false; // ExecuteWorkflow is never a trigger
+      const defaultInputs = [{ name: 'main', displayName: 'Main' }];
+      const defaultOutputs = [{ name: 'main', displayName: 'Main' }];
+
+      return {
+        id: node.name,
+        type: 'subworkflowNode',
+        position: node.position || { x: 0, y: 0 },
+        data: {
+          name: node.name,
+          type: node.type,
+          label: node.label || node.name,
+          icon: getNodeIcon(node.type),
+          parameters: node.parameters,
+          inputs: node.inputs?.map((i) => ({ name: i.name, displayName: i.displayName })) || defaultInputs,
+          inputCount: node.inputCount ?? 1,
+          outputs: node.outputs?.map((o) => ({ name: o.name, displayName: o.displayName })) || defaultOutputs,
+          outputCount: node.outputCount ?? 1,
+          group: normalizeNodeGroup(node.group),
+          subworkflowId: node.parameters.workflowId as string,
         } as WorkflowNodeData,
       };
     }

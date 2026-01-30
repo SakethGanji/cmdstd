@@ -16,7 +16,7 @@ from .base import (
 )
 
 if TYPE_CHECKING:
-    from ..engine.types import ExecutionContext, NodeData, NodeDefinition, NodeExecutionResult
+    from ..engine.types import ExecutionContext, ExecutionEvent, NodeData, NodeDefinition, NodeExecutionResult
 
 logger = logging.getLogger(__name__)
 
@@ -146,12 +146,24 @@ class ExecuteWorkflowNode(BaseNode):
                 f"No start node found in workflow '{stored_workflow.name}'"
             )
 
+        # Create a wrapper callback that tags events with parent node info
+        parent_on_event = context.on_event
+        tagged_on_event = None
+        if parent_on_event:
+            def tagged_on_event(event: 'ExecutionEvent') -> None:
+                # Tag node-level events with subworkflow parent info
+                if event.type.value.startswith("node:"):
+                    event.subworkflow_parent_node = node_definition.name
+                    event.subworkflow_id = workflow_id
+                parent_on_event(event)
+
         # Execute subworkflow with depth tracking
         sub_context = await runner.run_subworkflow(
             workflow=stored_workflow.workflow,
             start_node_name=start_node.name,
             input_data=subworkflow_input,
             parent_context=context,
+            on_event=tagged_on_event,
         )
 
         # Check for errors in subworkflow

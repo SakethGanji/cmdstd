@@ -19,6 +19,7 @@ import { useSaveWorkflow } from '../../hooks/useWorkflowApi';
 import { getNodeIcon } from '../../hooks/useNodeTypes';
 import AddNodesButton from './nodes/AddNodesButton';
 import WorkflowNode from './nodes/WorkflowNode';
+import SubworkflowNode from './nodes/SubworkflowNode';
 import SubnodeNode from './nodes/SubnodeNode';
 import WorkflowEdge from './edges/WorkflowEdge';
 import SubnodeEdge from './edges/SubnodeEdge';
@@ -36,6 +37,7 @@ import type { NodeIO } from '../../lib/nodeStyles';
 const nodeTypes: any = {
   addNodes: AddNodesButton,
   workflowNode: WorkflowNode,
+  subworkflowNode: SubworkflowNode,
   subnodeNode: SubnodeNode,
   stickyNote: StickyNote,
 };
@@ -113,7 +115,7 @@ export default function WorkflowCanvas() {
 
   // Fit view on initial load when nodes change from placeholder to real nodes
   useEffect(() => {
-    const hasRealNodes = nodes.some((n) => n.type === 'workflowNode');
+    const hasRealNodes = nodes.some((n) => n.type === 'workflowNode' || n.type === 'subworkflowNode');
     if (hasRealNodes) {
       // Small delay to ensure nodes are rendered
       const timer = setTimeout(() => {
@@ -217,7 +219,7 @@ export default function WorkflowCanvas() {
 
       for (const node of flowNodes) {
         // Skip placeholder, sticky notes, and subnodes
-        if (node.type !== 'workflowNode') continue;
+        if (node.type !== 'workflowNode' && node.type !== 'subworkflowNode') continue;
 
         // Skip trigger nodes (they have no inputs)
         if (isTriggerType(node.data?.type || '')) continue;
@@ -522,6 +524,7 @@ export default function WorkflowCanvas() {
           style={{ marginBottom: 20, marginLeft: 100 }}
           nodeColor={(node) => {
             if (node.type === 'addNodes') return 'var(--muted)';
+            if (node.type === 'subworkflowNode') return getMiniMapColor('flow');
             if (node.type === 'stickyNote') {
               const color = node.data?.color || 'yellow';
               const colors: Record<string, string> = {

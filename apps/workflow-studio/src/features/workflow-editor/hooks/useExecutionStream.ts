@@ -38,6 +38,9 @@ interface ExecutionEvent {
   // For execution:result event
   status?: 'success' | 'failed';
   errors?: Array<{ nodeName: string; error: string; timestamp: string }>;
+  // Subworkflow event fields
+  subworkflowParentNode?: string;
+  subworkflowId?: string;
 }
 
 interface UseExecutionStreamResult {
@@ -55,6 +58,7 @@ export function useExecutionStream(): UseExecutionStreamResult {
     workflowName,
     workflowId,
     setNodeExecutionData,
+    setSubworkflowNodeExecutionData,
     clearExecutionData,
   } = useWorkflowStore();
 
@@ -68,7 +72,7 @@ export function useExecutionStream(): UseExecutionStreamResult {
   // Build name-to-id mapping for translating backend node names to UI node IDs
   const buildNameToIdMap = useCallback(() => {
     const map = new Map<string, string>();
-    const workflowNodes = nodes.filter((n) => n.type === 'workflowNode');
+    const workflowNodes = nodes.filter((n) => n.type === 'workflowNode' || n.type === 'subworkflowNode');
     workflowNodes.forEach((node) => {
       const data = node.data as WorkflowNodeData;
       map.set(data.name, node.id);
@@ -111,7 +115,7 @@ export function useExecutionStream(): UseExecutionStreamResult {
     setProgress(null);
 
     // Mark all workflow nodes as pending initially
-    const workflowNodes = nodes.filter((n) => n.type === 'workflowNode');
+    const workflowNodes = nodes.filter((n) => n.type === 'workflowNode' || n.type === 'subworkflowNode');
     workflowNodes.forEach((node) => {
       setNodeExecutionData(node.id, {
         input: null,
@@ -212,63 +216,103 @@ export function useExecutionStream(): UseExecutionStreamResult {
           break;
 
         case 'node:start': {
-          const nodeId = nameToId.get(event.nodeName || '');
-          if (nodeId) {
-            setNodeExecutionData(nodeId, {
-              input: null,
-              output: null,
-              status: 'running',
-              startTime: Date.now(),
-            });
+          // Check if this is a subworkflow inner node event
+          if (event.subworkflowParentNode) {
+            const parentNodeId = nameToId.get(event.subworkflowParentNode);
+            if (parentNodeId && event.nodeName) {
+              setSubworkflowNodeExecutionData(parentNodeId, event.nodeName, {
+                input: null,
+                output: null,
+                status: 'running',
+                startTime: Date.now(),
+              });
+            }
+          } else {
+            const nodeId = nameToId.get(event.nodeName || '');
+            if (nodeId) {
+              setNodeExecutionData(nodeId, {
+                input: null,
+                output: null,
+                status: 'running',
+                startTime: Date.now(),
+              });
+            }
           }
           setProgress(event.progress || null);
           break;
         }
 
         case 'node:complete': {
-          const nodeId = nameToId.get(event.nodeName || '');
-          if (nodeId && event.nodeName) {
-            // Store output for later use as input to downstream nodes
-            if (event.data) {
-              nodeOutputs[event.nodeName] = event.data;
+          // Check if this is a subworkflow inner node event
+          if (event.subworkflowParentNode) {
+            const parentNodeId = nameToId.get(event.subworkflowParentNode);
+            if (parentNodeId && event.nodeName) {
+              setSubworkflowNodeExecutionData(parentNodeId, event.nodeName, {
+                input: null,
+                output: { items: event.data?.map((d) => d.json) || [] },
+                status: 'success',
+                startTime: Date.now(),
+                endTime: Date.now(),
+              });
+            }
+          } else {
+            const nodeId = nameToId.get(event.nodeName || '');
+            if (nodeId && event.nodeName) {
+              // Store output for later use as input to downstream nodes
+              if (event.data) {
+                nodeOutputs[event.nodeName] = event.data;
 
-              // Check for UI output content (HTML/Markdown)
-              for (const item of event.data) {
-                const data = item.json;
-                if (data._renderAs === 'html' && data.html) {
-                  setHtmlContent(String(data.html));
-                }
-                if (data._renderAs === 'markdown' && data.markdown) {
-                  setMarkdownContent(String(data.markdown));
+                // Check for UI output content (HTML/Markdown)
+                for (const item of event.data) {
+                  const data = item.json;
+                  if (data._renderAs === 'html' && data.html) {
+                    setHtmlContent(String(data.html));
+                  }
+                  if (data._renderAs === 'markdown' && data.markdown) {
+                    setMarkdownContent(String(data.markdown));
+                  }
                 }
               }
+
+              // Find input from upstream node
+              const inputNodeName = findInputNodeName(event.nodeName, nameToId);
+              const inputData = inputNodeName ? nodeOutputs[inputNodeName] : null;
+
+              setNodeExecutionData(nodeId, {
+                input: inputData ? { items: inputData.map((d) => d.json) } : null,
+                output: { items: event.data?.map((d) => d.json) || [] },
+                status: 'success',
+                startTime: Date.now(),
+                endTime: Date.now(),
+              });
             }
-
-            // Find input from upstream node
-            const inputNodeName = findInputNodeName(event.nodeName, nameToId);
-            const inputData = inputNodeName ? nodeOutputs[inputNodeName] : null;
-
-            setNodeExecutionData(nodeId, {
-              input: inputData ? { items: inputData.map((d) => d.json) } : null,
-              output: { items: event.data?.map((d) => d.json) || [] },
-              status: 'success',
-              startTime: Date.now(),
-              endTime: Date.now(),
-            });
           }
           setProgress(event.progress || null);
           break;
         }
 
         case 'node:error': {
-          const nodeId = nameToId.get(event.nodeName || '');
-          if (nodeId) {
-            setNodeExecutionData(nodeId, {
-              input: null,
-              output: { items: [], error: event.error },
-              status: 'error',
-              endTime: Date.now(),
-            });
+          // Check if this is a subworkflow inner node event
+          if (event.subworkflowParentNode) {
+            const parentNodeId = nameToId.get(event.subworkflowParentNode);
+            if (parentNodeId && event.nodeName) {
+              setSubworkflowNodeExecutionData(parentNodeId, event.nodeName, {
+                input: null,
+                output: { items: [], error: event.error },
+                status: 'error',
+                endTime: Date.now(),
+              });
+            }
+          } else {
+            const nodeId = nameToId.get(event.nodeName || '');
+            if (nodeId) {
+              setNodeExecutionData(nodeId, {
+                input: null,
+                output: { items: [], error: event.error },
+                status: 'error',
+                endTime: Date.now(),
+              });
+            }
           }
           break;
         }
@@ -308,6 +352,7 @@ export function useExecutionStream(): UseExecutionStreamResult {
     workflowName,
     workflowId,
     setNodeExecutionData,
+    setSubworkflowNodeExecutionData,
     clearExecutionData,
     buildNameToIdMap,
     findInputNodeName,

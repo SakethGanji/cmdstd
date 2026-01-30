@@ -127,7 +127,8 @@ export default function NodeCreatorPanel() {
         subnodes.push(nodeDef);
       } else if (isTrigger) {
         triggers.push(nodeDef);
-      } else {
+      } else if (node.type !== 'ExecuteWorkflow') {
+        // ExecuteWorkflow is added via "Embed Subworkflow" toolbar action, not the panel
         regular.push(nodeDef);
       }
     });

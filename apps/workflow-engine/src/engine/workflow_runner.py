@@ -75,6 +75,7 @@ class WorkflowRunner:
 
         context = self._create_context(workflow, mode)
         context.workflow_repository = workflow_repository
+        context.on_event = on_event
 
         total_nodes = len(workflow.nodes)
         completed_nodes = 0
@@ -263,6 +264,9 @@ class WorkflowRunner:
 
         # Share HTTP client for efficiency
         child_context.http_client = parent_context.http_client
+
+        # Propagate event callback for nested subworkflows
+        child_context.on_event = on_event
 
         # Run the subworkflow
         # Note: We don't use self.run() directly because it creates its own HTTP client
