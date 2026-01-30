@@ -12,6 +12,7 @@ export interface AIChatMessage {
 
 export interface AIChatRequest {
   message: string;
+  session_id: string;
   workflow_context: WorkflowContextPayload | null;
   conversation_history: { role: 'user' | 'assistant'; content: string }[];
   mode_hint: 'auto' | 'generate' | 'modify' | 'explain' | 'fix';

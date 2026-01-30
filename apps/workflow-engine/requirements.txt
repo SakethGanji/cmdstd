@@ -9,4 +9,6 @@ sse-starlette
 aiosqlite
 pandas
 openpyxl
+google-adk
+google-genai
 # aiosmtplib  # Uncomment if using SMTP for email

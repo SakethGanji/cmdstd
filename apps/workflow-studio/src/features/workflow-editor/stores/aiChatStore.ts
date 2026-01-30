@@ -6,7 +6,12 @@
 import { create } from 'zustand';
 import type { AIChatMessage } from '../types/aiChat';
 
+function generateSessionId(): string {
+  return `session_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+}
+
 interface AIChatState {
+  sessionId: string;
   messages: AIChatMessage[];
   isStreaming: boolean;
 
@@ -18,6 +23,7 @@ interface AIChatState {
 }
 
 export const useAIChatStore = create<AIChatState>((set) => ({
+  sessionId: generateSessionId(),
   messages: [],
   isStreaming: false,
 
@@ -48,5 +54,5 @@ export const useAIChatStore = create<AIChatState>((set) => ({
 
   setStreaming: (streaming) => set({ isStreaming: streaming }),
 
-  clearHistory: () => set({ messages: [] }),
+  clearHistory: () => set({ messages: [], sessionId: generateSessionId() }),
 }));

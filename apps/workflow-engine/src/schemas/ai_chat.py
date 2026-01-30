@@ -26,6 +26,7 @@ class AIChatRequest(BaseModel):
     """Request body for POST /api/ai/chat."""
 
     message: str
+    session_id: str | None = None
     workflow_context: WorkflowContext | None = None
     conversation_history: list[AIChatMessage] = []
     mode_hint: Literal["auto", "generate", "modify", "explain", "fix"] = "auto"

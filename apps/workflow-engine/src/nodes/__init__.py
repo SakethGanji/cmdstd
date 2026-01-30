@@ -42,6 +42,7 @@ from .item_lists import ItemListsNode
 from .respond_to_webhook import RespondToWebhookNode
 from .sample import SampleNode
 from .send_email import SendEmailNode
+from .sqlite import SQLiteNode
 
 # AI nodes
 from .llm_chat import LLMChatNode
@@ -90,6 +91,7 @@ __all__ = [
     "RespondToWebhookNode",
     "SampleNode",
     "SendEmailNode",
+    "SQLiteNode",
     # AI
     "LLMChatNode",
     "AIAgentNode",

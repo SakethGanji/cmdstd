@@ -19,7 +19,7 @@ export function useAIChat() {
 
   const sendMessage = useCallback(
     async (message: string, modeHint: AIChatRequest['mode_hint'] = 'auto') => {
-      const { addMessage, updateLastMessage, setStreaming, messages } = useAIChatStore.getState();
+      const { addMessage, updateLastMessage, setStreaming, messages, sessionId } = useAIChatStore.getState();
       const { nodes, edges, workflowName, workflowId } = useWorkflowStore.getState();
 
       // Add user message
@@ -66,6 +66,7 @@ export function useAIChat() {
 
       const body: AIChatRequest = {
         message,
+        session_id: sessionId,
         workflow_context: workflowContext,
         conversation_history: conversationHistory,
         mode_hint: modeHint,
