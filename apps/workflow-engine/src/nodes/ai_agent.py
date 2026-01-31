@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import json
-import os
 from typing import Any, TYPE_CHECKING
-
-import httpx
 
 from .base import (
     BaseNode,
@@ -62,6 +59,9 @@ class AIAgentNode(BaseNode):
                     NodePropertyOption(name="Gemini 2.0 Flash", value="gemini-2.0-flash"),
                     NodePropertyOption(name="Gemini 1.5 Flash", value="gemini-1.5-flash"),
                     NodePropertyOption(name="Gemini 1.5 Pro", value="gemini-1.5-pro"),
+                    NodePropertyOption(name="GPT-4o", value="gpt-4o"),
+                    NodePropertyOption(name="GPT-4o Mini", value="gpt-4o-mini"),
+                    NodePropertyOption(name="Claude Sonnet", value="claude-sonnet-4-20250514"),
                 ],
             ),
             NodeProperty(
@@ -208,7 +208,7 @@ class AIAgentNode(BaseNode):
             if context_str:
                 full_task = f"{full_task}\n\nInput data:\n{context_str}"
 
-            result = await self._run_gemini_agent(
+            result = await self._run_agent_loop(
                 model=model,
                 system_prompt=system_prompt,
                 task=full_task,
@@ -319,7 +319,7 @@ class AIAgentNode(BaseNode):
 
         return tools
 
-    async def _run_gemini_agent(
+    async def _run_agent_loop(
         self,
         model: str,
         system_prompt: str,
@@ -329,131 +329,74 @@ class AIAgentNode(BaseNode):
         max_iterations: int,
         temperature: float,
     ) -> dict[str, Any]:
-        """Run an agentic loop with Google Gemini."""
-        # Hardcoded for POC - move to config/env in production
-        api_key = os.environ.get("GEMINI_API_KEY") or "AIzaSyD5KPJ77iwkDr-y_-fv97rADxFR0XJzzVE"
+        """Run an agentic tool-calling loop via the unified LLM provider."""
+        from ..engine.llm_provider import get_llm_provider, LLMMessage, LLMTool
 
-        base_url = "https://generativelanguage.googleapis.com/v1beta"
+        provider = get_llm_provider()
 
-        # Build contents array for conversation
-        contents: list[dict[str, Any]] = []
-        if task:
-            contents.append({"role": "user", "parts": [{"text": task}]})
+        # Convert tools to LLMTool format
+        llm_tools: list[LLMTool] = []
+        for t in tools:
+            llm_tools.append(LLMTool(
+                name=t["name"],
+                description=t["description"],
+                parameters=t.get("input_schema", {}),
+            ))
+
+        # Build initial messages
+        messages: list[LLMMessage] = []
+        if system_prompt:
+            messages.append(LLMMessage(role="system", content=system_prompt))
+        messages.append(LLMMessage(role="user", content=task))
 
         tool_calls_list: list[dict[str, Any]] = []
         iterations = 0
 
-        # Convert tools to Gemini format
-        gemini_tools = None
-        if tools:
-            function_declarations = []
-            for t in tools:
-                func_decl: dict[str, Any] = {
-                    "name": t["name"],
-                    "description": t["description"],
+        while iterations < max_iterations:
+            iterations += 1
+
+            response = await provider.chat(
+                model=model,
+                messages=messages,
+                tools=llm_tools if llm_tools else None,
+                temperature=temperature,
+                max_tokens=4096,
+            )
+
+            if response.tool_calls:
+                # Append assistant message with tool calls
+                messages.append(LLMMessage(
+                    role="assistant",
+                    content=response.content,
+                    tool_calls=response.tool_calls,
+                ))
+
+                # Execute each tool and append results
+                for tc in response.tool_calls:
+                    tool_calls_list.append({
+                        "tool": tc.name,
+                        "input": tc.arguments,
+                        "id": tc.id,
+                    })
+
+                    tool_result = self._execute_tool(tc.name, tc.arguments, tool_executors)
+                    result_str = json.dumps(tool_result) if not isinstance(tool_result, str) else tool_result
+
+                    messages.append(LLMMessage(
+                        role="tool",
+                        content=result_str,
+                        tool_call_id=tc.id,
+                    ))
+
+                # Continue loop for model to process tool results
+                continue
+            else:
+                # No tool calls — final text response
+                return {
+                    "response": response.content or "",
+                    "toolCalls": tool_calls_list,
+                    "iterations": iterations,
                 }
-                # Only add parameters if they have properties
-                if t.get("input_schema") and t["input_schema"].get("properties"):
-                    func_decl["parameters"] = t["input_schema"]
-                function_declarations.append(func_decl)
-            gemini_tools = [{"functionDeclarations": function_declarations}]
-
-        async with httpx.AsyncClient() as client:
-            while iterations < max_iterations:
-                iterations += 1
-
-                # Build request body
-                request_body: dict[str, Any] = {
-                    "contents": contents,
-                    "generationConfig": {
-                        "temperature": temperature,
-                        "maxOutputTokens": 4096,
-                    },
-                }
-
-                if system_prompt:
-                    request_body["systemInstruction"] = {
-                        "parts": [{"text": system_prompt}]
-                    }
-
-                if gemini_tools:
-                    request_body["tools"] = gemini_tools
-
-                # Make API request
-                response = await client.post(
-                    f"{base_url}/models/{model}:generateContent",
-                    params={"key": api_key},
-                    json=request_body,
-                    timeout=120.0,
-                )
-
-                if response.status_code != 200:
-                    error_detail = response.text
-                    raise RuntimeError(f"Gemini API error ({response.status_code}): {error_detail}")
-
-                result = response.json()
-
-                # Check for errors in response
-                if "error" in result:
-                    raise RuntimeError(f"Gemini API error: {result['error']}")
-
-                # Get the candidate response
-                candidates = result.get("candidates", [])
-                if not candidates:
-                    return {
-                        "response": "No response from model",
-                        "toolCalls": tool_calls_list,
-                        "iterations": iterations,
-                    }
-
-                candidate = candidates[0]
-                content = candidate.get("content", {})
-                parts = content.get("parts", [])
-                finish_reason = candidate.get("finishReason", "")
-
-                # Check for function calls
-                function_calls = [p for p in parts if "functionCall" in p]
-
-                if function_calls:
-                    # Add assistant response to conversation
-                    contents.append({"role": "model", "parts": parts})
-
-                    # Process each function call
-                    function_responses = []
-                    for part in function_calls:
-                        fc = part["functionCall"]
-                        tool_name = fc["name"]
-                        tool_args = fc.get("args", {})
-
-                        tool_calls_list.append({
-                            "tool": tool_name,
-                            "input": tool_args,
-                            "id": f"{tool_name}_{iterations}",
-                        })
-
-                        # Execute tool using custom executor or built-in
-                        tool_result = self._execute_tool(tool_name, tool_args, tool_executors)
-                        function_responses.append({
-                            "functionResponse": {
-                                "name": tool_name,
-                                "response": {"result": tool_result},
-                            }
-                        })
-
-                    # Add function responses to conversation
-                    contents.append({"role": "user", "parts": function_responses})
-                    # Continue loop to get model's response to tool results
-                    continue
-                else:
-                    # No function calls - extract text response and return
-                    text_parts = [p.get("text", "") for p in parts if "text" in p]
-                    final_text = "".join(text_parts)
-
-                    return {
-                        "response": final_text,
-                        "toolCalls": tool_calls_list,
-                        "iterations": iterations,
-                    }
 
         return {
             "response": "Agent reached maximum iterations",

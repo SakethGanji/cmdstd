@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import os
 from typing import Any, TYPE_CHECKING
-
-import httpx
 
 from .base import (
     BaseNode,
@@ -55,6 +52,9 @@ class LLMChatNode(BaseNode):
                     NodePropertyOption(name="Gemini 2.0 Flash", value="gemini-2.0-flash"),
                     NodePropertyOption(name="Gemini 1.5 Flash", value="gemini-1.5-flash"),
                     NodePropertyOption(name="Gemini 1.5 Pro", value="gemini-1.5-pro"),
+                    NodePropertyOption(name="GPT-4o", value="gpt-4o"),
+                    NodePropertyOption(name="GPT-4o Mini", value="gpt-4o-mini"),
+                    NodePropertyOption(name="Claude Sonnet", value="claude-sonnet-4-20250514"),
                 ],
             ),
             NodeProperty(
@@ -135,7 +135,7 @@ class LLMChatNode(BaseNode):
             if model == "mock":
                 result = self._mock_response(user_message)
             else:
-                result = await self._call_gemini(
+                result = await self._call_llm(
                     model=model,
                     system_prompt=system_prompt,
                     user_message=user_message,
@@ -201,7 +201,7 @@ class LLMChatNode(BaseNode):
             "usage": {"input_tokens": len(user_message.split()), "output_tokens": len(response.split())},
         }
 
-    async def _call_gemini(
+    async def _call_llm(
         self,
         model: str,
         system_prompt: str,
@@ -209,69 +209,28 @@ class LLMChatNode(BaseNode):
         temperature: float,
         max_tokens: int,
     ) -> dict[str, Any]:
-        """Call Google Gemini API."""
-        # Hardcoded for POC - move to config/env in production
-        api_key = os.environ.get("GEMINI_API_KEY") or ""
+        """Call LLM via the unified provider."""
+        from ..engine.llm_provider import get_llm_provider, LLMMessage
 
-        base_url = "https://generativelanguage.googleapis.com/v1beta"
+        provider = get_llm_provider()
 
-        # Build request body
-        request_body: dict[str, Any] = {
-            "contents": [
-                {"role": "user", "parts": [{"text": user_message}]}
-            ],
-            "generationConfig": {
-                "temperature": temperature,
-                "maxOutputTokens": max_tokens,
+        messages: list[LLMMessage] = []
+        if system_prompt:
+            messages.append(LLMMessage(role="system", content=system_prompt))
+        messages.append(LLMMessage(role="user", content=user_message))
+
+        response = await provider.chat(
+            model=model,
+            messages=messages,
+            temperature=temperature,
+            max_tokens=max_tokens,
+        )
+
+        return {
+            "response": response.content or "",
+            "model": model,
+            "usage": {
+                "input_tokens": response.usage.input_tokens,
+                "output_tokens": response.usage.output_tokens,
             },
         }
-
-        if system_prompt:
-            request_body["systemInstruction"] = {
-                "parts": [{"text": system_prompt}]
-            }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{base_url}/models/{model}:generateContent",
-                params={"key": api_key},
-                json=request_body,
-                timeout=120.0,
-            )
-
-            if response.status_code != 200:
-                error_detail = response.text
-                raise RuntimeError(f"Gemini API error ({response.status_code}): {error_detail}")
-
-            result = response.json()
-
-            # Check for errors in response
-            if "error" in result:
-                raise RuntimeError(f"Gemini API error: {result['error']}")
-
-            # Extract response text
-            candidates = result.get("candidates", [])
-            if not candidates:
-                return {
-                    "response": "",
-                    "model": model,
-                    "usage": {"input_tokens": 0, "output_tokens": 0},
-                }
-
-            candidate = candidates[0]
-            content = candidate.get("content", {})
-            parts = content.get("parts", [])
-            text_parts = [p.get("text", "") for p in parts if "text" in p]
-            response_text = "".join(text_parts)
-
-            # Extract usage metadata
-            usage_metadata = result.get("usageMetadata", {})
-
-            return {
-                "response": response_text,
-                "model": model,
-                "usage": {
-                    "input_tokens": usage_metadata.get("promptTokenCount", 0),
-                    "output_tokens": usage_metadata.get("candidatesTokenCount", 0),
-                },
-            }

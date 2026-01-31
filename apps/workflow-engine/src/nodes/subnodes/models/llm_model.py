@@ -1,4 +1,4 @@
-"""Gemini model subnode for AI agents."""
+"""LLM model subnode for AI agents."""
 
 from __future__ import annotations
 
@@ -15,14 +15,14 @@ if TYPE_CHECKING:
     from ....engine.types import NodeDefinition
 
 
-class GeminiModelNode(BaseSubnode):
-    """Gemini model configuration subnode."""
+class LLMModelNode(BaseSubnode):
+    """LLM model configuration subnode."""
 
     node_description = NodeTypeDescription(
-        name="GeminiModel",
-        display_name="Gemini",
-        description="Google Gemini model configuration",
-        icon="fa:google",
+        name="LLMModel",
+        display_name="LLM Model",
+        description="LLM model configuration",
+        icon="fa:microchip",
         group=["ai"],
         inputs=[],
         outputs=[],
@@ -36,6 +36,9 @@ class GeminiModelNode(BaseSubnode):
                     NodePropertyOption(name="Gemini 2.0 Flash", value="gemini-2.0-flash"),
                     NodePropertyOption(name="Gemini 1.5 Flash", value="gemini-1.5-flash"),
                     NodePropertyOption(name="Gemini 1.5 Pro", value="gemini-1.5-pro"),
+                    NodePropertyOption(name="GPT-4o", value="gpt-4o"),
+                    NodePropertyOption(name="GPT-4o Mini", value="gpt-4o-mini"),
+                    NodePropertyOption(name="Claude Sonnet", value="claude-sonnet-4-20250514"),
                 ],
             ),
             NodeProperty(
@@ -59,20 +62,9 @@ class GeminiModelNode(BaseSubnode):
     )
 
     def get_config(self, node_definition: NodeDefinition) -> dict[str, Any]:
-        """Return Gemini model configuration."""
-        import os
-
-        api_key = os.environ.get("GEMINI_API_KEY", "")
-        if not api_key:
-            raise ValueError(
-                "GEMINI_API_KEY environment variable is required. "
-                "Set it with: export GEMINI_API_KEY=your-api-key"
-            )
-
+        """Return LLM model configuration."""
         return {
-            "provider": "gemini",
             "model": self.get_parameter(node_definition, "model", "gemini-2.0-flash"),
             "temperature": self.get_parameter(node_definition, "temperature", 0.7),
             "maxTokens": self.get_parameter(node_definition, "maxTokens", 4096),
-            "apiKey": api_key,
         }

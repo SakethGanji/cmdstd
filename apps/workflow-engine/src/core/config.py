@@ -43,6 +43,7 @@ class Settings(BaseSettings):
     database_url: str | None = None
 
     # AI/LLM settings
+    gemini_api_key: str | None = None
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
 

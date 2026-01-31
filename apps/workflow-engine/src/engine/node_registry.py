@@ -252,7 +252,7 @@ def register_all_nodes() -> None:
 
     # Import subnode types
     from ..nodes.subnodes import (
-        GeminiModelNode,
+        LLMModelNode,
         SimpleMemoryNode,
         CalculatorToolNode,
         CurrentTimeToolNode,
@@ -300,7 +300,7 @@ def register_all_nodes() -> None:
         # UI
         ChatInputNode,
         # Subnodes
-        GeminiModelNode,
+        LLMModelNode,
         SimpleMemoryNode,
         CalculatorToolNode,
         CurrentTimeToolNode,

@@ -1,5 +1,5 @@
 """Model subnodes for AI agents."""
 
-from .gemini_model import GeminiModelNode
+from .llm_model import LLMModelNode
 
-__all__ = ["GeminiModelNode"]
+__all__ = ["LLMModelNode"]
