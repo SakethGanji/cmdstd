@@ -1,4 +1,9 @@
-"""Unified LLM provider backed by LiteLLM."""
+"""Unified LLM provider backed by LiteLLM.
+
+Supports:
+- Company internal proxy (OpenAI-compatible Vertex AI gateway)
+- Direct API keys for Gemini, OpenAI, Anthropic (development/personal use)
+"""
 
 from __future__ import annotations
 
@@ -11,7 +16,7 @@ import litellm
 
 
 # ---------------------------------------------------------------------------
-# Data classes
+# Data classes (unchanged — these are the public interface)
 # ---------------------------------------------------------------------------
 
 
@@ -78,7 +83,6 @@ class LLMMessage:
                 }
                 for tc in self.tool_calls
             ]
-            # OpenAI format: assistant messages with tool_calls may have null content
             if self.content is None:
                 msg["content"] = None
 
@@ -117,6 +121,52 @@ class LLMChunk:
 
 
 # ---------------------------------------------------------------------------
+# COIN token helper (placeholder — replace with your company's implementation)
+# ---------------------------------------------------------------------------
+
+
+def get_coin_token() -> str:
+    """Get authentication token for the company LLM proxy.
+
+    TODO: Replace this placeholder with your company's COIN token refresh logic.
+    For now reads from COIN_TOKEN env var.
+    """
+    token = os.environ.get("COIN_TOKEN", "")
+    if not token:
+        raise LLMProviderError(
+            "COIN_TOKEN environment variable not set. "
+            "Set it or implement get_coin_token() with your company's auth."
+        )
+    return token
+
+
+# ---------------------------------------------------------------------------
+# Model registry — maps model names to proxy routing info
+# ---------------------------------------------------------------------------
+
+# Models available through the company proxy with their Vertex AI regions
+COMPANY_MODELS: dict[str, dict[str, str]] = {
+    # Gemini models
+    "gemini-2.0-flash": {"region": "us-central1"},
+    "gemini-2.0-flash-001": {"region": "us-central1"},
+    "gemini-1.5-flash": {"region": "us-central1"},
+    "gemini-1.5-pro": {"region": "us-central1"},
+    # Meta LLaMA models
+    "meta/llama-4-maverick-17b-128e-instruct-maas": {"region": "us-east5"},
+    "meta/llama-4-scout-17b-16e-instruct-maas": {"region": "us-east5"},
+    "meta/llama-3.3-70b-instruct-maas": {"region": "us-central1"},
+    "meta/llama-3.1-405b-instruct-maas": {"region": "us-central1"},
+}
+
+# Default company proxy base URL template
+_DEFAULT_PROXY_TEMPLATE = (
+    "https://r2d2-c3p0-icg-msst-genaihub-178909.apps.namicg39023u"
+    ".ecs.dyn.nsroot.net/vertex/v1beta1/projects/{project}"
+    "/locations/{region}/endpoints/openapi"
+)
+
+
+# ---------------------------------------------------------------------------
 # Provider
 # ---------------------------------------------------------------------------
 
@@ -125,42 +175,108 @@ litellm.suppress_debug_info = True
 
 
 class LLMProvider:
-    """Unified LLM provider backed by LiteLLM."""
+    """Unified LLM provider.
+
+    Routing logic:
+    1. If the model is in COMPANY_MODELS → route through company proxy
+       (OpenAI-compatible endpoint with COIN auth)
+    2. Otherwise → route through LiteLLM's default providers
+       (uses GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY env vars)
+    """
 
     def __init__(self) -> None:
-        self._configure_api_keys()
+        self._configure()
 
-    def _configure_api_keys(self) -> None:
-        """Read keys from config.py settings + env fallback, set in env for LiteLLM."""
+    def _configure(self) -> None:
+        """Configure API keys and SSL for both company proxy and direct access."""
         from ..core.config import settings
 
+        # Company proxy SSL cert
+        ssl_cert = getattr(settings, "ssl_cert_file", None) or os.environ.get("SSL_CERT_FILE")
+        if ssl_cert:
+            os.environ["SSL_CERT_FILE"] = ssl_cert
+
+        # Direct-access API keys (for development / non-company models)
         key_map = {
             "GEMINI_API_KEY": getattr(settings, "gemini_api_key", None),
             "OPENAI_API_KEY": getattr(settings, "openai_api_key", None),
             "ANTHROPIC_API_KEY": getattr(settings, "anthropic_api_key", None),
         }
-
         for env_var, config_val in key_map.items():
             value = config_val or os.environ.get(env_var, "")
             if value:
                 os.environ[env_var] = value
 
+        # Store company proxy settings
+        self._proxy_base_url = getattr(settings, "llm_proxy_base_url", None)
+        self._proxy_project = getattr(settings, "llm_proxy_project", "prj-gen-ai-9571")
+
+    def _get_company_proxy_url(self, model: str) -> str | None:
+        """Get the company proxy URL for a model, or None if not a company model."""
+        model_info = COMPANY_MODELS.get(model)
+        if model_info is None:
+            return None
+
+        if self._proxy_base_url:
+            return self._proxy_base_url
+
+        return _DEFAULT_PROXY_TEMPLATE.format(
+            project=self._proxy_project,
+            region=model_info["region"],
+        )
+
+    def _build_kwargs(
+        self,
+        model: str,
+        messages: list[LLMMessage],
+        tools: list[LLMTool] | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        stream: bool = False,
+    ) -> dict[str, Any]:
+        """Build kwargs for litellm.acompletion, routing to company proxy or direct."""
+        litellm_messages = [m.to_litellm() for m in messages]
+
+        proxy_url = self._get_company_proxy_url(model)
+
+        if proxy_url:
+            # Route through company's OpenAI-compatible proxy
+            kwargs: dict[str, Any] = {
+                "model": f"openai/{model}",  # Tell LiteLLM to use OpenAI protocol
+                "messages": litellm_messages,
+                "api_base": proxy_url,
+                "api_key": get_coin_token(),
+            }
+        else:
+            # Route through LiteLLM's default provider resolution
+            kwargs = {
+                "model": self._normalize_for_litellm(model),
+                "messages": litellm_messages,
+            }
+
+        if tools:
+            kwargs["tools"] = [t.to_litellm() for t in tools]
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        if stream:
+            kwargs["stream"] = True
+
+        return kwargs
+
     @staticmethod
-    def normalize_model_name(model: str) -> str:
-        """Add LiteLLM provider prefixes for known model families.
+    def _normalize_for_litellm(model: str) -> str:
+        """Add LiteLLM provider prefixes for direct API access.
 
-        - gemini-* -> gemini/gemini-*
-        - claude-* -> anthropic/claude-*
-        - gpt-*   -> unchanged (OpenAI is default)
+        Only used for non-company models that go through LiteLLM's default routing.
         """
-        if model.startswith("gemini/") or model.startswith("anthropic/") or model.startswith("openai/"):
+        if model.startswith(("gemini/", "anthropic/", "openai/")):
             return model
-
         if model.startswith("gemini-"):
             return f"gemini/{model}"
         if model.startswith("claude-"):
             return f"anthropic/{model}"
-        # gpt-* and others pass through unchanged (LiteLLM default is OpenAI)
         return model
 
     async def chat(
@@ -171,20 +287,8 @@ class LLMProvider:
         temperature: float | None = None,
         max_tokens: int | None = None,
     ) -> LLMResponse:
-        """Non-streaming completion via litellm.acompletion()."""
-        litellm_model = self.normalize_model_name(model)
-        litellm_messages = [m.to_litellm() for m in messages]
-
-        kwargs: dict[str, Any] = {
-            "model": litellm_model,
-            "messages": litellm_messages,
-        }
-        if tools:
-            kwargs["tools"] = [t.to_litellm() for t in tools]
-        if temperature is not None:
-            kwargs["temperature"] = temperature
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
+        """Non-streaming completion."""
+        kwargs = self._build_kwargs(model, messages, tools, temperature, max_tokens)
 
         try:
             response = await litellm.acompletion(**kwargs)
@@ -202,27 +306,13 @@ class LLMProvider:
         max_tokens: int | None = None,
     ) -> AsyncIterator[LLMChunk]:
         """Streaming completion with tool-call delta accumulation."""
-        litellm_model = self.normalize_model_name(model)
-        litellm_messages = [m.to_litellm() for m in messages]
-
-        kwargs: dict[str, Any] = {
-            "model": litellm_model,
-            "messages": litellm_messages,
-            "stream": True,
-        }
-        if tools:
-            kwargs["tools"] = [t.to_litellm() for t in tools]
-        if temperature is not None:
-            kwargs["temperature"] = temperature
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
+        kwargs = self._build_kwargs(model, messages, tools, temperature, max_tokens, stream=True)
 
         try:
             response = await litellm.acompletion(**kwargs)
         except Exception as e:
             raise LLMProviderError(f"LLM API error: {e}") from e
 
-        # Accumulate tool call deltas
         tool_call_accum: dict[int, dict[str, Any]] = {}
 
         async for chunk in response:
@@ -278,7 +368,6 @@ class LLMProvider:
         content = choice.message.content
         finish_reason = choice.finish_reason
 
-        # Parse tool calls
         tool_calls = None
         raw_tc = getattr(choice.message, "tool_calls", None)
         if raw_tc:
@@ -292,7 +381,6 @@ class LLMProvider:
                     LLMToolCall(id=tc.id, name=tc.function.name, arguments=args)
                 )
 
-        # Parse usage
         usage = LLMUsage()
         raw_usage = getattr(response, "usage", None)
         if raw_usage:
