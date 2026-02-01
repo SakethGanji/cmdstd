@@ -242,7 +242,9 @@ def register_all_nodes() -> None:
         RespondToWebhookNode,
         SampleNode,
         SendEmailNode,
-        SQLiteNode,
+        PostgresNode,
+        Neo4jNode,
+        MongoDBNode,
         # AI
         LLMChatNode,
         AIAgentNode,
@@ -293,7 +295,9 @@ def register_all_nodes() -> None:
         RespondToWebhookNode,
         SampleNode,
         SendEmailNode,
-        SQLiteNode,
+        PostgresNode,
+        Neo4jNode,
+        MongoDBNode,
         # AI
         LLMChatNode,
         AIAgentNode,

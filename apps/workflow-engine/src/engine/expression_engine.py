@@ -299,6 +299,87 @@ class ExpressionEngine:
             return json.dumps(value)
         return str(value)
 
+    def resolve_json_template(self, json_string: str, context: ExpressionContext) -> Any:
+        """Resolve expressions inside a JSON string safely.
+
+        Instead of string-interpolating into JSON (which breaks on quotes,
+        nested objects, etc.), this method:
+        1. Finds all {{ expr }} placeholders
+        2. Temporarily replaces them with safe tokens
+        3. Parses the JSON
+        4. Walks the parsed structure and replaces tokens with resolved values
+
+        This ensures that expression results with quotes, arrays, objects, etc.
+        are inserted as proper typed values, not string-interpolated.
+        """
+        if not json_string or not isinstance(json_string, str):
+            return json_string
+
+        trimmed = json_string.strip()
+        if not trimmed:
+            return {}
+
+        # If the whole thing is a single expression, resolve directly
+        if trimmed.startswith("{{") and trimmed.endswith("}}"):
+            inner = trimmed[2:-2].strip()
+            if "{{" not in inner:
+                return self._evaluate(inner, context)
+
+        # Find all {{ expr }} in the string
+        pattern = r"\{\{(.+?)\}\}"
+        expressions: list[tuple[str, str]] = []  # (token, expr)
+        counter = 0
+
+        def tokenize(match: re.Match[str]) -> str:
+            nonlocal counter
+            expr = match.group(1).strip()
+            token = f"__EXPR_{counter}__"
+            expressions.append((token, expr))
+            counter += 1
+            return token
+
+        tokenized = re.sub(pattern, tokenize, trimmed)
+
+        # If no expressions found, just parse directly
+        if not expressions:
+            try:
+                return json.loads(trimmed)
+            except json.JSONDecodeError:
+                return trimmed
+
+        # Evaluate all expressions
+        resolved: dict[str, Any] = {}
+        for token, expr in expressions:
+            resolved[token] = self._evaluate(expr, context)
+
+        # Now replace tokens in the tokenized string with JSON-safe representations
+        # and parse the result
+        for token, value in resolved.items():
+            if isinstance(value, str):
+                # Replace the token (which may be inside quotes) with the escaped string
+                tokenized = tokenized.replace(f'"{token}"', json.dumps(value))
+                tokenized = tokenized.replace(token, json.dumps(value)[1:-1])
+            elif isinstance(value, bool):
+                tokenized = tokenized.replace(f'"{token}"', json.dumps(value))
+                tokenized = tokenized.replace(token, json.dumps(value))
+            elif isinstance(value, (int, float)):
+                tokenized = tokenized.replace(f'"{token}"', json.dumps(value))
+                tokenized = tokenized.replace(token, str(value))
+            elif isinstance(value, (dict, list)):
+                tokenized = tokenized.replace(f'"{token}"', json.dumps(value))
+                tokenized = tokenized.replace(token, json.dumps(value))
+            elif value is None:
+                tokenized = tokenized.replace(f'"{token}"', "null")
+                tokenized = tokenized.replace(token, "null")
+            else:
+                tokenized = tokenized.replace(token, str(value))
+
+        try:
+            return json.loads(tokenized)
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse resolved JSON template: %s", tokenized)
+            return tokenized
+
     @staticmethod
     def create_context(
         current_data: list[NodeData],
