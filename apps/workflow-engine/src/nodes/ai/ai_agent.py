@@ -777,7 +777,9 @@ class AIAgentNode(BaseNode):
                     tool_calls_list.append({
                         "tool": tc.name,
                         "input": tc.args,
+                        "output": tool_result,
                         "id": tc.id,
+                        "is_error": is_error,
                     })
 
                     self._emit_event(context, node_name, ExecutionEventType.AGENT_TOOL_CALL, {
