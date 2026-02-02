@@ -1,9 +1,11 @@
-"""AI/LLM nodes - large language model integrations."""
+"""AI/LLM nodes — language models and agents."""
 
-from ..llm_chat import LLMChatNode
-from ..ai_agent import AIAgentNode
+from .ai_agent import AIAgentNode
+from .chat_input import ChatInputNode
+from .llm_chat import LLMChatNode
 
 __all__ = [
-    "LLMChatNode",
     "AIAgentNode",
+    "ChatInputNode",
+    "LLMChatNode",
 ]

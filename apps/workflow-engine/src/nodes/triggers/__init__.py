@@ -1,13 +1,15 @@
-"""Trigger nodes - workflow entry points."""
+"""Trigger nodes — workflow entry points."""
 
-from ..start import StartNode
-from ..webhook import WebhookNode
-from ..cron import CronNode
-from ..error_trigger import ErrorTriggerNode
+from .cron import CronNode
+from .error_trigger import ErrorTriggerNode
+from .execute_workflow_trigger import ExecuteWorkflowTriggerNode
+from .start import StartNode
+from .webhook import WebhookNode
 
 __all__ = [
-    "StartNode",
-    "WebhookNode",
     "CronNode",
     "ErrorTriggerNode",
+    "ExecuteWorkflowTriggerNode",
+    "StartNode",
+    "WebhookNode",
 ]
