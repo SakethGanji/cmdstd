@@ -256,10 +256,14 @@ def register_all_nodes() -> None:
     from ..nodes.subnodes import (
         LLMModelNode,
         SimpleMemoryNode,
+        SQLiteMemoryNode,
         CalculatorToolNode,
         CurrentTimeToolNode,
         RandomNumberToolNode,
         TextToolNode,
+        HttpRequestToolNode,
+        CodeToolNode,
+        WorkflowToolNode,
     )
 
     # All node classes (regular nodes + subnodes)
@@ -306,10 +310,14 @@ def register_all_nodes() -> None:
         # Subnodes
         LLMModelNode,
         SimpleMemoryNode,
+        SQLiteMemoryNode,
         CalculatorToolNode,
         CurrentTimeToolNode,
         RandomNumberToolNode,
         TextToolNode,
+        HttpRequestToolNode,
+        CodeToolNode,
+        WorkflowToolNode,
     ]
 
     for node_class in all_node_classes:

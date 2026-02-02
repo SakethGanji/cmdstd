@@ -345,7 +345,10 @@ class WorkflowService:
             # Compute dynamic I/O based on node type and parameters
             io_data = self._node_service.compute_node_io(n.type, n.parameters or {})
 
-            enriched_nodes.append({
+            # Get subnode metadata from node registry
+            node_info = self._node_service._node_registry.get_node_type_info(n.type)
+
+            node_dict: dict[str, Any] = {
                 "name": n.name,
                 "type": n.type,
                 "parameters": n.parameters,
@@ -362,7 +365,16 @@ class WorkflowService:
                 "outputStrategy": io_data["outputStrategy"],
                 # Node group for styling
                 "group": io_data["group"],
-            })
+            }
+
+            # Add subnode metadata so frontend doesn't need to guess
+            if node_info:
+                node_dict["isSubnode"] = node_info.is_subnode
+                node_dict["subnodeType"] = node_info.subnode_type
+                if node_info.subnode_slots:
+                    node_dict["subnodeSlots"] = node_info.subnode_slots
+
+            enriched_nodes.append(node_dict)
 
         return {
             "name": workflow.name,
@@ -375,6 +387,8 @@ class WorkflowService:
                     "target_node": c.target_node,
                     "source_output": c.source_output,
                     "target_input": c.target_input,
+                    **({"connection_type": c.connection_type} if c.connection_type else {}),
+                    **({"slot_name": c.slot_name} if c.slot_name else {}),
                 }
                 for c in workflow.connections
             ],

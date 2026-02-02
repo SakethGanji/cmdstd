@@ -1,10 +1,11 @@
 import { memo, useState, useMemo, useRef, useEffect } from 'react';
 import { Handle, Position, type NodeProps } from 'reactflow';
 import { Plus, Play, MoreHorizontal, Check, X } from 'lucide-react';
+import { Popover, PopoverTrigger, PopoverContent } from '@/shared/components/ui/popover';
 import { useNodeCreatorStore } from '../../../stores/nodeCreatorStore';
 import { useNDVStore } from '../../../stores/ndvStore';
 import { useWorkflowStore } from '../../../stores/workflowStore';
-import type { WorkflowNodeData } from '../../../types/workflow';
+import type { WorkflowNodeData, SubnodeType } from '../../../types/workflow';
 import {
   getNodeGroupFromType,
   getNodeStyles,
@@ -14,6 +15,13 @@ import {
 } from '../../../lib/nodeStyles';
 import { getIconForNode } from '../../../lib/nodeIcons';
 import { isTriggerType } from '../../../lib/nodeConfig';
+
+// Colors for stacked subnode badges (gray tones matching node theme)
+const SUBNODE_BADGE_COLORS: Record<SubnodeType, { bg: string; border: string; text: string }> = {
+  tool: { bg: 'var(--subnode-tool-light)', border: 'var(--subnode-tool-border)', text: 'var(--subnode-tool)' },
+  memory: { bg: 'var(--subnode-memory-light)', border: 'var(--subnode-memory-border)', text: 'var(--subnode-memory)' },
+  model: { bg: 'var(--subnode-model-light)', border: 'var(--subnode-model-border)', text: 'var(--subnode-model)' },
+};
 
 // Status badge component for success/error states
 const StatusBadge = ({ status }: { status: 'success' | 'error' }) => {
@@ -44,6 +52,7 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   const executionData = useWorkflowStore((s) => s.executionData[id]);
   const draggedNodeType = useWorkflowStore((s) => s.draggedNodeType);
   const edges = useWorkflowStore((s) => s.edges);
+  const allNodes = useWorkflowStore((s) => s.nodes);
   const updateNodeData = useWorkflowStore((s) => s.updateNodeData);
 
   // Focus input when editing starts
@@ -260,18 +269,33 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     return !hasConnection;
   };
 
-  // Render bottom section for subnode slots (n8n style - inside node)
+  // Get connected subnodes for a given slot
+  const getSlotSubnodes = (slotName: string) => {
+    const subnodeEdges = edges.filter(
+      (e) => e.target === id && e.data?.isSubnodeEdge && (e.data as { slotName?: string }).slotName === slotName
+    );
+    return subnodeEdges.map((e) => {
+      const node = allNodes.find((n) => n.id === e.source);
+      if (!node) return null;
+      const nd = node.data as WorkflowNodeData;
+      return { id: node.id, label: nd.label, type: nd.subnodeType || 'tool' as SubnodeType, icon: nd.icon, nodeType: nd.type };
+    }).filter(Boolean) as { id: string; label: string; type: SubnodeType; icon?: string; nodeType: string }[];
+  };
+
+  // Render bottom section for subnode slots (stacked badge style)
   const renderSubnodeSlotSection = () => {
     const slots = data.subnodeSlots;
     if (!slots || slots.length === 0) return null;
 
     return (
       <>
-        {/* Handles and + buttons at bottom - one per slot */}
+        {/* Handles and stacked badges at bottom - one per slot */}
         {slots.map((slot, index) => {
           // Position evenly across the node width
           const slotPercent = (index + 0.5) / slots.length * 100;
           const canAdd = canSlotAcceptMore(slot.name, slot.multiple);
+          const connectedSubnodes = getSlotSubnodes(slot.name);
+          const badgeColors = SUBNODE_BADGE_COLORS[slot.slotType as SubnodeType] || SUBNODE_BADGE_COLORS.tool;
 
           return (
             <div key={`slot-group-${slot.name}`}>
@@ -287,6 +311,93 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
                 className="!h-1.5 !w-1.5 !border !bg-muted-foreground/50 !border-muted-foreground/50"
               />
 
+              {/* Stacked badge for connected subnodes */}
+              {connectedSubnodes.length > 0 && (
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      className="nodrag absolute flex items-center cursor-pointer transition-transform hover:scale-105"
+                      style={{
+                        bottom: '-28px',
+                        left: `${slotPercent}%`,
+                        transform: 'translateX(-50%)',
+                        pointerEvents: 'all',
+                      }}
+                      title={`${connectedSubnodes.length} ${slot.displayName}${connectedSubnodes.length > 1 ? 's' : ''}`}
+                    >
+                      {/* Render up to 3 overlapping circles with icons */}
+                      <div className="relative flex items-center" style={{ height: 22 }}>
+                        {connectedSubnodes.slice(0, 3).map((subnode, i) => {
+                          const SubnodeIcon = getIconForNode(subnode.icon, subnode.nodeType);
+                          return (
+                            <div
+                              key={subnode.id}
+                              className="flex items-center justify-center rounded-full border-2"
+                              style={{
+                                width: 20,
+                                height: 20,
+                                backgroundColor: badgeColors.bg,
+                                borderColor: badgeColors.border,
+                                color: badgeColors.text,
+                                marginLeft: i > 0 ? -8 : 0,
+                                zIndex: 3 - i,
+                                position: 'relative',
+                              }}
+                              title={subnode.label}
+                            >
+                              <SubnodeIcon size={10} />
+                            </div>
+                          );
+                        })}
+                        {/* +N badge if more than 3 */}
+                        {connectedSubnodes.length > 3 && (
+                          <div
+                            className="flex items-center justify-center rounded-full border text-[8px] font-bold bg-muted border-border text-muted-foreground"
+                            style={{
+                              width: 20,
+                              height: 20,
+                              marginLeft: -8,
+                              zIndex: 0,
+                              position: 'relative',
+                            }}
+                          >
+                            +{connectedSubnodes.length - 3}
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="bottom"
+                    align="center"
+                    className="w-48 p-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="text-xs font-semibold text-muted-foreground mb-1.5 px-1">
+                      {slot.displayName}s ({connectedSubnodes.length})
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                      {connectedSubnodes.map((subnode) => (
+                        <button
+                          key={subnode.id}
+                          className="nodrag flex items-center gap-2 px-2 py-1.5 rounded-md text-xs text-left hover:bg-accent transition-colors w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openNDV(subnode.id);
+                          }}
+                        >
+                          <div
+                            className="w-3 h-3 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: badgeColors.border }}
+                          />
+                          <span className="truncate">{subnode.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              )}
+
               {/* + button for this slot (only if can accept more) */}
               {canAdd && (
                 <button
@@ -301,9 +412,11 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
                     ${showActions ? 'opacity-100' : 'opacity-0'}
                   `}
                   style={{
-                    bottom: '-20px',
-                    left: `${slotPercent}%`,
-                    transform: 'translateX(-50%)',
+                    bottom: connectedSubnodes.length > 0 ? '-28px' : '-20px',
+                    left: connectedSubnodes.length > 0
+                      ? `calc(${slotPercent}% + ${Math.min(connectedSubnodes.length, 3) * 6 + 14}px)`
+                      : `${slotPercent}%`,
+                    transform: connectedSubnodes.length > 0 ? 'none' : 'translateX(-50%)',
                     pointerEvents: 'all',
                   }}
                   title={`Add ${slot.displayName}`}
@@ -321,6 +434,7 @@ function WorkflowNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
   return (
     <div
       className="relative flex flex-col items-center"
+      style={subnodeSlotCount > 0 ? { paddingBottom: 32 } : undefined}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >

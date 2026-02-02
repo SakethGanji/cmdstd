@@ -173,6 +173,11 @@ class ExecutionEventType(str, Enum):
     NODE_ERROR = "node:error"
     EXECUTION_COMPLETE = "execution:complete"
     EXECUTION_ERROR = "execution:error"
+    # Agent-specific events
+    AGENT_THINKING = "agent:thinking"
+    AGENT_TOOL_CALL = "agent:tool_call"
+    AGENT_TOOL_RESULT = "agent:tool_result"
+    AGENT_TOKEN = "agent:token"
 
 
 @dataclass

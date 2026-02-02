@@ -58,7 +58,7 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
     deleteNode: s.deleteNode,
     workflowId: s.workflowId,
   }));
-  const { openNDV } = useNDVStore();
+  const { openNDV, closeNDV } = useNDVStore();
   const { openForSubnode } = useNodeCreatorStore();
 
   // Webhook URL for Webhook nodes
@@ -299,7 +299,10 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
                             </div>
                             {canAddMore && (
                               <button
-                                onClick={() => openForSubnode(node.id, slot.name, slot.slotType as SubnodeType)}
+                                onClick={() => {
+                                  closeNDV();
+                                  openForSubnode(node.id, slot.name, slot.slotType as SubnodeType);
+                                }}
                                 className="flex items-center gap-1 px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground hover:bg-accent rounded transition-colors"
                               >
                                 <Plus size={12} />

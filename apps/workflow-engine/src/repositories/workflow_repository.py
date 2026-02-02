@@ -49,6 +49,8 @@ class WorkflowRepository:
                     "target_node": c.target_node,
                     "source_output": c.source_output,
                     "target_input": c.target_input,
+                    **({"connection_type": c.connection_type} if c.connection_type and c.connection_type != "normal" else {}),
+                    **({"slot_name": c.slot_name} if c.slot_name else {}),
                 }
                 for c in workflow.connections
             ],
@@ -117,6 +119,8 @@ class WorkflowRepository:
                     "target_node": c.target_node,
                     "source_output": c.source_output,
                     "target_input": c.target_input,
+                    **({"connection_type": c.connection_type} if c.connection_type and c.connection_type != "normal" else {}),
+                    **({"slot_name": c.slot_name} if c.slot_name else {}),
                 }
                 for c in workflow.connections
             ],
@@ -190,6 +194,8 @@ class WorkflowRepository:
                 target_node=c["target_node"],
                 source_output=c.get("source_output", "main"),
                 target_input=c.get("target_input", "main"),
+                connection_type=c.get("connection_type", "normal"),
+                slot_name=c.get("slot_name"),
             )
             for c in definition.get("connections", [])
         ]

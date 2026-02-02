@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, AsyncGenerator
 
 from ..core.config import settings
-from ..engine.llm_provider import get_llm_provider, LLMMessage
+from ..engine.llm_provider import call_llm
 from ..engine.node_registry import NodeRegistryClass
 from ..engine.types import (
     Connection,
@@ -210,21 +210,20 @@ class AIChatService:
         """
         try:
             shadow = ShadowWorkflow.from_workflow_context(request.workflow_context)
-            provider = get_llm_provider()
 
             messages = [
-                LLMMessage(role="system", content=self._build_system_prompt(shadow)),
-                LLMMessage(role="user", content=self._build_user_message(request)),
+                {"role": "system", "content": self._build_system_prompt(shadow)},
+                {"role": "user", "content": self._build_user_message(request)},
             ]
 
-            response = await provider.chat(
+            response = await call_llm(
                 model=AGENT_MODEL,
                 messages=messages,
                 temperature=0.4,
                 max_tokens=4096,
             )
 
-            text = response.content or ""
+            text = response.text or ""
             if text:
                 yield {
                     "event": "text",

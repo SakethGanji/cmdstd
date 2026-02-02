@@ -76,6 +76,8 @@ dmypy.json
 
 # Database
 *.db
+*.db-shm
+*.db-wal
 apps/workflow-engine/workflows.db
 
 # OS

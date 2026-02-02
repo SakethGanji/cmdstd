@@ -62,6 +62,7 @@ export interface WorkflowNodeData {
   providesToSlot?: string;              // Which slot this subnode provides to
   subnodeSlots?: SubnodeSlotDefinition[];  // Slots for subnodes (parent nodes only)
   nodeShape?: 'rectangular' | 'circular';  // Visual shape variant
+  stacked?: boolean;                         // True when subnode is visually stacked inside parent badge
 
   // Subworkflow embedding
   subworkflowId?: string;  // workflow ID being embedded (for ExecuteWorkflow nodes)

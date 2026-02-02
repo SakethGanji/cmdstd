@@ -210,16 +210,14 @@ class LLMChatNode(BaseNode):
         max_tokens: int,
     ) -> dict[str, Any]:
         """Call LLM via the unified provider."""
-        from ..engine.llm_provider import get_llm_provider, LLMMessage
+        from ..engine.llm_provider import call_llm
 
-        provider = get_llm_provider()
-
-        messages: list[LLMMessage] = []
+        messages: list[dict[str, str]] = []
         if system_prompt:
-            messages.append(LLMMessage(role="system", content=system_prompt))
-        messages.append(LLMMessage(role="user", content=user_message))
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": user_message})
 
-        response = await provider.chat(
+        response = await call_llm(
             model=model,
             messages=messages,
             temperature=temperature,
@@ -227,10 +225,6 @@ class LLMChatNode(BaseNode):
         )
 
         return {
-            "response": response.content or "",
+            "response": response.text or "",
             "model": model,
-            "usage": {
-                "input_tokens": response.usage.input_tokens,
-                "output_tokens": response.usage.output_tokens,
-            },
         }

@@ -105,11 +105,11 @@
   --node-flow-border: #8b5cf6;
   --node-flow-icon-bg: #ddd6fe;
 
-  /* AI: Rose/Pink gradient - intelligence */
-  --node-ai: #db2777;
-  --node-ai-light: #fce7f3;
-  --node-ai-border: #ec4899;
-  --node-ai-icon-bg: #fbcfe8;
+  /* AI: Neutral gray - intelligence */
+  --node-ai: #6b7280;
+  --node-ai-light: #f3f4f6;
+  --node-ai-border: #9ca3af;
+  --node-ai-icon-bg: #e5e7eb;
 
   /* Action: Emerald - execution */
   --node-action: #059669;
@@ -126,21 +126,21 @@
   /* Node handle */
   --node-handle: #a8a29e;
 
-  /* Subnode colors - Soft slate */
-  --subnode-model: #64748b;
-  --subnode-model-light: #f8fafc;
-  --subnode-model-border: #cbd5e1;
-  --subnode-model-icon-bg: #e2e8f0;
+  /* Subnode colors - Darker gray (distinct from AI parent) */
+  --subnode-model: #4b5563;
+  --subnode-model-light: #f0f0f0;
+  --subnode-model-border: #6b7280;
+  --subnode-model-icon-bg: #d1d5db;
 
-  --subnode-memory: #64748b;
-  --subnode-memory-light: #f8fafc;
-  --subnode-memory-border: #cbd5e1;
-  --subnode-memory-icon-bg: #e2e8f0;
+  --subnode-memory: #4b5563;
+  --subnode-memory-light: #f0f0f0;
+  --subnode-memory-border: #6b7280;
+  --subnode-memory-icon-bg: #d1d5db;
 
-  --subnode-tool: #64748b;
-  --subnode-tool-light: #f8fafc;
-  --subnode-tool-border: #cbd5e1;
-  --subnode-tool-icon-bg: #e2e8f0;
+  --subnode-tool: #4b5563;
+  --subnode-tool-light: #f0f0f0;
+  --subnode-tool-border: #6b7280;
+  --subnode-tool-icon-bg: #d1d5db;
 
   /* ═══════════════════════════════════════════════════════════════════════════
      TYPOGRAPHY
@@ -282,11 +282,11 @@
   --node-flow-border: #7a5fc7;
   --node-flow-icon-bg: #2a2242;
 
-  /* AI: Pink/Rose - SOLID background */
-  --node-ai: #f472b6;
-  --node-ai-light: #2a1825;
-  --node-ai-border: #b8558a;
-  --node-ai-icon-bg: #3a2035;
+  /* AI: Neutral gray - SOLID background */
+  --node-ai: #9ca3af;
+  --node-ai-light: #1f2124;
+  --node-ai-border: #6b7280;
+  --node-ai-icon-bg: #2a2d32;
 
   /* Action: Bright emerald - SOLID background */
   --node-action: #34d399;
@@ -303,21 +303,21 @@
   /* Node handle */
   --node-handle: #525252;
 
-  /* Subnodes - Neutral gray */
-  --subnode-model: #a3a3a3;
-  --subnode-model-light: #1f1f1f;
-  --subnode-model-border: #525252;
-  --subnode-model-icon-bg: #2a2a2a;
+  /* Subnodes - Darker gray (distinct from AI parent) */
+  --subnode-model: #d1d5db;
+  --subnode-model-light: #18191b;
+  --subnode-model-border: #4b5563;
+  --subnode-model-icon-bg: #1f2225;
 
-  --subnode-memory: #a3a3a3;
-  --subnode-memory-light: #1f1f1f;
-  --subnode-memory-border: #525252;
-  --subnode-memory-icon-bg: #2a2a2a;
+  --subnode-memory: #d1d5db;
+  --subnode-memory-light: #18191b;
+  --subnode-memory-border: #4b5563;
+  --subnode-memory-icon-bg: #1f2225;
 
-  --subnode-tool: #a3a3a3;
-  --subnode-tool-light: #1f1f1f;
-  --subnode-tool-border: #525252;
-  --subnode-tool-icon-bg: #2a2a2a;
+  --subnode-tool: #d1d5db;
+  --subnode-tool-light: #18191b;
+  --subnode-tool-border: #4b5563;
+  --subnode-tool-icon-bg: #1f2225;
 
   /* ═══════════════════════════════════════════════════════════════════════════
      SHADOWS - Dark Mode
@@ -679,12 +679,12 @@
   animation: badge-pop 0.3s ease-out forwards;
 }
 
-/* AI node shimmer effect - Pink/Rose gradient */
+/* AI node shimmer effect - Gray gradient */
 .node-ai-shimmer {
   background: linear-gradient(
     135deg,
     var(--node-ai-icon-bg) 0%,
-    rgba(236, 72, 153, 0.15) 50%,
+    rgba(107, 114, 128, 0.15) 50%,
     var(--node-ai-icon-bg) 100%
   );
   background-size: 200% 200%;
@@ -695,7 +695,7 @@
   background: linear-gradient(
     135deg,
     var(--node-ai-icon-bg) 0%,
-    rgba(244, 114, 182, 0.25) 50%,
+    rgba(156, 163, 175, 0.25) 50%,
     var(--node-ai-icon-bg) 100%
   );
   background-size: 200% 200%;

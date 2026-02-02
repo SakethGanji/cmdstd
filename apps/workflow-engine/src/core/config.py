@@ -47,6 +47,11 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     anthropic_api_key: str | None = None
 
+    # Company LLM proxy settings
+    llm_proxy_base_url: str | None = None
+    llm_proxy_project: str = "prj-gen-ai-9571"
+    ssl_cert_file: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

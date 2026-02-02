@@ -652,13 +652,20 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
     const subnodeX = slotCenterX - 24; // Subtract half subnode width (48px / 2)
     const subnodeY = parentNode.position.y + 130; // Below parent node
 
-    // Create subnode
+    // Generate unique name for the subnode (backend requires unique names)
+    const existingNames = nodes
+      .filter((n) => n.type === 'workflowNode' || n.type === 'subworkflowNode' || n.type === 'subnodeNode')
+      .map((n) => (n.data as WorkflowNodeData)?.name)
+      .filter(Boolean) as string[];
+    const uniqueName = generateNodeName(subnodeData.type, existingNames);
+
+    // Create subnode (marked as stacked so it's hidden and rendered as badge on parent)
     const newNode: Node = {
       id: `${subnodeData.type}-${Date.now()}`,
       type: 'subnodeNode',
       position: { x: subnodeX, y: subnodeY },
       data: {
-        name: subnodeData.type,
+        name: uniqueName,
         type: subnodeData.type,
         label: subnodeData.label,
         icon: subnodeData.icon || 'wrench',
@@ -666,6 +673,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
         subnodeType: subnodeData.subnodeType,
         nodeShape: 'circular',
         parameters: subnodeData.properties || {},
+        stacked: true,
       },
     };
 
@@ -836,11 +844,18 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => ({
   // Load workflow from API data
   loadWorkflow: (data) => {
     // Process nodes to compute dynamic outputs for nodes with outputStrategy
+    // and ensure all subnodes are marked as stacked
     const processedNodes = data.nodes.map((node) => {
       if ((node.type === 'workflowNode' || node.type === 'subworkflowNode') && node.data) {
         const nodeData = node.data as WorkflowNodeData;
         if (nodeData.outputStrategy) {
           return { ...node, data: computeDynamicOutputs(nodeData) };
+        }
+      }
+      if (node.type === 'subnodeNode' && node.data) {
+        const nodeData = node.data as WorkflowNodeData;
+        if (!nodeData.stacked) {
+          return { ...node, data: { ...nodeData, stacked: true } };
         }
       }
       return node;

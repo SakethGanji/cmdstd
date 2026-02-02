@@ -1,164 +1,87 @@
-"""Unified LLM provider backed by LiteLLM.
+"""Unified LLM provider using direct SDKs (google-genai, openai, anthropic).
 
-Supports:
-- Company internal proxy (OpenAI-compatible Vertex AI gateway)
-- Direct API keys for Gemini, OpenAI, Anthropic (development/personal use)
+Public API:
+    call_llm(model, messages, temperature, tools, **kwargs) -> LLMResponse
+
+Routing:
+  - gemini-*           -> google.genai  (Vertex AI or API key)
+  - meta/llama-*       -> openai SDK    (company OpenAI-compatible proxy)
+  - gpt-* / o1-* / o3  -> openai SDK    (direct OpenAI API)
+  - claude-*           -> anthropic SDK  (direct Anthropic API)
 """
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import json
 import os
+import uuid
 from dataclasses import dataclass, field
-from typing import Any, AsyncIterator
-
-import litellm
+from typing import Any, Callable, Dict, List, Optional
 
 
 # ---------------------------------------------------------------------------
-# Data classes (unchanged — these are the public interface)
+# Data Classes
 # ---------------------------------------------------------------------------
 
 
-class LLMProviderError(Exception):
-    """Custom exception for LLM provider errors."""
-
-
 @dataclass
-class LLMTool:
-    """OpenAI-standard tool definition."""
-
-    name: str
-    description: str
-    parameters: dict[str, Any] = field(default_factory=dict)
-
-    def to_litellm(self) -> dict[str, Any]:
-        """Convert to LiteLLM/OpenAI tool format."""
-        return {
-            "type": "function",
-            "function": {
-                "name": self.name,
-                "description": self.description,
-                "parameters": self.parameters or {"type": "object", "properties": {}},
-            },
-        }
-
-
-@dataclass
-class LLMToolCall:
-    """Parsed tool call from model response."""
+class ToolCall:
+    """Represents a tool call requested by the LLM."""
 
     id: str
     name: str
-    arguments: dict[str, Any]
-
-
-@dataclass
-class LLMMessage:
-    """Conversation message."""
-
-    role: str  # "system", "user", "assistant", "tool"
-    content: str | None = None
-    tool_calls: list[LLMToolCall] | None = None
-    tool_call_id: str | None = None
-
-    def to_litellm(self) -> dict[str, Any]:
-        """Convert to LiteLLM/OpenAI message format."""
-        msg: dict[str, Any] = {"role": self.role}
-
-        if self.content is not None:
-            msg["content"] = self.content
-
-        if self.tool_calls:
-            msg["tool_calls"] = [
-                {
-                    "id": tc.id,
-                    "type": "function",
-                    "function": {
-                        "name": tc.name,
-                        "arguments": json.dumps(tc.arguments)
-                        if isinstance(tc.arguments, dict)
-                        else tc.arguments,
-                    },
-                }
-                for tc in self.tool_calls
-            ]
-            if self.content is None:
-                msg["content"] = None
-
-        if self.tool_call_id is not None:
-            msg["tool_call_id"] = self.tool_call_id
-
-        return msg
-
-
-@dataclass
-class LLMUsage:
-    """Token usage counts."""
-
-    input_tokens: int = 0
-    output_tokens: int = 0
-    total_tokens: int = 0
+    args: Dict[str, Any]
 
 
 @dataclass
 class LLMResponse:
-    """Normalized non-streaming response."""
+    """Standardized response from call_llm."""
 
-    content: str | None = None
-    tool_calls: list[LLMToolCall] | None = None
-    usage: LLMUsage = field(default_factory=LLMUsage)
-    finish_reason: str | None = None
+    text: Optional[str] = None
+    tool_calls: List[ToolCall] = field(default_factory=list)
 
-
-@dataclass
-class LLMChunk:
-    """Streaming chunk."""
-
-    content: str | None = None
-    tool_calls: list[LLMToolCall] | None = None
-    finish_reason: str | None = None
-
-
-# ---------------------------------------------------------------------------
-# COIN token helper (placeholder — replace with your company's implementation)
-# ---------------------------------------------------------------------------
-
-
-def get_coin_token() -> str:
-    """Get authentication token for the company LLM proxy.
-
-    TODO: Replace this placeholder with your company's COIN token refresh logic.
-    For now reads from COIN_TOKEN env var.
-    """
-    token = os.environ.get("COIN_TOKEN", "")
-    if not token:
-        raise LLMProviderError(
-            "COIN_TOKEN environment variable not set. "
-            "Set it or implement get_coin_token() with your company's auth."
-        )
-    return token
+    def get_assistant_message(self) -> Dict:
+        """Return the model's response as an OpenAI-format message dict."""
+        if self.tool_calls:
+            return {
+                "role": "assistant",
+                "content": self.text,
+                "tool_calls": [
+                    {
+                        "id": tc.id,
+                        "type": "function",
+                        "function": {
+                            "name": tc.name,
+                            "arguments": json.dumps(tc.args),
+                        },
+                    }
+                    for tc in self.tool_calls
+                ],
+            }
+        return {"role": "assistant", "content": self.text}
 
 
 # ---------------------------------------------------------------------------
-# Model registry — maps model names to proxy routing info
+# Model & Configuration Registry
 # ---------------------------------------------------------------------------
 
-# Models available through the company proxy with their Vertex AI regions
-COMPANY_MODELS: dict[str, dict[str, str]] = {
-    # Gemini models
-    "gemini-2.0-flash": {"region": "us-central1"},
-    "gemini-2.0-flash-001": {"region": "us-central1"},
-    "gemini-1.5-flash": {"region": "us-central1"},
-    "gemini-1.5-pro": {"region": "us-central1"},
-    # Meta LLaMA models
-    "meta/llama-4-maverick-17b-128e-instruct-maas": {"region": "us-east5"},
-    "meta/llama-4-scout-17b-16e-instruct-maas": {"region": "us-east5"},
-    "meta/llama-3.3-70b-instruct-maas": {"region": "us-central1"},
-    "meta/llama-3.1-405b-instruct-maas": {"region": "us-central1"},
+GEMINI_MODELS: set[str] = {
+    "gemini-2.5-pro", "gemini-2.5-flash",
+    "gemini-2.0-flash", "gemini-2.0-flash-001",
+    "gemini-1.5-flash", "gemini-1.5-flash-latest",
+    "gemini-1.5-pro", "gemini-1.5-pro-latest",
+    "gemini-1.0-pro",
 }
 
-# Default company proxy base URL template
+LLAMA_MODELS: dict[str, str] = {
+    "meta/llama-4-maverick-17b-128e-instruct-maas": "us-east5",
+    "meta/llama-4-scout-17b-16e-instruct-maas": "us-east5",
+    "meta/llama-3.3-70b-instruct-maas": "us-central1",
+    "meta/llama-3.1-405b-instruct-maas": "us-central1",
+}
+
 _DEFAULT_PROXY_TEMPLATE = (
     "https://r2d2-c3p0-icg-msst-genaihub-178909.apps.namicg39023u"
     ".ecs.dyn.nsroot.net/vertex/v1beta1/projects/{project}"
@@ -167,247 +90,581 @@ _DEFAULT_PROXY_TEMPLATE = (
 
 
 # ---------------------------------------------------------------------------
-# Provider
+# Config helper
 # ---------------------------------------------------------------------------
 
-# Suppress LiteLLM's noisy logs
-litellm.suppress_debug_info = True
 
+def _get_env(key: str) -> str | None:
+    """Read a config value, checking WORKFLOW_ prefix first, then raw.
 
-class LLMProvider:
-    """Unified LLM provider.
-
-    Routing logic:
-    1. If the model is in COMPANY_MODELS → route through company proxy
-       (OpenAI-compatible endpoint with COIN auth)
-    2. Otherwise → route through LiteLLM's default providers
-       (uses GEMINI_API_KEY / OPENAI_API_KEY / ANTHROPIC_API_KEY env vars)
+    Falls back to pydantic-settings if available (loads from .env file).
     """
-
-    def __init__(self) -> None:
-        self._configure()
-
-    def _configure(self) -> None:
-        """Configure API keys and SSL for both company proxy and direct access."""
+    val = os.environ.get(f"WORKFLOW_{key}") or os.environ.get(key)
+    if val:
+        return val
+    # Fallback: try loading from pydantic-settings (reads .env)
+    try:
         from ..core.config import settings
+        attr = key.lower()  # e.g. GEMINI_API_KEY -> gemini_api_key
+        return getattr(settings, attr, None)
+    except Exception:
+        return None
 
-        # Company proxy SSL cert
-        ssl_cert = getattr(settings, "ssl_cert_file", None) or os.environ.get("SSL_CERT_FILE")
-        if ssl_cert:
-            os.environ["SSL_CERT_FILE"] = ssl_cert
 
-        # Direct-access API keys (for development / non-company models)
-        key_map = {
-            "GEMINI_API_KEY": getattr(settings, "gemini_api_key", None),
-            "OPENAI_API_KEY": getattr(settings, "openai_api_key", None),
-            "ANTHROPIC_API_KEY": getattr(settings, "anthropic_api_key", None),
-        }
-        for env_var, config_val in key_map.items():
-            value = config_val or os.environ.get(env_var, "")
-            if value:
-                os.environ[env_var] = value
+# ---------------------------------------------------------------------------
+# Lazy client singletons
+# ---------------------------------------------------------------------------
 
-        # Store company proxy settings
-        self._proxy_base_url = getattr(settings, "llm_proxy_base_url", None)
-        self._proxy_project = getattr(settings, "llm_proxy_project", "prj-gen-ai-9571")
+_clients: dict[str, Any] = {}
 
-    def _get_company_proxy_url(self, model: str) -> str | None:
-        """Get the company proxy URL for a model, or None if not a company model."""
-        model_info = COMPANY_MODELS.get(model)
-        if model_info is None:
-            return None
 
-        if self._proxy_base_url:
-            return self._proxy_base_url
+def _get_gemini_client() -> Any:
+    if "gemini" not in _clients:
+        from google import genai
 
-        return _DEFAULT_PROXY_TEMPLATE.format(
-            project=self._proxy_project,
-            region=model_info["region"],
-        )
-
-    def _build_kwargs(
-        self,
-        model: str,
-        messages: list[LLMMessage],
-        tools: list[LLMTool] | None = None,
-        temperature: float | None = None,
-        max_tokens: int | None = None,
-        stream: bool = False,
-    ) -> dict[str, Any]:
-        """Build kwargs for litellm.acompletion, routing to company proxy or direct."""
-        litellm_messages = [m.to_litellm() for m in messages]
-
-        proxy_url = self._get_company_proxy_url(model)
-
-        if proxy_url:
-            # Route through company's OpenAI-compatible proxy
-            kwargs: dict[str, Any] = {
-                "model": f"openai/{model}",  # Tell LiteLLM to use OpenAI protocol
-                "messages": litellm_messages,
-                "api_base": proxy_url,
-                "api_key": get_coin_token(),
-            }
+        api_key = _get_env("GEMINI_API_KEY")
+        if api_key:
+            _clients["gemini"] = genai.Client(api_key=api_key)
         else:
-            # Route through LiteLLM's default provider resolution
-            kwargs = {
-                "model": self._normalize_for_litellm(model),
-                "messages": litellm_messages,
-            }
+            project = os.environ.get(
+                "GOOGLE_CLOUD_PROJECT",
+                _get_env("LLM_PROXY_PROJECT") or "prj-gen-ai-9571",
+            )
+            location = os.environ.get("GOOGLE_CLOUD_LOCATION", "us-central1")
+            _clients["gemini"] = genai.Client(
+                vertexai=True, project=project, location=location,
+            )
+    return _clients["gemini"]
 
-        if tools:
-            kwargs["tools"] = [t.to_litellm() for t in tools]
-        if temperature is not None:
-            kwargs["temperature"] = temperature
-        if max_tokens is not None:
-            kwargs["max_tokens"] = max_tokens
-        if stream:
-            kwargs["stream"] = True
 
-        return kwargs
+def _reset_gemini_client() -> Any:
+    _clients.pop("gemini", None)
+    return _get_gemini_client()
 
-    @staticmethod
-    def _normalize_for_litellm(model: str) -> str:
-        """Add LiteLLM provider prefixes for direct API access.
 
-        Only used for non-company models that go through LiteLLM's default routing.
-        """
-        if model.startswith(("gemini/", "anthropic/", "openai/")):
-            return model
-        if model.startswith("gemini-"):
-            return f"gemini/{model}"
-        if model.startswith("claude-"):
-            return f"anthropic/{model}"
-        return model
+def _get_openai_client() -> Any:
+    if "openai" not in _clients:
+        from openai import AsyncOpenAI
 
-    async def chat(
-        self,
-        model: str,
-        messages: list[LLMMessage],
-        tools: list[LLMTool] | None = None,
-        temperature: float | None = None,
-        max_tokens: int | None = None,
-    ) -> LLMResponse:
-        """Non-streaming completion."""
-        kwargs = self._build_kwargs(model, messages, tools, temperature, max_tokens)
+        _clients["openai"] = AsyncOpenAI(api_key=_get_env("OPENAI_API_KEY"))
+    return _clients["openai"]
 
-        try:
-            response = await litellm.acompletion(**kwargs)
-        except Exception as e:
-            raise LLMProviderError(f"LLM API error: {e}") from e
 
-        return self._parse_response(response)
+def _get_anthropic_client() -> Any:
+    if "anthropic" not in _clients:
+        from anthropic import AsyncAnthropic
 
-    async def chat_stream(
-        self,
-        model: str,
-        messages: list[LLMMessage],
-        tools: list[LLMTool] | None = None,
-        temperature: float | None = None,
-        max_tokens: int | None = None,
-    ) -> AsyncIterator[LLMChunk]:
-        """Streaming completion with tool-call delta accumulation."""
-        kwargs = self._build_kwargs(model, messages, tools, temperature, max_tokens, stream=True)
+        _clients["anthropic"] = AsyncAnthropic(api_key=_get_env("ANTHROPIC_API_KEY"))
+    return _clients["anthropic"]
 
-        try:
-            response = await litellm.acompletion(**kwargs)
-        except Exception as e:
-            raise LLMProviderError(f"LLM API error: {e}") from e
 
-        tool_call_accum: dict[int, dict[str, Any]] = {}
+def _get_llama_client(model: str) -> Any:
+    key = f"llama:{model}"
+    if key not in _clients:
+        from openai import AsyncOpenAI
 
-        async for chunk in response:
-            delta = chunk.choices[0].delta if chunk.choices else None
-            if delta is None:
-                continue
+        region = LLAMA_MODELS[model]
+        base_url = _get_env("LLM_PROXY_BASE_URL") or _DEFAULT_PROXY_TEMPLATE.format(
+            project=_get_env("LLM_PROXY_PROJECT") or "prj-gen-ai-9571",
+            region=region,
+        )
+        token = os.environ.get("COIN_TOKEN", "")
+        _clients[key] = AsyncOpenAI(api_key=token, base_url=base_url)
+    return _clients[key]
 
-            finish_reason = chunk.choices[0].finish_reason
 
-            content = getattr(delta, "content", None)
-            tc_deltas = getattr(delta, "tool_calls", None)
+# ---------------------------------------------------------------------------
+# Tool schema extraction (supports both callables and dicts)
+# ---------------------------------------------------------------------------
 
-            if tc_deltas:
-                for tc_delta in tc_deltas:
-                    idx = tc_delta.index
-                    if idx not in tool_call_accum:
-                        tool_call_accum[idx] = {
-                            "id": tc_delta.id or "",
-                            "name": "",
-                            "arguments": "",
-                        }
-                    entry = tool_call_accum[idx]
-                    if tc_delta.id:
-                        entry["id"] = tc_delta.id
-                    if tc_delta.function:
-                        if tc_delta.function.name:
-                            entry["name"] += tc_delta.function.name
-                        if tc_delta.function.arguments:
-                            entry["arguments"] += tc_delta.function.arguments
 
-            if finish_reason == "tool_calls" and tool_call_accum:
-                parsed_calls = []
-                for _idx in sorted(tool_call_accum.keys()):
-                    entry = tool_call_accum[_idx]
-                    try:
-                        args = json.loads(entry["arguments"]) if entry["arguments"] else {}
-                    except json.JSONDecodeError:
-                        args = {}
-                    parsed_calls.append(
-                        LLMToolCall(id=entry["id"], name=entry["name"], arguments=args)
-                    )
-                yield LLMChunk(tool_calls=parsed_calls, finish_reason=finish_reason)
-                tool_call_accum.clear()
-            elif content or finish_reason:
-                yield LLMChunk(content=content, finish_reason=finish_reason)
+def _tool_to_schema(tool: Any) -> dict[str, Any]:
+    """Convert a tool (callable or dict) to {name, description, parameters}."""
+    if isinstance(tool, dict):
+        return {
+            "name": tool["name"],
+            "description": tool.get("description", ""),
+            "parameters": (
+                tool.get("parameters")
+                or tool.get("input_schema")
+                or {}
+            ),
+        }
+    if callable(tool):
+        return _function_to_schema(tool)
+    raise TypeError(f"Tool must be a callable or dict, got {type(tool)}")
 
-    def _parse_response(self, response: Any) -> LLMResponse:
-        """Normalize LiteLLM ModelResponse to LLMResponse."""
-        choice = response.choices[0] if response.choices else None
-        if choice is None:
-            return LLMResponse()
 
-        content = choice.message.content
-        finish_reason = choice.finish_reason
+def _function_to_schema(func: Callable) -> dict[str, Any]:
+    """Extract tool schema from a function's docstring and type hints."""
+    try:
+        from docstring_parser import parse as parse_docstring
+    except ImportError:
+        # Fallback when docstring_parser is not installed
+        return {
+            "name": func.__name__,
+            "description": (func.__doc__ or "").strip().split("\n")[0],
+            "parameters": {"type": "OBJECT", "properties": {}},
+        }
 
-        tool_calls = None
-        raw_tc = getattr(choice.message, "tool_calls", None)
-        if raw_tc:
-            tool_calls = []
-            for tc in raw_tc:
-                try:
-                    args = json.loads(tc.function.arguments) if tc.function.arguments else {}
-                except json.JSONDecodeError:
-                    args = {}
-                tool_calls.append(
-                    LLMToolCall(id=tc.id, name=tc.function.name, arguments=args)
-                )
+    docstring = parse_docstring(func.__doc__ or "")
+    type_map = {
+        "str": "STRING", "int": "INTEGER",
+        "float": "NUMBER", "bool": "BOOLEAN",
+    }
 
-        usage = LLMUsage()
-        raw_usage = getattr(response, "usage", None)
-        if raw_usage:
-            usage = LLMUsage(
-                input_tokens=getattr(raw_usage, "prompt_tokens", 0) or 0,
-                output_tokens=getattr(raw_usage, "completion_tokens", 0) or 0,
-                total_tokens=getattr(raw_usage, "total_tokens", 0) or 0,
+    properties: dict[str, Any] = {}
+    required: list[str] = []
+
+    sig = inspect.signature(func)
+    for param_name, param in sig.parameters.items():
+        if param.default is inspect.Parameter.empty:
+            required.append(param_name)
+
+    for param_info in docstring.params:
+        param_name = param_info.arg_name
+        param_type = "STRING"
+        if param_name in func.__annotations__:
+            type_name = (
+                str(func.__annotations__[param_name])
+                .split("[")[0].split(".")[0].split("|")[-1].lower()
+            )
+            param_type = type_map.get(type_name, "STRING")
+        properties[param_name] = {
+            "type": param_type,
+            "description": param_info.description or "",
+        }
+
+    return {
+        "name": func.__name__,
+        "description": docstring.short_description or "",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": properties,
+            "required": required,
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# Message conversion: dict messages -> Gemini Content objects
+# ---------------------------------------------------------------------------
+
+
+def _convert_messages_to_gemini_content(
+    messages: list[dict],
+) -> tuple[list[Any], str | None]:
+    from google.genai.types import Content, Part
+
+    system_instruction: str | None = None
+    contents: list[Content] = []
+
+    for msg in messages:
+        role = msg["role"]
+        content = msg.get("content") or ""
+
+        if role == "system":
+            system_instruction = content
+            continue
+
+        if role == "user":
+            contents.append(
+                Content(role="user", parts=[Part(text=content)])
             )
 
-        return LLMResponse(
-            content=content,
-            tool_calls=tool_calls,
-            usage=usage,
-            finish_reason=finish_reason,
+        elif role == "assistant":
+            if msg.get("tool_calls"):
+                parts = []
+                for tc in msg["tool_calls"]:
+                    fn = tc.get("function", {})
+                    args_raw = fn.get("arguments", "{}")
+                    try:
+                        args = (
+                            json.loads(args_raw)
+                            if isinstance(args_raw, str)
+                            else args_raw
+                        )
+                    except json.JSONDecodeError:
+                        args = {}
+                    parts.append(
+                        Part.from_function_call(name=fn.get("name"), args=args)
+                    )
+                contents.append(Content(role="model", parts=parts))
+            elif content:
+                contents.append(
+                    Content(role="model", parts=[Part(text=content)])
+                )
+
+        elif role == "tool":
+            try:
+                resp = json.loads(msg["content"]) if isinstance(msg.get("content"), str) else msg.get("content", {})
+                if not isinstance(resp, dict):
+                    resp = {"content": resp}
+            except (json.JSONDecodeError, TypeError):
+                resp = {"content": str(msg.get("content", ""))}
+
+            name = msg.get("name") or _find_tool_name(
+                messages, msg.get("tool_call_id"),
+            )
+            contents.append(Content(
+                role="user",
+                parts=[Part.from_function_response(name=name, response=resp)],
+            ))
+
+    return contents, system_instruction
+
+
+def _find_tool_name(messages: list[dict], tool_call_id: str | None) -> str:
+    """Look up the function name for a tool_call_id in the conversation."""
+    if not tool_call_id:
+        return "unknown"
+    for msg in messages:
+        for tc in msg.get("tool_calls") or []:
+            if tc.get("id") == tool_call_id:
+                return tc.get("function", {}).get("name", "unknown")
+    return "unknown"
+
+
+# ---------------------------------------------------------------------------
+# Message conversion: dict messages -> Anthropic format
+# ---------------------------------------------------------------------------
+
+
+def _convert_messages_to_anthropic(
+    messages: list[dict],
+) -> tuple[list[dict], str | None]:
+    system: str | None = None
+    result: list[dict] = []
+
+    for msg in messages:
+        role = msg["role"]
+
+        if role == "system":
+            system = msg.get("content")
+            continue
+
+        if role == "assistant":
+            if msg.get("tool_calls"):
+                content: list[dict] = []
+                if msg.get("content"):
+                    content.append({"type": "text", "text": msg["content"]})
+                for tc in msg["tool_calls"]:
+                    fn = tc.get("function", {})
+                    args_raw = fn.get("arguments", "{}")
+                    try:
+                        args = (
+                            json.loads(args_raw)
+                            if isinstance(args_raw, str)
+                            else args_raw
+                        )
+                    except json.JSONDecodeError:
+                        args = {}
+                    content.append({
+                        "type": "tool_use",
+                        "id": tc["id"],
+                        "name": fn["name"],
+                        "input": args,
+                    })
+                result.append({"role": "assistant", "content": content})
+            else:
+                result.append({
+                    "role": "assistant",
+                    "content": msg.get("content") or "",
+                })
+
+        elif role == "tool":
+            result.append({
+                "role": "user",
+                "content": [{
+                    "type": "tool_result",
+                    "tool_use_id": msg.get("tool_call_id", ""),
+                    "content": msg.get("content", ""),
+                }],
+            })
+
+        elif role == "user":
+            result.append({"role": "user", "content": msg.get("content") or ""})
+
+    return result, system
+
+
+# ---------------------------------------------------------------------------
+# Backend: Gemini (google.genai)
+# ---------------------------------------------------------------------------
+
+
+async def _call_gemini_vertex(
+    model: str,
+    messages: list[dict],
+    temperature: float = 0.2,
+    tools: Optional[list] = None,
+    **kwargs: Any,
+) -> LLMResponse:
+    from google.genai.types import GenerateContentConfig, FunctionDeclaration, Tool
+    from google.api_core import exceptions as google_exceptions
+
+    client = _get_gemini_client()
+    contents, system_instruction = _convert_messages_to_gemini_content(messages)
+
+    # Build tools — wrap in Tool(function_declarations=...)
+    gemini_tools = None
+    if tools:
+        declarations = []
+        for t in tools:
+            schema = _tool_to_schema(t)
+            declarations.append(FunctionDeclaration(
+                name=schema["name"],
+                description=schema["description"],
+                parameters=schema["parameters"] or {"type": "OBJECT", "properties": {}},
+            ))
+        gemini_tools = [Tool(function_declarations=declarations)]
+
+    config_kwargs: dict[str, Any] = {"temperature": temperature}
+    if gemini_tools:
+        config_kwargs["tools"] = gemini_tools
+    if system_instruction:
+        config_kwargs["system_instruction"] = system_instruction
+    if kwargs.get("max_tokens"):
+        config_kwargs["max_output_tokens"] = kwargs["max_tokens"]
+
+    rf = kwargs.get("response_format")
+    if rf and rf.get("type") == "json_object":
+        config_kwargs["response_mime_type"] = "application/json"
+        if "schema" in rf:
+            config_kwargs["response_schema"] = rf["schema"]
+
+    config = GenerateContentConfig(**config_kwargs)
+
+    def do_sync_call():
+        return client.models.generate_content(
+            model=model, contents=contents, config=config,
         )
 
+    try:
+        response = await asyncio.to_thread(do_sync_call)
+    except (google_exceptions.Unauthenticated, google_exceptions.PermissionDenied):
+        fresh_client = _reset_gemini_client()
+
+        def do_retry():
+            return fresh_client.models.generate_content(
+                model=model, contents=contents, config=config,
+            )
+
+        response = await asyncio.to_thread(do_retry)
+
+    return _parse_gemini_response(response)
+
+
+def _parse_gemini_response(response: Any) -> LLMResponse:
+    if not response.candidates:
+        return LLMResponse(text="[Model returned no candidates]")
+
+    candidate = response.candidates[0]
+    parts = candidate.content.parts if candidate.content else []
+    has_fc = any(getattr(p, "function_call", None) for p in parts)
+
+    if has_fc:
+        tool_calls = []
+        for part in parts:
+            fc = getattr(part, "function_call", None)
+            if fc:
+                tool_calls.append(ToolCall(
+                    id=str(uuid.uuid4()),
+                    name=fc.name,
+                    args=dict(fc.args) if fc.args else {},
+                ))
+        return LLMResponse(tool_calls=tool_calls)
+
+    text = None
+    try:
+        text = response.text
+    except (ValueError, AttributeError):
+        pass
+
+    if not text:
+        finish = getattr(candidate, "finish_reason", None)
+        text = "[Model returned an empty response]"
+        if finish and getattr(finish, "name", None) != "STOP":
+            text += f" Finish Reason: {finish.name}"
+
+    return LLMResponse(text=text)
+
 
 # ---------------------------------------------------------------------------
-# Singleton
+# Backend: OpenAI-compatible (OpenAI direct + Llama proxy)
 # ---------------------------------------------------------------------------
 
-_provider_instance: LLMProvider | None = None
+
+async def _call_openai_compat(
+    client: Any,
+    model: str,
+    messages: list[dict],
+    temperature: float = 0.2,
+    tools: Optional[list] = None,
+    **kwargs: Any,
+) -> LLMResponse:
+    api_tools = None
+    if tools:
+        api_tools = []
+        for t in tools:
+            schema = _tool_to_schema(t)
+            params = schema["parameters"] or {"type": "object", "properties": {}}
+            # Normalize type casing for OpenAI (OBJECT -> object)
+            if isinstance(params.get("type"), str):
+                params["type"] = params["type"].lower()
+            api_tools.append({
+                "type": "function",
+                "function": {
+                    "name": schema["name"],
+                    "description": schema["description"],
+                    "parameters": params,
+                },
+            })
+
+    completion_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "temperature": temperature,
+    }
+    if api_tools:
+        completion_kwargs["tools"] = api_tools
+        completion_kwargs["tool_choice"] = "auto"
+    if kwargs.get("max_tokens"):
+        completion_kwargs["max_tokens"] = kwargs["max_tokens"]
+    if kwargs.get("user"):
+        completion_kwargs["user"] = kwargs["user"]
+
+    rf = kwargs.get("response_format")
+    if rf and rf.get("type") == "json_object":
+        completion_kwargs["response_format"] = {"type": "json_object"}
+
+    completion = await client.chat.completions.create(**completion_kwargs)
+
+    resp = LLMResponse()
+    choice = completion.choices[0] if completion.choices else None
+    if not choice:
+        return resp
+
+    msg = choice.message
+    if msg.tool_calls:
+        for tc in msg.tool_calls:
+            try:
+                args = json.loads(tc.function.arguments) if tc.function.arguments else {}
+            except json.JSONDecodeError:
+                args = {}
+            resp.tool_calls.append(ToolCall(
+                id=tc.id, name=tc.function.name, args=args,
+            ))
+    else:
+        resp.text = msg.content
+
+    return resp
 
 
-def get_llm_provider() -> LLMProvider:
-    """Return shared LLMProvider instance."""
-    global _provider_instance
-    if _provider_instance is None:
-        _provider_instance = LLMProvider()
-    return _provider_instance
+# ---------------------------------------------------------------------------
+# Backend: Anthropic
+# ---------------------------------------------------------------------------
+
+
+async def _call_anthropic(
+    model: str,
+    messages: list[dict],
+    temperature: float = 0.2,
+    tools: Optional[list] = None,
+    **kwargs: Any,
+) -> LLMResponse:
+    client = _get_anthropic_client()
+    api_messages, system_prompt = _convert_messages_to_anthropic(messages)
+
+    api_tools = None
+    if tools:
+        api_tools = []
+        for t in tools:
+            schema = _tool_to_schema(t)
+            params = schema["parameters"] or {"type": "object", "properties": {}}
+            if isinstance(params.get("type"), str):
+                params["type"] = params["type"].lower()
+            api_tools.append({
+                "name": schema["name"],
+                "description": schema["description"],
+                "input_schema": params,
+            })
+
+    call_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": api_messages,
+        "max_tokens": kwargs.get("max_tokens") or 4096,
+    }
+    if system_prompt:
+        call_kwargs["system"] = system_prompt
+    if api_tools:
+        call_kwargs["tools"] = api_tools
+    if temperature is not None:
+        call_kwargs["temperature"] = temperature
+
+    response = await client.messages.create(**call_kwargs)
+
+    resp = LLMResponse()
+    text_parts: list[str] = []
+    for block in response.content:
+        if block.type == "text":
+            text_parts.append(block.text)
+        elif block.type == "tool_use":
+            resp.tool_calls.append(ToolCall(
+                id=block.id,
+                name=block.name,
+                args=block.input if isinstance(block.input, dict) else {},
+            ))
+    if text_parts:
+        resp.text = "\n".join(text_parts)
+
+    return resp
+
+
+# ---------------------------------------------------------------------------
+# Public API
+# ---------------------------------------------------------------------------
+
+
+async def call_llm(
+    model: str,
+    messages: list[dict],
+    temperature: float = 0.2,
+    tools: Optional[list] = None,
+    **kwargs: Any,
+) -> LLMResponse:
+    """Unified function to call an LLM with optional tool calling.
+
+    Args:
+        model: Model identifier (e.g. "gemini-2.0-flash", "gpt-4o").
+        messages: Conversation as OpenAI-format dicts.
+        temperature: Sampling temperature.
+        tools: List of tools — each can be a Python callable (schema
+               extracted from docstring) or a dict with name/description/parameters.
+        **kwargs: Extra options forwarded to the backend:
+            max_tokens (int), response_format (dict), user (str).
+
+    Returns:
+        LLMResponse with .text and/or .tool_calls populated.
+    """
+    if model in GEMINI_MODELS or model.startswith("gemini-"):
+        return await _call_gemini_vertex(
+            model, messages, temperature, tools=tools, **kwargs,
+        )
+
+    if model in LLAMA_MODELS:
+        return await _call_openai_compat(
+            _get_llama_client(model), model, messages, temperature,
+            tools=tools, **kwargs,
+        )
+
+    if model.startswith("claude-"):
+        return await _call_anthropic(
+            model, messages, temperature, tools=tools, **kwargs,
+        )
+
+    # Default: OpenAI (gpt-*, o1-*, o3-*, etc.)
+    return await _call_openai_compat(
+        _get_openai_client(), model, messages, temperature,
+        tools=tools, **kwargs,
+    )

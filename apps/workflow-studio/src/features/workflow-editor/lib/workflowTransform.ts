@@ -165,13 +165,19 @@ export function toBackendWorkflow(
     retryDelay: 1000,
   }));
 
-  // Transform edges to connections
+  // Transform edges to connections (deduplicate by source+target+handles)
+  const seenConnections = new Set<string>();
   const connections: BackendConnection[] = edges
     .filter((edge) => {
       // Include edges where both source and target are valid nodes
       const sourceName = idToName.get(edge.source);
       const targetName = idToName.get(edge.target);
-      return sourceName && targetName;
+      if (!sourceName || !targetName) return false;
+      // Deduplicate connections with same source/target/handles
+      const key = `${sourceName}::${edge.sourceHandle || ''}::${targetName}::${edge.targetHandle || ''}`;
+      if (seenConnections.has(key)) return false;
+      seenConnections.add(key);
+      return true;
     })
     .map((edge) => {
       const isSubnodeConnection = subnodeIds.has(edge.source);
@@ -253,6 +259,13 @@ interface ApiWorkflowDetail {
       // Subnode properties
       isSubnode?: boolean;
       subnodeType?: 'model' | 'memory' | 'tool';
+      subnodeSlots?: Array<{
+        name: string;
+        displayName: string;
+        slotType: 'model' | 'memory' | 'tool';
+        required: boolean;
+        multiple: boolean;
+      }>;
     }>;
     connections: Array<{
       source_node: string;
@@ -271,7 +284,8 @@ const SUBNODE_TYPE_PATTERNS: Array<{ pattern: RegExp; subnodeType: 'model' | 'me
   { pattern: /Model$/i, subnodeType: 'model' },
   { pattern: /^(Gemini|OpenAI|Anthropic|Claude)/i, subnodeType: 'model' },
   { pattern: /Memory$/i, subnodeType: 'memory' },
-  { pattern: /^(Simple|Buffer|Window)Memory/i, subnodeType: 'memory' },
+  { pattern: /^(Simple|Buffer|Window|SQLite)Memory/i, subnodeType: 'memory' },
+  { pattern: /Tool$/i, subnodeType: 'tool' },
   { pattern: /^(Calculator|CurrentTime|RandomNumber|Text)$/i, subnodeType: 'tool' },
 ];
 
@@ -419,6 +433,8 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
         outputStrategy: node.outputStrategy as WorkflowNodeData['outputStrategy'],
         // Node group for styling (normalized from backend array)
         group: normalizeNodeGroup(node.group),
+        // Subnode slots for parent nodes (e.g., AIAgent has chatModel, memory, tools)
+        ...(node.subnodeSlots ? { subnodeSlots: node.subnodeSlots } : {}),
       } as WorkflowNodeData,
     };
   });
@@ -432,16 +448,17 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
     const edgeId = `edge-${sanitizeId(conn.source_node)}-${sanitizeId(conn.source_output)}-${sanitizeId(conn.target_node)}-${sanitizeId(conn.target_input)}`;
 
     if (isSubnodeEdge) {
+      const slotName = conn.slot_name || conn.target_input;
       return {
         id: edgeId,
         source: conn.source_node,
         target: conn.target_node,
-        sourceHandle: conn.source_output,
-        targetHandle: conn.target_input,
+        sourceHandle: conn.source_output || 'config',
+        targetHandle: slotName,
         type: 'subnodeEdge',
         data: {
           isSubnodeEdge: true,
-          slotName: conn.slot_name || conn.target_input,
+          slotName,
           slotType: detectSubnodeType(
             api.definition.nodes.find((n) => n.name === conn.source_node)?.type || '',
             true
@@ -461,6 +478,54 @@ export function fromBackendWorkflow(api: ApiWorkflowDetail): {
       ...(conn.waypoints ? { data: { waypoints: conn.waypoints } } : {}),
     };
   });
+
+  // Auto-layout subnodes below their parent nodes and mark as stacked
+  // Group subnode edges by parent (target) and slot
+  const subnodeEdgesByParentSlot = new Map<string, Map<string, string[]>>();
+  for (const edge of edges) {
+    if (edge.type === 'subnodeEdge' && edge.data?.isSubnodeEdge) {
+      const parentId = edge.target;
+      const slotName = (edge.data as { slotName?: string }).slotName || edge.targetHandle || '';
+      if (!subnodeEdgesByParentSlot.has(parentId)) {
+        subnodeEdgesByParentSlot.set(parentId, new Map());
+      }
+      const slotMap = subnodeEdgesByParentSlot.get(parentId)!;
+      if (!slotMap.has(slotName)) {
+        slotMap.set(slotName, []);
+      }
+      slotMap.get(slotName)!.push(edge.source);
+    }
+  }
+
+  // Position each subnode below its parent slot and mark as stacked
+  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
+  for (const [parentId, slotMap] of subnodeEdgesByParentSlot) {
+    const parentNode = nodeMap.get(parentId);
+    if (!parentNode) continue;
+
+    const parentData = parentNode.data as WorkflowNodeData;
+    const slots = parentData.subnodeSlots || [];
+    const parentWidth = slots.length > 0 ? Math.max(180, slots.length * 55 + 20) : 64;
+
+    for (const [slotName, subnodeIds] of slotMap) {
+      const slotIndex = slots.findIndex((s) => s.name === slotName);
+      const slotCenterPercent = slots.length > 0 ? (slotIndex + 0.5) / slots.length : 0.5;
+      const slotCenterX = parentNode.position.x + parentWidth * slotCenterPercent;
+
+      subnodeIds.forEach((subnodeId, i) => {
+        const subnodeNode = nodeMap.get(subnodeId);
+        if (!subnodeNode) return;
+        // Offset multiple subnodes horizontally (~55px apart), centered on slot
+        const totalWidth = (subnodeIds.length - 1) * 55;
+        const offsetX = i * 55 - totalWidth / 2;
+        subnodeNode.position = {
+          x: slotCenterX + offsetX - 24,
+          y: parentNode.position.y + 130,
+        };
+        (subnodeNode.data as WorkflowNodeData).stacked = true;
+      });
+    }
+  }
 
   return {
     nodes,

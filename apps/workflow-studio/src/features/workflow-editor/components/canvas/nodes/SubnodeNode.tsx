@@ -50,6 +50,20 @@ function SubnodeNode({ id, data, selected }: NodeProps<WorkflowNodeData>) {
     openNDV(id);
   };
 
+  // When stacked, hide visually but keep in ReactFlow graph
+  if (data.stacked) {
+    return (
+      <div style={{ visibility: 'hidden', width: 0, height: 0, overflow: 'hidden' }}>
+        <Handle
+          type="source"
+          position={Position.Top}
+          id="config"
+          style={{ visibility: 'hidden' }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="relative flex flex-col items-center pt-1">
       {/* Circular node with consistent styling */}
