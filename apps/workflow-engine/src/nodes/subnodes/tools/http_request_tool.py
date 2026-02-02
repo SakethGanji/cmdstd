@@ -132,34 +132,40 @@ async def _execute_http_request(
 
     try:
         # Reuse the shared httpx client from context if available, otherwise create one
+        owned_client = False
         client = context.http_client
         if client is None:
             client = httpx.AsyncClient(timeout=30.0)
+            owned_client = True
 
-        kwargs: dict[str, Any] = {"headers": headers}
-        if body is not None and method in ("POST", "PUT", "PATCH"):
-            if isinstance(body, (dict, list)):
-                kwargs["json"] = body
+        try:
+            kwargs: dict[str, Any] = {"headers": headers}
+            if body is not None and method in ("POST", "PUT", "PATCH"):
+                if isinstance(body, (dict, list)):
+                    kwargs["json"] = body
+                else:
+                    kwargs["content"] = str(body)
+
+            response = await client.request(method, url, **kwargs)
+
+            # Parse response body
+            content_type = response.headers.get("content-type", "")
+            if "json" in content_type:
+                try:
+                    resp_body = response.json()
+                except Exception:
+                    resp_body = response.text
             else:
-                kwargs["content"] = str(body)
-
-        response = await client.request(method, url, **kwargs)
-
-        # Parse response body
-        content_type = response.headers.get("content-type", "")
-        if "json" in content_type:
-            try:
-                resp_body = response.json()
-            except Exception:
                 resp_body = response.text
-        else:
-            resp_body = response.text
 
-        return {
-            "status": response.status_code,
-            "headers": dict(response.headers),
-            "body": resp_body,
-        }
+            return {
+                "status": response.status_code,
+                "headers": dict(response.headers),
+                "body": resp_body,
+            }
+        finally:
+            if owned_client:
+                await client.aclose()
     except httpx.TimeoutException:
         return {"error": "Request timed out"}
     except Exception as e:

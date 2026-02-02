@@ -317,7 +317,7 @@ class AIAgentNode(BaseNode):
         # Get chat history as structured messages if memory is connected
         chat_history: list[dict[str, str]] = []
         if memory_config and "getHistory" in memory_config:
-            chat_history = memory_config["getHistory"]()
+            chat_history = await asyncio.to_thread(memory_config["getHistory"])
 
         for item in input_data if input_data else [NodeData(json={})]:
             # Build task with input data context
@@ -344,9 +344,9 @@ class AIAgentNode(BaseNode):
 
             # Save to memory if connected
             if memory_config and "addMessage" in memory_config:
-                memory_config["addMessage"]("user", task)
+                await asyncio.to_thread(memory_config["addMessage"], "user", task)
                 if result.get("response"):
-                    memory_config["addMessage"]("assistant", result["response"])
+                    await asyncio.to_thread(memory_config["addMessage"], "assistant", result["response"])
 
             results.append(NodeData(json=result))
 
