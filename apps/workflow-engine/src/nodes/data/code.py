@@ -177,6 +177,10 @@ External imports and file system access are limited.""",
             pass
 
         try:
+            # Unescape literal \n and \t that arrive from LLM tool-call JSON
+            if '\\n' in code:
+                code = code.replace('\\n', '\n').replace('\\t', '\t')
+
             # Wrap code in a function - properly indent each line
             code_lines = code.split('\n')
             indented_lines = []
