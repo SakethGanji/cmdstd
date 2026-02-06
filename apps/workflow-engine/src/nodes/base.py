@@ -130,7 +130,7 @@ class BaseNode(ABC):
         key: str,
         default: Any = None,
     ) -> Any:
-        """Get a parameter value from node definition."""
+        """Get a parameter value from node definition, with type coercion."""
         value = node_definition.parameters.get(key)
         if value is None:
             if default is None and self._is_required_parameter(key):
@@ -138,7 +138,7 @@ class BaseNode(ABC):
                     f'Missing required parameter "{key}" in node "{node_definition.name}"'
                 )
             return default
-        return value
+        return self._coerce_parameter(key, value)
 
     def _is_required_parameter(self, key: str) -> bool:
         """Check if a parameter is required."""
@@ -148,6 +148,22 @@ class BaseNode(ABC):
             if prop.name == key:
                 return prop.required
         return False
+
+    def _coerce_parameter(self, key: str, value: Any) -> Any:
+        """Coerce a parameter value to its expected type based on the schema."""
+        if self.node_description is None:
+            return value
+        prop = next((p for p in self.node_description.properties if p.name == key), None)
+        if prop is None:
+            return value
+        if prop.type == "number" and isinstance(value, str):
+            try:
+                return float(value) if "." in value else int(value)
+            except (ValueError, TypeError):
+                return value
+        if prop.type == "boolean" and isinstance(value, str):
+            return value.lower() in ("true", "1", "yes")
+        return value
 
     def output(self, data: list[NodeData]) -> NodeExecutionResult:
         """Helper to create single-output result."""

@@ -4,6 +4,7 @@ import {
   Info,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Loader2,
   Plus,
   Bot,
@@ -50,6 +51,7 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
     options: false,
   });
   const [copiedUrl, setCopiedUrl] = useState(false);
+  const [expandedSubnodes, setExpandedSubnodes] = useState<Record<string, boolean>>({});
   const { updateNodeData, edges, nodes, executionData, deleteNode, workflowId } = useWorkflowStore((s) => ({
     updateNodeData: s.updateNodeData,
     edges: s.edges,
@@ -58,7 +60,7 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
     deleteNode: s.deleteNode,
     workflowId: s.workflowId,
   }));
-  const { openNDV, closeNDV } = useNDVStore();
+  const { closeNDV } = useNDVStore();
   const { openForSubnode } = useNodeCreatorStore();
 
   // Webhook URL for Webhook nodes
@@ -314,32 +316,44 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
                           {/* Connected subnodes list */}
                           {slotSubnodes.length > 0 ? (
                             <div className="space-y-1.5 ml-5">
-                              {slotSubnodes.map((subnode) => (
-                                <div
-                                  key={subnode.id}
-                                  className="flex items-center justify-between rounded-md border border-border/50 bg-secondary/30 px-2.5 py-1.5 group"
-                                >
-                                  <button
-                                    onClick={() => openNDV(subnode.id)}
-                                    className="flex items-center gap-2 text-xs text-foreground hover:text-primary transition-colors"
-                                  >
+                              {slotSubnodes.map((subnode) => {
+                                const isExpanded = expandedSubnodes[subnode.id] || false;
+                                return (
+                                  <div key={subnode.id} className="space-y-0">
                                     <div
-                                      className="w-5 h-5 rounded-full flex items-center justify-center"
-                                      style={{ backgroundColor: `${slotColor}20`, color: slotColor }}
+                                      className="flex items-center justify-between rounded-md border border-border/50 bg-secondary/30 px-2.5 py-1.5 group"
                                     >
-                                      <SlotIcon size={10} />
+                                      <button
+                                        onClick={() => setExpandedSubnodes(prev => ({ ...prev, [subnode.id]: !prev[subnode.id] }))}
+                                        className="flex items-center gap-2 text-xs text-foreground hover:text-primary transition-colors"
+                                      >
+                                        {isExpanded ? (
+                                          <ChevronDown size={12} className="text-muted-foreground" />
+                                        ) : (
+                                          <ChevronRight size={12} className="text-muted-foreground" />
+                                        )}
+                                        <div
+                                          className="w-5 h-5 rounded-full flex items-center justify-center"
+                                          style={{ backgroundColor: `${slotColor}20`, color: slotColor }}
+                                        >
+                                          <SlotIcon size={10} />
+                                        </div>
+                                        <span>{subnode.data.label}</span>
+                                      </button>
+                                      <button
+                                        onClick={() => deleteNode(subnode.id)}
+                                        className="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                                        title="Remove subnode"
+                                      >
+                                        <X size={12} />
+                                      </button>
                                     </div>
-                                    <span>{subnode.data.label}</span>
-                                  </button>
-                                  <button
-                                    onClick={() => deleteNode(subnode.id)}
-                                    className="p-1 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
-                                    title="Remove subnode"
-                                  >
-                                    <X size={12} />
-                                  </button>
-                                </div>
-                              ))}
+                                    {isExpanded && (
+                                      <SubnodeInlineForm subnode={subnode} nodeTypes={nodeTypes} />
+                                    )}
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
                             <div className="ml-5 text-xs text-muted-foreground/60 italic">
@@ -497,6 +511,41 @@ export default function NodeSettings({ node }: NodeSettingsProps) {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// --- Inline subnode configuration form ---
+
+interface SubnodeInlineFormProps {
+  subnode: Node<WorkflowNodeData>;
+  nodeTypes: { type: string; properties: { name: string; displayName: string; type: string; default?: unknown; required?: boolean; description?: string; options?: { name: string; value: unknown }[] }[] }[] | undefined;
+}
+
+function SubnodeInlineForm({ subnode, nodeTypes }: SubnodeInlineFormProps) {
+  const { updateNodeData } = useWorkflowStore((s) => ({ updateNodeData: s.updateNodeData }));
+  const subnodeSchema = nodeTypes?.find((n) => n.type === subnode.data.type);
+
+  if (!subnodeSchema?.properties?.length) {
+    return (
+      <div className="ml-3 mt-1 rounded-md border border-border/40 bg-muted/20 px-3 py-2">
+        <p className="text-xs text-muted-foreground">No configurable parameters.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ml-3 mt-1 rounded-md border border-border/40 bg-muted/20 px-3 py-3">
+      <DynamicNodeForm
+        properties={subnodeSchema.properties as NodeProperty[]}
+        values={(subnode.data.parameters as Record<string, unknown>) || {}}
+        onChange={(key, value) => {
+          updateNodeData(subnode.id, {
+            parameters: { ...subnode.data.parameters, [key]: value },
+          });
+        }}
+        allValues={(subnode.data.parameters as Record<string, unknown>) || {}}
+      />
     </div>
   );
 }

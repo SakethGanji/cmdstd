@@ -375,7 +375,10 @@ function NumberField({
       <input
         type="number"
         value={value ?? (typeof property.default === 'number' ? property.default : '')}
-        onChange={(e) => onChange(parseFloat(e.target.value))}
+        onChange={(e) => {
+          const parsed = parseFloat(e.target.value);
+          onChange(isNaN(parsed) ? (typeof property.default === 'number' ? property.default : 0) : parsed);
+        }}
         min={min}
         max={max}
         step={step}

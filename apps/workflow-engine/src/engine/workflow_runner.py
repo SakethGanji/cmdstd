@@ -861,9 +861,33 @@ class WorkflowRunner:
                 )
                 continue
 
+            # Resolve expressions in subnode parameters before get_config
+            try:
+                expr_context = ExpressionEngine.create_context(
+                    [],  # subnodes don't have input data
+                    context.node_states,
+                    context.execution_id,
+                    0,
+                )
+                resolved_params = expression_engine.resolve(
+                    subnode_def.parameters, expr_context, skip_json=False
+                )
+                resolved_subnode_def = NodeDefinition(
+                    name=subnode_def.name,
+                    type=subnode_def.type,
+                    parameters=resolved_params,
+                    position=subnode_def.position,
+                    retry_on_fail=subnode_def.retry_on_fail,
+                    retry_delay=subnode_def.retry_delay,
+                    continue_on_fail=subnode_def.continue_on_fail,
+                )
+            except Exception as e:
+                logger.warning(f"Error resolving subnode '{conn.source_node}' parameters: {e}")
+                resolved_subnode_def = subnode_def
+
             # Get config from subnode
             try:
-                config = subnode_instance.get_config(subnode_def)
+                config = subnode_instance.get_config(resolved_subnode_def)
             except Exception as e:
                 logger.error(f"Error getting config from subnode '{conn.source_node}': {e}")
                 continue
